@@ -1,0 +1,405 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  CUSTOMER
+  ARTISAN
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  BANNED
+}
+
+enum VerifyStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum KycStatus {
+  NOT_SUBMITTED
+  PENDING
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+}
+
+enum BookingStatus {
+  REQUESTED
+  ACCEPTED
+  DECLINED
+  CANCELLED
+  COMPLETED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAYMENT_PENDING
+  PAID_HELD
+  PARTIALLY_RELEASED
+  RELEASED
+  REFUNDED
+  PARTIALLY_REFUNDED
+  FAILED
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED_REFUND
+  RESOLVED_RELEASE
+  RESOLVED_PARTIAL
+  CLOSED
+}
+
+enum LedgerEntryType {
+  CUSTOMER_PAYMENT
+  PLATFORM_FEE
+  PROVIDER_EARNING
+  PROVIDER_PAYOUT
+  CUSTOMER_REFUND
+  ADJUSTMENT
+}
+
+enum NotificationType {
+  BOOKING
+  PAYMENT
+  DISPUTE
+  MESSAGE
+  REVIEW
+  ADMIN
+}
+
+model User {
+  firebaseUid        String         @id @map("firebase_uid")
+  email              String?        @unique
+  phone              String?        @unique
+  role               Role?
+  status             UserStatus     @default(ACTIVE)
+  fcmToken           String?        @map("fcm_token")
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
+
+  artisanProfile     ArtisanProfile?
+  bookingsAsCustomer Booking[]      @relation("CustomerBookings")
+  reviewsWritten     Review[]       @relation("CustomerReviews")
+  conversationsAsCustomer Conversation[] @relation("CustomerConversations")
+  messagesSent       Message[]      @relation("SentMessages")
+  adminNotes         AdminNote[]    @relation("AdminNotes")
+  notifications      Notification[]
+
+  @@map("users")
+}
+
+model ArtisanProfile {
+  id                String            @id @default(uuid())
+  userId            String            @unique @map("user_id")
+  displayName       String            @map("display_name")
+  bio               String?
+  city              String
+  area              String?
+  lat               Float
+  lng               Float
+  verifyStatus      VerifyStatus      @default(PENDING) @map("verify_status")
+  verifiedAt        DateTime?         @map("verified_at")
+  avgRating         Float             @default(0) @map("avg_rating")
+  ratingCount       Int               @default(0) @map("rating_count")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  user              User              @relation(fields: [userId], references: [firebaseUid])
+  offerings         Offering[]
+  availabilitySlots AvailabilitySlot[]
+  portfolioImages   PortfolioImage[]
+  bookingsReceived  Booking[]         @relation("ArtisanBookings")
+  reviewsReceived   Review[]          @relation("ArtisanReviews")
+  conversations      Conversation[]
+  payoutAccount      ProviderPayoutAccount?
+  kycSubmission      ArtisanKycSubmission?
+
+  @@map("artisan_profiles")
+}
+
+model Category {
+  id        String     @id @default(uuid())
+  name      String     @unique
+  slug      String     @unique
+  iconKey   String     @map("icon_key")
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  offerings Offering[]
+
+  @@map("categories")
+}
+
+model Offering {
+  id          String         @id @default(uuid())
+  artisanId   String         @map("artisan_id")
+  categoryId  String         @map("category_id")
+  title       String
+  description String?
+  priceFrom   Int            @map("price_from")
+  priceTo     Int?           @map("price_to")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  artisan     ArtisanProfile @relation(fields: [artisanId], references: [id])
+  category    Category       @relation(fields: [categoryId], references: [id])
+  bookings    Booking[]
+
+  @@map("offerings")
+}
+
+model AvailabilitySlot {
+  id        String         @id @default(uuid())
+  artisanId String         @map("artisan_id")
+  dayOfWeek Int            @map("day_of_week")
+  startTime String         @map("start_time")
+  endTime   String         @map("end_time")
+  isActive  Boolean        @default(true) @map("is_active")
+
+  artisan   ArtisanProfile @relation(fields: [artisanId], references: [id])
+
+  @@map("availability_slots")
+}
+
+model PortfolioImage {
+  id           String         @id @default(uuid())
+  artisanId    String         @map("artisan_id")
+  cloudinaryId String         @map("cloudinary_id")
+  url          String
+  displayOrder Int            @default(0) @map("display_order")
+  createdAt    DateTime       @default(now()) @map("created_at")
+
+  artisan      ArtisanProfile @relation(fields: [artisanId], references: [id])
+
+  @@map("portfolio_images")
+}
+
+model Booking {
+  id           String         @id @default(uuid())
+  customerId   String         @map("customer_id")
+  artisanId    String         @map("artisan_id")
+  offeringId   String         @map("offering_id")
+  status       BookingStatus  @default(REQUESTED)
+  scheduledAt  DateTime?      @map("scheduled_at")
+  note         String?
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  customerUser User           @relation("CustomerBookings", fields: [customerId], references: [firebaseUid])
+  artisan      ArtisanProfile @relation("ArtisanBookings", fields: [artisanId], references: [id])
+  offering     Offering       @relation(fields: [offeringId], references: [id])
+  review       Review?
+  payment      Payment?
+  payouts      Payout[]
+  disputes     Dispute[]
+  ledgerEntries LedgerEntry[]
+
+  @@map("bookings")
+}
+
+model Payment {
+  id                  String        @id @default(uuid())
+  bookingId           String        @unique @map("booking_id")
+  customerId          String        @map("customer_id")
+  artisanId           String        @map("artisan_id")
+  amount              Int
+  platformFee         Int           @map("platform_fee")
+  providerEarning     Int           @map("provider_earning")
+  currency            String        @default("NGN")
+  status              PaymentStatus @default(UNPAID)
+  paystackReference   String        @unique @map("paystack_reference")
+  paystackAccessCode  String?       @map("paystack_access_code")
+  authorizationUrl    String?       @map("authorization_url")
+  paidAt              DateTime?     @map("paid_at")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  booking             Booking       @relation(fields: [bookingId], references: [id])
+  payouts             Payout[]
+  ledgerEntries       LedgerEntry[]
+
+  @@map("payments")
+}
+
+model ProviderPayoutAccount {
+  id                    String         @id @default(uuid())
+  artisanId              String         @unique @map("artisan_id")
+  bankCode               String         @map("bank_code")
+  bankName               String?        @map("bank_name")
+  accountNumber          String         @map("account_number")
+  accountName            String?        @map("account_name")
+  paystackRecipientCode  String         @unique @map("paystack_recipient_code")
+  isVerified             Boolean        @default(false) @map("is_verified")
+  createdAt              DateTime       @default(now()) @map("created_at")
+  updatedAt              DateTime       @updatedAt @map("updated_at")
+
+  artisan                ArtisanProfile @relation(fields: [artisanId], references: [id])
+
+  @@map("provider_payout_accounts")
+}
+
+model Payout {
+  id                   String       @id @default(uuid())
+  bookingId             String       @map("booking_id")
+  paymentId             String       @map("payment_id")
+  artisanId             String       @map("artisan_id")
+  amount                Int
+  status                PayoutStatus @default(PENDING)
+  paystackTransferCode  String?      @map("paystack_transfer_code")
+  paystackReference     String?      @unique @map("paystack_reference")
+  reason                String?
+  sentAt                DateTime?    @map("sent_at")
+  createdAt             DateTime     @default(now()) @map("created_at")
+  updatedAt             DateTime     @updatedAt @map("updated_at")
+
+  booking               Booking      @relation(fields: [bookingId], references: [id])
+  payment               Payment      @relation(fields: [paymentId], references: [id])
+
+  @@map("payouts")
+}
+
+model Dispute {
+  id          String        @id @default(uuid())
+  bookingId   String        @map("booking_id")
+  raisedById  String        @map("raised_by_id")
+  reason      String
+  status      DisputeStatus @default(OPEN)
+  resolution  String?
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  booking     Booking       @relation(fields: [bookingId], references: [id])
+
+  @@map("disputes")
+}
+
+model LedgerEntry {
+  id        String          @id @default(uuid())
+  bookingId String          @map("booking_id")
+  paymentId String?         @map("payment_id")
+  type      LedgerEntryType
+  amount    Int
+  currency  String          @default("NGN")
+  note      String?
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  booking   Booking         @relation(fields: [bookingId], references: [id])
+  payment   Payment?        @relation(fields: [paymentId], references: [id])
+
+  @@map("ledger_entries")
+}
+
+model Review {
+  id         String         @id @default(uuid())
+  bookingId  String         @unique @map("booking_id")
+  customerId String         @map("customer_id")
+  artisanId  String         @map("artisan_id")
+  rating     Int
+  comment    String?
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  booking    Booking        @relation(fields: [bookingId], references: [id])
+  customer   User           @relation("CustomerReviews", fields: [customerId], references: [firebaseUid])
+  artisan    ArtisanProfile @relation("ArtisanReviews", fields: [artisanId], references: [id])
+
+  @@map("reviews")
+}
+
+model Notification {
+  id         String           @id @default(uuid())
+  userId     String           @map("user_id")
+  type       NotificationType
+  title      String
+  body       String
+  link       String?
+  readAt     DateTime?        @map("read_at")
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  user       User             @relation(fields: [userId], references: [firebaseUid])
+
+  @@map("notifications")
+}
+
+model ArtisanKycSubmission {
+  id               String         @id @default(uuid())
+  artisanId        String         @unique @map("artisan_id")
+  status           KycStatus      @default(PENDING)
+  legalName        String         @map("legal_name")
+  documentType     String         @map("document_type")
+  documentNumber   String         @map("document_number")
+  documentImageUrl String         @map("document_image_url")
+  selfieImageUrl   String?        @map("selfie_image_url")
+  address          String
+  city             String
+  reviewNote       String?        @map("review_note")
+  submittedAt      DateTime       @default(now()) @map("submitted_at")
+  reviewedAt       DateTime?      @map("reviewed_at")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  artisan          ArtisanProfile @relation(fields: [artisanId], references: [id])
+
+  @@map("artisan_kyc_submissions")
+}
+
+model Conversation {
+  id          String         @id @default(uuid())
+  customerId  String         @map("customer_id")
+  artisanId   String         @map("artisan_id")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  customer    User           @relation("CustomerConversations", fields: [customerId], references: [firebaseUid])
+  artisan     ArtisanProfile @relation(fields: [artisanId], references: [id])
+  messages    Message[]
+  adminNotes  AdminNote[]
+
+  @@unique([customerId, artisanId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String       @map("conversation_id")
+  senderId       String       @map("sender_id")
+  body           String
+  readAt         DateTime?    @map("read_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  sender         User         @relation("SentMessages", fields: [senderId], references: [firebaseUid])
+
+  @@map("messages")
+}
+
+model AdminNote {
+  id             String       @id @default(uuid())
+  conversationId String       @map("conversation_id")
+  adminId        String       @map("admin_id")
+  body           String
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  admin          User         @relation("AdminNotes", fields: [adminId], references: [firebaseUid])
+
+  @@map("admin_notes")
+}
