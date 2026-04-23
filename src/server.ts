@@ -1,4 +1,5 @@
 import express, { Request, Response } from 'express';
+import crypto from 'node:crypto';
 import cors from 'cors';
 import { env } from './config/env';
 import { verifyFirebaseToken } from './middlewares/verifyFirebaseToken';
@@ -12,6 +13,8 @@ import offeringRoutes from './modules/offerings/offerings.routes';
 import paymentRoutes from './modules/payments/payments.routes';
 import reviewRoutes from './modules/reviews/reviews.routes';
 import userRoutes from './modules/users/users.routes';
+import logger from './utils/logger';
+import db from './db/client';
 
 const app = express();
 const allowedOrigins = env.CORS_ORIGIN.split(',')
@@ -38,6 +41,54 @@ app.use(
     },
   })
 );
+
+app.use((req, res, next) => {
+  const requestId = crypto.randomUUID();
+  const startedAt = Date.now();
+
+  (req as any).requestId = requestId;
+  res.setHeader('X-Request-Id', requestId);
+
+  res.on('finish', () => {
+    logger.info(
+      {
+        requestId,
+        method: req.method,
+        path: req.originalUrl,
+        statusCode: res.statusCode,
+        durationMs: Date.now() - startedAt,
+      },
+      'HTTP request completed'
+    );
+  });
+
+  next();
+});
+
+app.get('/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'bundo-api',
+    timestamp: new Date().toISOString(),
+    environment: env.NODE_ENV,
+  });
+});
+
+app.get('/ready', async (_req, res) => {
+  try {
+    await db.$queryRaw`SELECT 1`;
+    res.json({
+      status: 'ready',
+      service: 'bundo-api',
+      timestamp: new Date().toISOString(),
+    });
+  } catch {
+    res.status(503).json({
+      status: 'not_ready',
+      service: 'bundo-api',
+    });
+  }
+});
 
 app.get('/protected', verifyFirebaseToken, (req: Request, res: Response) => {
   res.json({
@@ -71,10 +122,17 @@ app.use(
     res: Response,
     _next: express.NextFunction
   ) => {
-    console.error(error);
+    logger.error(
+      {
+        error,
+        requestId: (res.req as any)?.requestId,
+      },
+      'Unhandled request error'
+    );
 
     return res.status(500).json({
       message: 'Internal server error',
+      requestId: (res.req as any)?.requestId,
     });
   }
 );
@@ -82,7 +140,7 @@ app.use(
 const PORT = env.PORT;
 
 const server = app.listen(Number(PORT), () => {
-  console.log(`Server running on port ${PORT}`);
+  logger.info({ port: PORT }, 'Server running');
 });
 
 server.ref();

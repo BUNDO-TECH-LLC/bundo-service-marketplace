@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { UserStatus } from '@prisma/client';
 import admin from '../config/firebase';
 import { findOrCreateUser } from '../modules/users/users.service';
+import logger from '../utils/logger';
 
 export const verifyFirebaseToken = async (
   req: Request,
@@ -15,11 +16,16 @@ export const verifyFirebaseToken = async (
   }
 
   const token = authHeader.split(' ')[1];
+  let decoded;
 
   try {
-    const decoded = await admin.auth().verifyIdToken(token);
+    decoded = await admin.auth().verifyIdToken(token);
+  } catch (error) {
+    logger.warn({ error }, 'Firebase token verification failed');
+    return res.status(401).json({ message: 'Invalid token' });
+  }
 
-    // 🔥 Sync user with DB
+  try {
     const user = await findOrCreateUser(decoded);
 
     if (user.status === UserStatus.BANNED) {
@@ -30,6 +36,7 @@ export const verifyFirebaseToken = async (
 
     next();
   } catch (error) {
-    return res.status(401).json({ message: 'Invalid token' });
+    logger.error({ error, firebaseUid: decoded.uid }, 'Failed to sync authenticated user');
+    return res.status(500).json({ message: 'Could not finish account sync' });
   }
 };

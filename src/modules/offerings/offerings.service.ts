@@ -30,7 +30,80 @@ type OfferingFilters = {
   q?: string;
   minPrice?: number;
   maxPrice?: number;
+  sort?: 'newest' | 'price_low' | 'price_high' | 'rating';
 };
+
+function buildOfferingWhere(filters: OfferingFilters = {}): Prisma.OfferingWhereInput {
+  const where: Prisma.OfferingWhereInput = {
+    artisan: { verifyStatus: VerifyStatus.APPROVED },
+  };
+
+  if (filters.artisanId) {
+    where.artisanId = filters.artisanId;
+  }
+
+  if (filters.categoryId) {
+    where.categoryId = filters.categoryId;
+  }
+
+  if (filters.city) {
+    where.artisan = {
+      verifyStatus: VerifyStatus.APPROVED,
+      city: { equals: filters.city, mode: 'insensitive' },
+    };
+  }
+
+  if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
+    where.priceFrom = {
+      gte: filters.minPrice,
+      lte: filters.maxPrice,
+    };
+  }
+
+  if (filters.q) {
+    where.OR = [
+      { title: { contains: filters.q, mode: 'insensitive' } },
+      { description: { contains: filters.q, mode: 'insensitive' } },
+      {
+        category: {
+          name: { contains: filters.q, mode: 'insensitive' },
+        },
+      },
+      {
+        artisan: {
+          displayName: { contains: filters.q, mode: 'insensitive' },
+        },
+      },
+      {
+        artisan: {
+          area: { contains: filters.q, mode: 'insensitive' },
+        },
+      },
+    ];
+  }
+
+  return where;
+}
+
+function offeringOrderBy(
+  sort?: OfferingFilters['sort']
+): Prisma.OfferingOrderByWithRelationInput | Prisma.OfferingOrderByWithRelationInput[] {
+  switch (sort) {
+    case 'price_low':
+      return [{ priceFrom: 'asc' }, { createdAt: 'desc' }];
+    case 'price_high':
+      return [{ priceFrom: 'desc' }, { createdAt: 'desc' }];
+    case 'rating':
+      return [
+        { artisan: { avgRating: 'desc' } },
+        { artisan: { ratingCount: 'desc' } },
+        { createdAt: 'desc' },
+      ];
+    case 'newest':
+    default:
+      return { createdAt: 'desc' };
+  }
+}
 
 export const createOfferingForArtisan = async (input: CreateOfferingInput) => {
   const artisan = await getArtisanProfileByUserId(input.artisanUserId);
@@ -77,47 +150,11 @@ export const getOfferings = async (
   filters: OfferingFilters = {},
   pagination?: Pagination
 ) => {
-  const where: Prisma.OfferingWhereInput = {
-    artisan: { verifyStatus: VerifyStatus.APPROVED },
-  };
-
-  if (filters.artisanId) {
-    where.artisanId = filters.artisanId;
-  }
-
-  if (filters.categoryId) {
-    where.categoryId = filters.categoryId;
-  }
-
-  if (filters.city) {
-    where.artisan = {
-      verifyStatus: VerifyStatus.APPROVED,
-      city: { equals: filters.city, mode: 'insensitive' },
-    };
-  }
-
-  if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
-    where.priceFrom = {
-      gte: filters.minPrice,
-      lte: filters.maxPrice,
-    };
-  }
-
-  if (filters.q) {
-    where.OR = [
-      { title: { contains: filters.q, mode: 'insensitive' } },
-      { description: { contains: filters.q, mode: 'insensitive' } },
-      {
-        category: {
-          name: { contains: filters.q, mode: 'insensitive' },
-        },
-      },
-    ];
-  }
+  const where = buildOfferingWhere(filters);
 
   return db.offering.findMany({
     where,
-    orderBy: { createdAt: 'desc' },
+    orderBy: offeringOrderBy(filters.sort),
     take: pagination?.limit,
     skip: pagination?.skip,
     include: {
@@ -138,45 +175,7 @@ export const getOfferings = async (
 };
 
 export const countOfferings = async (filters: OfferingFilters = {}) => {
-  const where: Prisma.OfferingWhereInput = {
-    artisan: { verifyStatus: VerifyStatus.APPROVED },
-  };
-
-  if (filters.artisanId) {
-    where.artisanId = filters.artisanId;
-  }
-
-  if (filters.categoryId) {
-    where.categoryId = filters.categoryId;
-  }
-
-  if (filters.city) {
-    where.artisan = {
-      verifyStatus: VerifyStatus.APPROVED,
-      city: { equals: filters.city, mode: 'insensitive' },
-    };
-  }
-
-  if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
-    where.priceFrom = {
-      gte: filters.minPrice,
-      lte: filters.maxPrice,
-    };
-  }
-
-  if (filters.q) {
-    where.OR = [
-      { title: { contains: filters.q, mode: 'insensitive' } },
-      { description: { contains: filters.q, mode: 'insensitive' } },
-      {
-        category: {
-          name: { contains: filters.q, mode: 'insensitive' },
-        },
-      },
-    ];
-  }
-
-  return db.offering.count({ where });
+  return db.offering.count({ where: buildOfferingWhere(filters) });
 };
 
 export const getOfferingById = async (id: string) => {

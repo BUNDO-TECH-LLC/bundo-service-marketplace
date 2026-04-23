@@ -169,25 +169,20 @@ router.get('/artisans/:id', async (req, res) => {
 });
 
 router.get('/kyc-submissions', async (req, res) => {
-  try {
-    const pagination = getPagination(req);
-    const [submissions, total] = await Promise.all([
-      getAdminKycSubmissions(pagination),
-      countAdminKycSubmissions(),
-    ]);
+  const pagination = getPagination(req);
+  const [submissions, total] = await Promise.all([
+    getAdminKycSubmissions(pagination),
+    countAdminKycSubmissions(),
+  ]);
 
-    return res.json({
-      message: 'Admin KYC submissions fetched',
-      submissions,
-      meta: {
-        ...paginationMeta(pagination),
-        total,
-      },
-    });
-  } catch (error) {
-    console.error('GET /admin/kyc-submissions failed', error);
-    throw error;
-  }
+  return res.json({
+    message: 'Admin KYC submissions fetched',
+    submissions,
+    meta: {
+      ...paginationMeta(pagination),
+      total,
+    },
+  });
 });
 
 router.get('/kyc-submissions/:id', async (req, res) => {

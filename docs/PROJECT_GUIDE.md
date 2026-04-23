@@ -225,7 +225,9 @@ Result:
 
 Result:
 
-- Bundo has a basic trust and compliance layer before wider artisan rollout
+- Bundo has a working trust and compliance layer before wider artisan rollout
+- validated flow:
+  artisan submit -> artisan fetch -> admin list -> admin review -> artisan sees final reviewed status
 
 ## 3. Customer discovery and booking
 
@@ -399,7 +401,7 @@ Base path: `/artisans`
 Public:
 
 - `GET /artisans`
-  Public artisan listing, with state and search support.
+  Public artisan listing, with state, category, search, and sorting support.
 - `GET /artisans/:id`
   Single artisan profile.
 - `GET /artisans/:id/reviews`
@@ -415,6 +417,8 @@ Authenticated artisan:
   Create artisan profile.
 - `PATCH /artisans/profile`
   Update artisan profile.
+- `POST /artisans/portfolio-images/sign-upload`
+  Create a signed Cloudinary upload payload for direct browser portfolio uploads.
 - `GET /artisans/kyc`
   Fetch my current KYC submission.
 - `POST /artisans/kyc`
@@ -449,7 +453,7 @@ Authenticated artisan:
 Base path: `/offerings`
 
 - `GET /offerings`
-  Public offerings list with search and state filtering.
+  Public offerings list with search, category, price, state filtering, and sorting.
 - `GET /offerings/:id`
   Single offering.
 - `GET /offerings/me`
@@ -533,6 +537,13 @@ Base path: `/notifications`
   Mark all unread notifications as read.
 - `POST /notifications/test`
   Trigger a test notification for the authenticated user and attempt browser push delivery if a device token exists.
+
+## Health and observability
+
+- `GET /health`
+  Lightweight liveness check.
+- `GET /ready`
+  Readiness check with database ping.
 
 ## Admin
 
@@ -671,6 +682,10 @@ Reference environment template:
 - persistent in-app notifications with backend push-delivery support
 - booking rescheduling with ownership and availability checks
 - artisan KYC submission and admin review workflow
+- KYC flow validated end to end across artisan and admin roles
+- richer marketplace filtering and sorting for discovery
+- direct browser portfolio uploads through signed Cloudinary uploads
+- request-id aware health and readiness endpoints for observability
 
 ---
 
@@ -692,19 +707,23 @@ Reference environment template:
 
 - [x] Admin control center
 - [x] Artisan approval and verification status
+- [x] Artisan KYC submission and admin review validated end to end
 - [x] Dispute handling
 - [x] Held payments and payout release
 - [x] In-app notifications
 - [x] Browser push notification support
 - [x] Help-center and trust-policy content
+- [x] Search and sorting filters for public marketplace discovery
+- [x] Direct browser media upload flow for artisan portfolio
+- [x] Basic production observability with health, readiness, request IDs, and structured request logging
 
 ### Still needed before a stronger public MVP launch
 
 - [ ] Production webhook exposure and confirmed end-to-end Paystack settlement testing
 - [ ] Stronger payout audit and settlement reconciliation
-- [ ] Search ranking and filtering polish
-- [ ] Production observability and alerting
-- [ ] Cloud media upload polish for artisan portfolio
+- [ ] Search ranking tuned with distance and recommendation signals
+- [ ] Production observability and alerting beyond basic health checks
+- [ ] Richer media management for artisan portfolio editing and reordering
 
 ---
 
@@ -715,9 +734,9 @@ The project is strong for MVP, but these are sensible next expansions:
 1. transfer success webhook handling for payout settlement confirmation
 2. richer refund and payout audit trail entities
 3. richer scheduling windows and negotiated rescheduling flow
-4. search ranking, sorting, and filtering by price/rating/distance
-5. cloud media upload polish for artisan portfolio
-6. production observability and background job handling
+4. search ranking and recommendation quality by price/rating/distance
+5. richer cloud media management for artisan portfolio
+6. production observability, alerting, and background job handling
 
 ---
 
@@ -729,8 +748,8 @@ The smartest order from here is:
 2. Full real payment + refund + payout acceptance test
 3. Better scheduling and negotiated rescheduling polish
 4. Search relevance and marketplace ranking
-5. Portfolio and profile polish
-6. Production observability and support tooling
+5. Portfolio and profile management polish
+6. Production alerting and support tooling
 
 ---
 

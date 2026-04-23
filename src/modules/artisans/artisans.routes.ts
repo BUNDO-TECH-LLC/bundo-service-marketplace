@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { Prisma, Role } from '@prisma/client';
+import crypto from 'node:crypto';
 import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
 import { requireRole } from '../../middlewares/requireRole';
 import { getReviewsForArtisan } from '../reviews/reviews.service';
@@ -32,6 +33,7 @@ import {
   updateArtisanProfile,
   updatePortfolioImageForArtisan,
 } from './artisans.service';
+import { env } from '../../config/env';
 
 const router = Router();
 
@@ -40,8 +42,42 @@ router.post(
   verifyFirebaseToken,
   requireRole(Role.ARTISAN),
   async (req, res) => {
-    try {
-      const {
+    const {
+      legalName,
+      documentType,
+      documentNumber,
+      documentImageUrl,
+      selfieImageUrl,
+      address,
+      city,
+    } = req.body;
+
+    const requiredFields = [
+      ['legalName', legalName],
+      ['documentType', documentType],
+      ['documentNumber', documentNumber],
+      ['documentImageUrl', documentImageUrl],
+      ['address', address],
+      ['city', city],
+    ];
+
+    for (const [field, value] of requiredFields) {
+      if (!value || typeof value !== 'string' || !value.trim()) {
+        return res.status(400).json({ message: `${field} is required` });
+      }
+    }
+
+    if (
+      selfieImageUrl !== undefined &&
+      selfieImageUrl !== null &&
+      (typeof selfieImageUrl !== 'string' || !selfieImageUrl.trim())
+    ) {
+      return res.status(400).json({ message: 'selfieImageUrl must be a string' });
+    }
+
+    const submission = await createOrUpdateKycSubmission(
+      (req as any).user.firebaseUid,
+      {
         legalName,
         documentType,
         documentNumber,
@@ -49,58 +85,19 @@ router.post(
         selfieImageUrl,
         address,
         city,
-      } = req.body;
-
-      const requiredFields = [
-        ['legalName', legalName],
-        ['documentType', documentType],
-        ['documentNumber', documentNumber],
-        ['documentImageUrl', documentImageUrl],
-        ['address', address],
-        ['city', city],
-      ];
-
-      for (const [field, value] of requiredFields) {
-        if (!value || typeof value !== 'string' || !value.trim()) {
-          return res.status(400).json({ message: `${field} is required` });
-        }
       }
+    );
 
-      if (
-        selfieImageUrl !== undefined &&
-        selfieImageUrl !== null &&
-        (typeof selfieImageUrl !== 'string' || !selfieImageUrl.trim())
-      ) {
-        return res.status(400).json({ message: 'selfieImageUrl must be a string' });
-      }
-
-      const submission = await createOrUpdateKycSubmission(
-        (req as any).user.firebaseUid,
-        {
-          legalName,
-          documentType,
-          documentNumber,
-          documentImageUrl,
-          selfieImageUrl,
-          address,
-          city,
-        }
-      );
-
-      if (!submission) {
-        return res.status(404).json({
-          message: 'Create an artisan profile before submitting KYC',
-        });
-      }
-
-      return res.status(201).json({
-        message: 'KYC submitted',
-        submission,
+    if (!submission) {
+      return res.status(404).json({
+        message: 'Create an artisan profile before submitting KYC',
       });
-    } catch (error) {
-      console.error('POST /artisans/kyc failed', error);
-      throw error;
     }
+
+    return res.status(201).json({
+      message: 'KYC submitted',
+      submission,
+    });
   }
 );
 
@@ -109,19 +106,40 @@ router.get(
   verifyFirebaseToken,
   requireRole(Role.ARTISAN),
   async (req, res) => {
-    try {
-      const submission = await getKycSubmissionForArtisanUser(
-        (req as any).user.firebaseUid
-      );
+    const submission = await getKycSubmissionForArtisanUser(
+      (req as any).user.firebaseUid
+    );
 
-      return res.json({
-        message: 'KYC fetched',
-        submission,
-      });
-    } catch (error) {
-      console.error('GET /artisans/kyc failed', error);
-      throw error;
-    }
+    return res.json({
+      message: 'KYC fetched',
+      submission,
+    });
+  }
+);
+
+router.post(
+  '/portfolio-images/sign-upload',
+  verifyFirebaseToken,
+  requireRole(Role.ARTISAN),
+  async (_req, res) => {
+    const timestamp = Math.floor(Date.now() / 1000);
+    const folder = 'bundo/artisan-portfolio';
+    const paramsToSign = `folder=${folder}&timestamp=${timestamp}`;
+    const signature = crypto
+      .createHash('sha1')
+      .update(`${paramsToSign}${env.CLOUDINARY_API_SECRET}`)
+      .digest('hex');
+
+    return res.json({
+      message: 'Upload signature created',
+      upload: {
+        cloudName: env.CLOUDINARY_CLOUD_NAME,
+        apiKey: env.CLOUDINARY_API_KEY,
+        timestamp,
+        folder,
+        signature,
+      },
+    });
   }
 );
 
@@ -673,7 +691,7 @@ router.delete(
 );
 
 router.get('/', async (req, res) => {
-  const { city, state, area, categoryId, q } = req.query;
+  const { city, state, area, categoryId, q, sort } = req.query;
   const pagination = getPagination(req);
   const location =
     typeof state === 'string'
@@ -686,6 +704,10 @@ router.get('/', async (req, res) => {
     area: typeof area === 'string' ? area : undefined,
     categoryId: typeof categoryId === 'string' ? categoryId : undefined,
     q: typeof q === 'string' ? q : undefined,
+    sort:
+      typeof sort === 'string' && ['newest', 'rating', 'reviews'].includes(sort)
+        ? (sort as 'newest' | 'rating' | 'reviews')
+        : undefined,
   };
   const [artisans, total] = await Promise.all([
     getArtisans(filters, pagination),

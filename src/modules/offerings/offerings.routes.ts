@@ -123,7 +123,8 @@ router.get('/me', verifyFirebaseToken, requireRole(Role.ARTISAN), async (req, re
 });
 
 router.get('/', async (req, res) => {
-  const { artisanId, categoryId, city, state, q, minPrice, maxPrice } = req.query;
+  const { artisanId, categoryId, city, state, q, minPrice, maxPrice, sort } =
+    req.query;
   const pagination = getPagination(req);
   const location =
     typeof state === 'string'
@@ -138,6 +139,11 @@ router.get('/', async (req, res) => {
     q: typeof q === 'string' ? q : undefined,
     minPrice: typeof minPrice === 'string' ? Number(minPrice) : undefined,
     maxPrice: typeof maxPrice === 'string' ? Number(maxPrice) : undefined,
+    sort:
+      typeof sort === 'string' &&
+      ['newest', 'price_low', 'price_high', 'rating'].includes(sort)
+        ? (sort as 'newest' | 'price_low' | 'price_high' | 'rating')
+        : undefined,
   };
 
   if (

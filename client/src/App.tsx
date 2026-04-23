@@ -21,15 +21,18 @@ import {
   ArtisanKycSubmission,
   Booking,
   Category,
+  CloudinarySignedUpload,
   Conversation,
   Message,
   Notification,
   Offering,
   PaymentStatus,
+  PortfolioImage,
   PayoutBank,
   ProviderPayoutAccount,
   Review,
   Role,
+  AvailabilitySlot,
 } from './types';
 import bundoLogo from './assets/bundo-logo.png';
 
@@ -37,6 +40,7 @@ type View = 'home' | 'marketplace' | 'workspace' | 'admin' | 'help' | 'artisan-p
 type WorkspaceSection = 'overview' | 'bookings' | 'messages' | 'offers' | 'notifications';
 type ActionRunner = (action: () => Promise<void>, done?: string) => Promise<void>;
 type PushStatus = 'idle' | 'unsupported' | 'missing-config' | 'unavailable' | 'enabled' | 'denied';
+type MarketplaceSort = 'newest' | 'rating' | 'price_low' | 'price_high';
 
 const heroImage =
   'https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?auto=format&fit=crop&w=1300&q=80';
@@ -91,6 +95,8 @@ function money(value: number) {
   }).format(value);
 }
 
+const dayLabels = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
 function formatMessageTime(value: string) {
   return new Intl.DateTimeFormat('en', {
     hour: 'numeric',
@@ -118,6 +124,13 @@ function clearUrlSearch() {
   const url = new URL(window.location.href);
   url.search = '';
   window.history.replaceState({}, '', url.toString());
+}
+
+function resetWorkspaceState() {
+  return {
+    view: 'home' as View,
+    workspaceSection: 'overview' as WorkspaceSection,
+  };
 }
 
 async function resolveApiSession(user: User) {
@@ -192,6 +205,11 @@ function App() {
   const [adminKycSubmissions, setAdminKycSubmissions] = useState<ArtisanKycSubmission[]>([]);
   const [selectedState, setSelectedState] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  const [priceMin, setPriceMin] = useState('');
+  const [priceMax, setPriceMax] = useState('');
+  const [marketplaceSort, setMarketplaceSort] = useState<MarketplaceSort>('rating');
+  const [authPromptSignal, setAuthPromptSignal] = useState(0);
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [pushStatus, setPushStatus] = useState<PushStatus>(hasPushConfig() ? 'idle' : 'missing-config');
@@ -252,11 +270,24 @@ function App() {
     setPushToken(nextPushToken);
   }
 
-  async function loadPublicData(state = selectedState, queryText = searchTerm) {
+  async function loadPublicData(
+    state = selectedState,
+    queryText = searchTerm,
+    options?: {
+      categoryId?: string;
+      minPrice?: string;
+      maxPrice?: string;
+      sort?: MarketplaceSort;
+    }
+  ) {
     const params = new URLSearchParams({
       page: '1',
       limit: '12',
     });
+    const nextCategoryId = options?.categoryId ?? selectedCategoryId;
+    const nextMinPrice = options?.minPrice ?? priceMin;
+    const nextMaxPrice = options?.maxPrice ?? priceMax;
+    const nextSort = options?.sort ?? marketplaceSort;
 
     if (state) {
       params.set('state', state);
@@ -264,6 +295,22 @@ function App() {
 
     if (queryText.trim()) {
       params.set('q', queryText.trim());
+    }
+
+    if (nextCategoryId) {
+      params.set('categoryId', nextCategoryId);
+    }
+
+    if (nextMinPrice.trim()) {
+      params.set('minPrice', nextMinPrice.trim());
+    }
+
+    if (nextMaxPrice.trim()) {
+      params.set('maxPrice', nextMaxPrice.trim());
+    }
+
+    if (nextSort) {
+      params.set('sort', nextSort);
     }
 
     const query = `?${params.toString()}`;
@@ -346,6 +393,7 @@ function App() {
         if (currentTokenRef.current) {
           syncPushToken(currentTokenRef.current, null).catch(() => undefined);
         }
+        const resetState = resetWorkspaceState();
         setToken('');
         setMe(null);
         setBookings([]);
@@ -358,6 +406,12 @@ function App() {
         setAdminStats(null);
         setPushToken('');
         setPushStatus(hasPushConfig() ? 'idle' : 'missing-config');
+        setWorkspaceSection(resetState.workspaceSection);
+        setView(resetState.view);
+        setActiveHelpTopicId(null);
+        setSelectedArtisan(null);
+        setSelectedArtisanReviews([]);
+        clearUrlSearch();
         return;
       }
 
@@ -415,7 +469,20 @@ function App() {
           clearUrlSearch();
         }
       } catch {
-        setNotice('We signed you in, but could not finish account sync. Please refresh and try again.');
+        const resetState = resetWorkspaceState();
+        setToken('');
+        setMe(null);
+        setBookings([]);
+        setConversations([]);
+        setAdminConversations([]);
+        setAdminBookings([]);
+        setAdminKycSubmissions([]);
+        setNotifications([]);
+        setMyOfferings([]);
+        setAdminStats(null);
+        setWorkspaceSection(resetState.workspaceSection);
+        setView(resetState.view);
+        setNotice('We could not finish account sync. Please make sure the backend is running, then sign in again.');
       }
     });
   }, []);
@@ -530,8 +597,37 @@ function App() {
           <button
             className="professional-link"
             onClick={() => {
-              setWorkspaceSection('overview');
-              setView('workspace');
+              if (!me) {
+                setAuthPromptSignal((value) => value + 1);
+                setNotice('Create or sign in to an artisan account to start professional onboarding.');
+                setView('home');
+                return;
+              }
+
+              if (me.role === 'ADMIN') {
+                setNotice('Admin accounts already have marketplace control access.');
+                setView('admin');
+                return;
+              }
+
+              if (me.role === 'ARTISAN') {
+                setWorkspaceSection('offers');
+                setView('workspace');
+                setNotice('Welcome back to your artisan workspace.');
+                return;
+              }
+
+              withNotice(async () => {
+                await api('/users/role', {
+                  method: 'PATCH',
+                  token,
+                  body: JSON.stringify({ role: 'ARTISAN' }),
+                });
+                const nextUser = await refreshMe();
+                await loadPrivateData(token, nextUser || me);
+                setWorkspaceSection('overview');
+                setView('workspace');
+              }, 'Your account is now set up for artisan onboarding');
             }}
           >
             Register as a professional
@@ -540,6 +636,7 @@ function App() {
         <AuthBox
           firebaseUser={firebaseUser}
           me={me}
+          authPromptSignal={authPromptSignal}
           unreadCount={notifications.filter((notification) => !notification.readAt).length}
           onReady={(nextToken, nextUser) => {
             setToken(nextToken);
@@ -609,10 +706,59 @@ function App() {
           <section className="toolbar" aria-label="Marketplace summary">
             {selectedState && <span>Location: {selectedState}</span>}
             {searchTerm && <span>Search: {searchTerm}</span>}
+            {selectedCategoryId && (
+              <span>
+                Category: {categories.find((category) => category.id === selectedCategoryId)?.name || 'Selected'}
+              </span>
+            )}
             <span>{publicOfferings.length} services</span>
             <span>{artisans.length} artisans</span>
             <span>{categories.length} categories</span>
           </section>
+
+          <MarketplaceFilters
+            categories={categories}
+            selectedState={selectedState}
+            states={nigeriaStates}
+            searchTerm={searchTerm}
+            selectedCategoryId={selectedCategoryId}
+            priceMin={priceMin}
+            priceMax={priceMax}
+            sort={marketplaceSort}
+            onSelectedStateChange={setSelectedState}
+            onSearchTermChange={setSearchTerm}
+            onCategoryChange={setSelectedCategoryId}
+            onPriceMinChange={setPriceMin}
+            onPriceMaxChange={setPriceMax}
+            onSortChange={setMarketplaceSort}
+            onApply={() =>
+              withNotice(
+                async () => {
+                  await loadPublicData(selectedState, searchTerm);
+                },
+                'Marketplace filters updated'
+              )
+            }
+            onClear={async () => {
+              setSelectedState('');
+              setSearchTerm('');
+              setSelectedCategoryId('');
+              setPriceMin('');
+              setPriceMax('');
+              setMarketplaceSort('rating');
+              await withNotice(
+                async () => {
+                  await loadPublicData('', '', {
+                    categoryId: '',
+                    minPrice: '',
+                    maxPrice: '',
+                    sort: 'rating',
+                  });
+                },
+                'Marketplace filters cleared'
+              );
+            }}
+          />
 
           <OfferingGrid
             offerings={publicOfferings}
@@ -627,7 +773,7 @@ function App() {
 
           <section className="section-head compact">
             <h2>Approved artisans</h2>
-            <p>Public profiles are ready for search, filtering, portfolio images, and richer discovery later.</p>
+            <p>Public profiles now respond to category, price, location, and sort signals to make discovery sharper.</p>
           </section>
           <div className="grid three">
             {artisans.length === 0 && <EmptyState title="No artisans yet" body="Approve artisan profiles from admin to make them visible here." />}
@@ -843,6 +989,7 @@ function App() {
 function AuthBox({
   firebaseUser,
   me,
+  authPromptSignal,
   unreadCount,
   onReady,
   onNavigate,
@@ -851,6 +998,7 @@ function AuthBox({
 }: {
   firebaseUser: User | null;
   me: ApiUser | null;
+  authPromptSignal: number;
   unreadCount: number;
   onReady: (token: string, user: ApiUser) => void;
   onNavigate: (view: View) => void;
@@ -863,6 +1011,14 @@ function AuthBox({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [preferredRole, setPreferredRole] = useState<Role | null>(null);
+
+  useEffect(() => {
+    if (!authPromptSignal) return;
+    setPreferredRole('ARTISAN');
+    setMode('signup');
+    setDrawerOpen(true);
+  }, [authPromptSignal]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -874,11 +1030,42 @@ function AuthBox({
         mode === 'login'
           ? await signInWithEmailAndPassword(auth, email, password)
           : await createUserWithEmailAndPassword(auth, email, password);
-      const session = await resolveApiSession(credential.user);
+      let session = await resolveApiSession(credential.user);
+
+      if (
+        preferredRole === 'ARTISAN' &&
+        session.user.role !== 'ARTISAN' &&
+        session.user.role !== 'ADMIN'
+      ) {
+        await api('/users/role', {
+          method: 'PATCH',
+          token: session.token,
+          body: JSON.stringify({ role: 'ARTISAN' }),
+        });
+        const refreshed = await api<{ user: ApiUser }>('/me', { token: session.token });
+        session = {
+          token: session.token,
+          user: refreshed.user,
+        };
+      }
+
       onReady(session.token, session.user);
-      onNotice(mode === 'login' ? 'Signed in' : 'Account created');
+      if (preferredRole === 'ARTISAN') {
+        onWorkspaceSection('overview');
+        onNavigate('workspace');
+        onNotice(
+          session.user.role === 'ARTISAN'
+            ? 'Your artisan onboarding is ready. Complete your profile, KYC, and offerings for admin review.'
+            : mode === 'login'
+              ? 'Signed in'
+              : 'Account created'
+        );
+      } else {
+        onNotice(mode === 'login' ? 'Signed in' : 'Account created');
+      }
       setDrawerOpen(false);
       setPassword('');
+      setPreferredRole(null);
     } catch (error) {
       onNotice(error instanceof Error ? error.message : 'Could not sign in');
     } finally {
@@ -886,7 +1073,7 @@ function AuthBox({
     }
   }
 
-  if (firebaseUser) {
+  if (firebaseUser && me) {
     const displayName = userDisplayName(firebaseUser, me);
     const initial = displayName.slice(0, 1).toUpperCase();
     const role = me?.role || null;
@@ -958,6 +1145,9 @@ function AuthBox({
               className="danger-menu-item"
               onClick={() => {
                 setMenuOpen(false);
+                onWorkspaceSection('overview');
+                onNavigate('home');
+                onNotice('Signed out');
                 auth && signOut(auth);
               }}
             >
@@ -974,6 +1164,7 @@ function AuthBox({
       <button
         type="button"
         onClick={() => {
+          setPreferredRole(null);
           setMode('login');
           setDrawerOpen(true);
         }}
@@ -984,6 +1175,7 @@ function AuthBox({
         type="button"
         className="signup-link"
         onClick={() => {
+          setPreferredRole(null);
           setMode('signup');
           setDrawerOpen(true);
         }}
@@ -1004,10 +1196,20 @@ function AuthBox({
               <img className="drawer-logo" src={bundoLogo} alt="Bundo logo" />
               <button type="button" onClick={() => setDrawerOpen(false)}>Close</button>
             </div>
-            <p className="eyebrow">Welcome to Bundo</p>
-            <h2>{mode === 'login' ? 'Login to your account' : 'Create your account'}</h2>
+            <p className="eyebrow">{preferredRole === 'ARTISAN' ? 'Join as a professional' : 'Welcome to Bundo'}</p>
+            <h2>
+              {preferredRole === 'ARTISAN'
+                ? mode === 'login'
+                  ? 'Login as a professional'
+                  : 'Create your artisan account'
+                : mode === 'login'
+                  ? 'Login to your account'
+                  : 'Create your account'}
+            </h2>
             <p className="drawer-copy">
-              Continue as a customer, artisan, or admin and pick up your marketplace workflow.
+              {preferredRole === 'ARTISAN'
+                ? 'Sign up or log in, then we will place you on the artisan path so you can complete profile setup, KYC, offerings, and admin verification.'
+                : 'Continue as a customer, artisan, or admin and pick up your marketplace workflow.'}
             </p>
 
             <form className="auth-form" onSubmit={submit}>
@@ -1019,7 +1221,15 @@ function AuthBox({
                 Password
                 <input value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Your password" type="password" required />
               </label>
-              <button disabled={!firebaseReady || submitting}>{mode === 'login' ? 'Login' : 'Create account'}</button>
+              <button disabled={!firebaseReady || submitting}>
+                {preferredRole === 'ARTISAN'
+                  ? mode === 'login'
+                    ? 'Continue as professional'
+                    : 'Create artisan account'
+                  : mode === 'login'
+                    ? 'Login'
+                    : 'Create account'}
+              </button>
             </form>
 
             <button type="button" className="mode-switch" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}>
@@ -1150,6 +1360,109 @@ function ServicesSection({ categories, onBrowse }: { categories: Category[]; onB
             {category.name}
           </button>
         ))}
+      </div>
+    </section>
+  );
+}
+
+function MarketplaceFilters({
+  categories,
+  selectedState,
+  states,
+  searchTerm,
+  selectedCategoryId,
+  priceMin,
+  priceMax,
+  sort,
+  onSelectedStateChange,
+  onSearchTermChange,
+  onCategoryChange,
+  onPriceMinChange,
+  onPriceMaxChange,
+  onSortChange,
+  onApply,
+  onClear,
+}: {
+  categories: Category[];
+  selectedState: string;
+  states: string[];
+  searchTerm: string;
+  selectedCategoryId: string;
+  priceMin: string;
+  priceMax: string;
+  sort: MarketplaceSort;
+  onSelectedStateChange: (value: string) => void;
+  onSearchTermChange: (value: string) => void;
+  onCategoryChange: (value: string) => void;
+  onPriceMinChange: (value: string) => void;
+  onPriceMaxChange: (value: string) => void;
+  onSortChange: (value: MarketplaceSort) => void;
+  onApply: () => Promise<void>;
+  onClear: () => Promise<void>;
+}) {
+  return (
+    <section className="marketplace-filters">
+      <div className="section-title-row">
+        <div>
+          <p className="eyebrow">Refine results</p>
+          <h2>Search with more control</h2>
+        </div>
+      </div>
+      <div className="marketplace-filter-grid">
+        <label>
+          State
+          <select value={selectedState} onChange={(event) => onSelectedStateChange(event.target.value)}>
+            <option value="">All states</option>
+            {states.map((state) => (
+              <option key={state} value={state}>
+                {state}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Category
+          <select value={selectedCategoryId} onChange={(event) => onCategoryChange(event.target.value)}>
+            <option value="">All categories</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Search
+          <input
+            type="search"
+            value={searchTerm}
+            onChange={(event) => onSearchTermChange(event.target.value)}
+            placeholder="Artisan, service, category"
+          />
+        </label>
+        <label>
+          Min price
+          <input type="number" min="0" value={priceMin} onChange={(event) => onPriceMinChange(event.target.value)} placeholder="5000" />
+        </label>
+        <label>
+          Max price
+          <input type="number" min="0" value={priceMax} onChange={(event) => onPriceMaxChange(event.target.value)} placeholder="50000" />
+        </label>
+        <label>
+          Sort by
+          <select value={sort} onChange={(event) => onSortChange(event.target.value as MarketplaceSort)}>
+            <option value="rating">Top rated</option>
+            <option value="newest">Newest</option>
+            <option value="price_low">Lowest price</option>
+            <option value="price_high">Highest price</option>
+          </select>
+        </label>
+      </div>
+      <div className="marketplace-filter-actions">
+        <button onClick={() => void onApply()}>Apply filters</button>
+        <button className="secondary-button" onClick={() => void onClear()}>
+          Clear
+        </button>
       </div>
     </section>
   );
@@ -1865,26 +2178,39 @@ function ArtisanPanel({
   runAction: ActionRunner;
   refresh: () => Promise<void>;
 }) {
+  const [profile, setProfile] = useState<Artisan | null>(null);
+  const [portfolioImages, setPortfolioImages] = useState<PortfolioImage[]>([]);
+  const [availabilitySlots, setAvailabilitySlots] = useState<AvailabilitySlot[]>([]);
   const [payoutAccount, setPayoutAccount] = useState<ProviderPayoutAccount | null>(null);
   const [banks, setBanks] = useState<PayoutBank[]>([]);
   const [kycSubmission, setKycSubmission] = useState<ArtisanKycSubmission | null>(null);
+  const [uploadingPortfolio, setUploadingPortfolio] = useState(false);
 
   useEffect(() => {
     let mounted = true;
 
     Promise.all([
+      api<{ profile: Artisan }>('/artisans/me', { token }).catch(() => ({ profile: null as unknown as Artisan })),
+      api<{ images: PortfolioImage[] }>('/artisans/portfolio-images/me', { token }).catch(() => ({ images: [] })),
+      api<{ slots: AvailabilitySlot[] }>('/artisans/availability-slots/me', { token }).catch(() => ({ slots: [] })),
       api<{ account: ProviderPayoutAccount | null }>('/artisans/payout-account', { token }),
       api<{ banks: PayoutBank[] }>('/payments/banks', { token }),
       api<{ submission: ArtisanKycSubmission | null }>('/artisans/kyc', { token }),
     ])
-      .then(([accountResponse, bankResponse, kycResponse]) => {
+      .then(([profileResponse, imageResponse, slotResponse, accountResponse, bankResponse, kycResponse]) => {
         if (!mounted) return;
+        setProfile(profileResponse.profile || null);
+        setPortfolioImages(imageResponse.images);
+        setAvailabilitySlots(slotResponse.slots);
         setPayoutAccount(accountResponse.account);
         setBanks(bankResponse.banks);
         setKycSubmission(kycResponse.submission);
       })
       .catch(() => {
         if (!mounted) return;
+        setProfile(null);
+        setPortfolioImages([]);
+        setAvailabilitySlots([]);
         setPayoutAccount(null);
         setBanks([]);
         setKycSubmission(null);
@@ -1895,10 +2221,26 @@ function ArtisanPanel({
     };
   }, [token]);
 
+  async function hydrateWorkspace() {
+    const [profileResponse, imageResponse, slotResponse, accountResponse, kycResponse] = await Promise.all([
+      api<{ profile: Artisan }>('/artisans/me', { token }).catch(() => ({ profile: null as unknown as Artisan })),
+      api<{ images: PortfolioImage[] }>('/artisans/portfolio-images/me', { token }).catch(() => ({ images: [] })),
+      api<{ slots: AvailabilitySlot[] }>('/artisans/availability-slots/me', { token }).catch(() => ({ slots: [] })),
+      api<{ account: ProviderPayoutAccount | null }>('/artisans/payout-account', { token }),
+      api<{ submission: ArtisanKycSubmission | null }>('/artisans/kyc', { token }),
+    ]);
+
+    setProfile(profileResponse.profile || null);
+    setPortfolioImages(imageResponse.images);
+    setAvailabilitySlots(slotResponse.slots);
+    setPayoutAccount(accountResponse.account);
+    setKycSubmission(kycResponse.submission);
+  }
+
   async function createProfile(formElement: HTMLFormElement) {
     const form = new FormData(formElement);
     await api('/artisans/profile', {
-      method: 'POST',
+      method: profile ? 'PATCH' : 'POST',
       token,
       body: JSON.stringify({
         displayName: form.get('displayName'),
@@ -1910,7 +2252,7 @@ function ArtisanPanel({
       }),
     });
     await refresh();
-    formElement.reset();
+    await hydrateWorkspace();
   }
 
   async function savePayoutAccount(formElement: HTMLFormElement) {
@@ -1948,6 +2290,97 @@ function ArtisanPanel({
     formElement.reset();
   }
 
+  async function addAvailability(formElement: HTMLFormElement) {
+    const form = new FormData(formElement);
+    await api('/artisans/availability-slots', {
+      method: 'POST',
+      token,
+      body: JSON.stringify({
+        dayOfWeek: Number(form.get('dayOfWeek')),
+        startTime: form.get('startTime'),
+        endTime: form.get('endTime'),
+      }),
+    });
+    await hydrateWorkspace();
+    formElement.reset();
+  }
+
+  async function toggleAvailability(slot: AvailabilitySlot) {
+    await api(`/artisans/availability-slots/${slot.id}`, {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify({
+        isActive: !slot.isActive,
+      }),
+    });
+    await hydrateWorkspace();
+  }
+
+  async function removeAvailability(slotId: string) {
+    await api(`/artisans/availability-slots/${slotId}`, {
+      method: 'DELETE',
+      token,
+    });
+    await hydrateWorkspace();
+  }
+
+  async function uploadPortfolioFile(file: File) {
+    setUploadingPortfolio(true);
+
+    try {
+      const signatureResponse = await api<{ upload: CloudinarySignedUpload }>(
+        '/artisans/portfolio-images/sign-upload',
+        {
+          method: 'POST',
+          token,
+        }
+      );
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('api_key', signatureResponse.upload.apiKey);
+      formData.append('timestamp', String(signatureResponse.upload.timestamp));
+      formData.append('folder', signatureResponse.upload.folder);
+      formData.append('signature', signatureResponse.upload.signature);
+
+      const uploadResponse = await fetch(
+        `https://api.cloudinary.com/v1_1/${signatureResponse.upload.cloudName}/image/upload`,
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
+
+      const uploadData = await uploadResponse.json();
+
+      if (!uploadResponse.ok) {
+        throw new Error(uploadData?.error?.message || 'Could not upload image');
+      }
+
+      await api('/artisans/portfolio-images', {
+        method: 'POST',
+        token,
+        body: JSON.stringify({
+          cloudinaryId: uploadData.public_id,
+          url: uploadData.secure_url,
+          displayOrder: portfolioImages.length,
+        }),
+      });
+
+      await hydrateWorkspace();
+    } finally {
+      setUploadingPortfolio(false);
+    }
+  }
+
+  async function removePortfolioImage(imageId: string) {
+    await api(`/artisans/portfolio-images/${imageId}`, {
+      method: 'DELETE',
+      token,
+    });
+    await hydrateWorkspace();
+  }
+
   async function submitKyc(formElement: HTMLFormElement) {
     const form = new FormData(formElement);
     const response = await api<{ submission: ArtisanKycSubmission }>('/artisans/kyc', {
@@ -1978,13 +2411,13 @@ function ArtisanPanel({
       >
         <p className="eyebrow">Onboarding</p>
         <h2>Artisan profile</h2>
-        <input name="displayName" placeholder="Display name" required />
-        <input name="bio" placeholder="Bio" />
-        <input name="city" placeholder="City" defaultValue="Lagos" required />
-        <input name="area" placeholder="Area" defaultValue="Lekki" />
-        <input name="lat" placeholder="Latitude" defaultValue="6.5244" required />
-        <input name="lng" placeholder="Longitude" defaultValue="3.3792" required />
-        <button disabled={busy}>Save profile</button>
+        <input name="displayName" placeholder="Display name" defaultValue={profile?.displayName || ''} required />
+        <input name="bio" placeholder="Bio" defaultValue={profile?.bio || ''} />
+        <input name="city" placeholder="City" defaultValue={profile?.city || 'Lagos'} required />
+        <input name="area" placeholder="Area" defaultValue={profile?.area || 'Lekki'} />
+        <input name="lat" placeholder="Latitude" defaultValue={profile?.lat ?? '6.5244'} required />
+        <input name="lng" placeholder="Longitude" defaultValue={profile?.lng ?? '3.3792'} required />
+        <button disabled={busy}>{profile ? 'Update profile' : 'Save profile'}</button>
       </form>
       <form
         className="panel-card form-card"
@@ -2104,13 +2537,101 @@ function ArtisanPanel({
         <button disabled={busy}>Save payout account</button>
       </form>
       <article className="panel-card">
-        <p className="eyebrow">Portfolio</p>
+        <p className="eyebrow">Services</p>
         <h2>My offerings</h2>
         {offerings.length === 0 && <p>No offerings created yet.</p>}
         {offerings.map((offering) => (
           <div className="list-item" key={offering.id}>
             <strong>{offering.title}</strong>
-            <span>{money(offering.priceFrom)}</span>
+            <span>
+              {money(offering.priceFrom)}
+              {offering.category?.name ? ` · ${offering.category.name}` : ''}
+            </span>
+          </div>
+        ))}
+      </article>
+      <article className="panel-card form-card">
+        <p className="eyebrow">Portfolio</p>
+        <h2>Upload work samples</h2>
+        <p>Add a few clean job photos so customers can trust what you do before they book.</p>
+        <label className="upload-field">
+          <span>Choose image</span>
+          <input
+            type="file"
+            accept="image/*"
+            disabled={busy || uploadingPortfolio}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              void runAction(
+                () => uploadPortfolioFile(file),
+                'Portfolio image uploaded'
+              );
+              event.currentTarget.value = '';
+            }}
+          />
+        </label>
+        <div className="workspace-media-grid">
+          {portfolioImages.length === 0 && <p className="muted">No portfolio images uploaded yet.</p>}
+          {portfolioImages.map((image) => (
+            <div className="workspace-media-card" key={image.id}>
+              <img src={image.url} alt="Portfolio upload" />
+              <button
+                className="secondary-button"
+                disabled={busy || uploadingPortfolio}
+                onClick={() => runAction(() => removePortfolioImage(image.id), 'Portfolio image removed')}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      </article>
+      <article className="panel-card form-card">
+        <p className="eyebrow">Availability</p>
+        <h2>Working hours</h2>
+        <form
+          className="inline-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const form = event.currentTarget;
+            runAction(() => addAvailability(form), 'Availability added');
+          }}
+        >
+          <select name="dayOfWeek" defaultValue="1" required>
+            {dayLabels.map((day, index) => (
+              <option key={day} value={index}>
+                {day}
+              </option>
+            ))}
+          </select>
+          <input name="startTime" type="time" defaultValue="09:00" required />
+          <input name="endTime" type="time" defaultValue="17:00" required />
+          <button disabled={busy}>Add slot</button>
+        </form>
+        {availabilitySlots.length === 0 && <p className="muted">No availability slots yet.</p>}
+        {availabilitySlots.map((slot) => (
+          <div className="list-item" key={slot.id}>
+            <strong>
+              {dayLabels[slot.dayOfWeek]} · {slot.startTime} - {slot.endTime}
+            </strong>
+            <span>{slot.isActive ? 'Active' : 'Paused'}</span>
+            <div className="actions">
+              <button
+                className="secondary-button"
+                disabled={busy}
+                onClick={() => runAction(() => toggleAvailability(slot), slot.isActive ? 'Availability paused' : 'Availability activated')}
+              >
+                {slot.isActive ? 'Pause' : 'Activate'}
+              </button>
+              <button
+                className="secondary-button"
+                disabled={busy}
+                onClick={() => runAction(() => removeAvailability(slot.id), 'Availability removed')}
+              >
+                Remove
+              </button>
+            </div>
           </div>
         ))}
       </article>

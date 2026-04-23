@@ -207,6 +207,7 @@ export type AdminNote = {
 export type PortfolioImage = {
   id: string;
   artisanId: string;
+  cloudinaryId?: string;
   url: string;
   displayOrder: number;
   createdAt: string;
@@ -219,6 +220,14 @@ export type AvailabilitySlot = {
   startTime: string;
   endTime: string;
   isActive: boolean;
+};
+
+export type CloudinarySignedUpload = {
+  cloudName: string;
+  apiKey: string;
+  timestamp: number;
+  folder: string;
+  signature: string;
 };
 
 export type Review = {

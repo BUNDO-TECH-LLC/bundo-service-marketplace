@@ -782,6 +782,49 @@ footer {
   font-weight: 800;
 }
 
+.marketplace-filters {
+  display: grid;
+  gap: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 26px;
+  padding: 22px;
+  background: #fff;
+  box-shadow: 0 8px 26px rgb(0 0 0 / 5%);
+}
+
+.marketplace-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.marketplace-filter-grid label,
+.upload-field {
+  display: grid;
+  gap: 8px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.marketplace-filter-grid input,
+.marketplace-filter-grid select,
+.upload-field input,
+.inline-form input,
+.inline-form select {
+  min-width: 0;
+  border: 1px solid #dedede;
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #fff;
+}
+
+.marketplace-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .grid {
   display: grid;
   gap: 18px;
@@ -888,6 +931,11 @@ footer {
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 18px;
+}
+
+.list-item .actions {
+  margin-top: 0;
+  margin-left: auto;
 }
 
 .form-card {
@@ -1038,6 +1086,34 @@ footer {
 
 .admin-chat {
   margin-top: 42px;
+}
+
+.workspace-media-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.workspace-media-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+.workspace-media-card img {
+  width: 100%;
+  aspect-ratio: 1 / 0.78;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.inline-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .wide-panel {
@@ -2204,7 +2280,10 @@ footer {
   .dashboard-grid,
   .grid.stats,
   .notifications-hero,
-  .notifications-summary-grid {
+  .notifications-summary-grid,
+  .marketplace-filter-grid,
+  .workspace-media-grid,
+  .inline-form {
     grid-template-columns: 1fr;
   }
 

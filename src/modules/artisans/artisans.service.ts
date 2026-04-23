@@ -37,7 +37,71 @@ type ArtisanFilters = {
   categoryId?: string;
   q?: string;
   includeUnapproved?: boolean;
+  sort?: 'newest' | 'rating' | 'reviews';
 };
+
+function buildArtisanWhere(
+  filters: ArtisanFilters = {}
+): Prisma.ArtisanProfileWhereInput {
+  const where: Prisma.ArtisanProfileWhereInput = filters.includeUnapproved
+    ? {}
+    : { verifyStatus: VerifyStatus.APPROVED };
+
+  if (filters.city) {
+    where.city = { equals: filters.city, mode: 'insensitive' };
+  }
+
+  if (filters.area) {
+    where.area = { equals: filters.area, mode: 'insensitive' };
+  }
+
+  if (filters.q) {
+    where.OR = [
+      { displayName: { contains: filters.q, mode: 'insensitive' } },
+      { bio: { contains: filters.q, mode: 'insensitive' } },
+      { city: { contains: filters.q, mode: 'insensitive' } },
+      { area: { contains: filters.q, mode: 'insensitive' } },
+      {
+        offerings: {
+          some: {
+            title: { contains: filters.q, mode: 'insensitive' },
+          },
+        },
+      },
+      {
+        offerings: {
+          some: {
+            category: {
+              name: { contains: filters.q, mode: 'insensitive' },
+            },
+          },
+        },
+      },
+    ];
+  }
+
+  if (filters.categoryId) {
+    where.offerings = {
+      some: { categoryId: filters.categoryId },
+    };
+  }
+
+  return where;
+}
+
+function artisanOrderBy(
+  sort?: ArtisanFilters['sort']
+): Prisma.ArtisanProfileOrderByWithRelationInput | Prisma.ArtisanProfileOrderByWithRelationInput[] {
+  switch (sort) {
+    case 'reviews':
+      return [{ ratingCount: 'desc' }, { avgRating: 'desc' }, { createdAt: 'desc' }];
+    case 'rating':
+      return [{ avgRating: 'desc' }, { ratingCount: 'desc' }, { createdAt: 'desc' }];
+    case 'newest':
+    default:
+      return { createdAt: 'desc' };
+  }
+}
 
 export const createArtisanProfile = async (input: CreateArtisanProfileInput) => {
   return db.artisanProfile.create({
@@ -59,36 +123,11 @@ export const getArtisans = async (
   filters: ArtisanFilters = {},
   pagination?: Pagination
 ) => {
-  const where: Prisma.ArtisanProfileWhereInput = filters.includeUnapproved
-    ? {}
-    : { verifyStatus: VerifyStatus.APPROVED };
-
-  if (filters.city) {
-    where.city = { equals: filters.city, mode: 'insensitive' };
-  }
-
-  if (filters.area) {
-    where.area = { equals: filters.area, mode: 'insensitive' };
-  }
-
-  if (filters.q) {
-    where.OR = [
-      { displayName: { contains: filters.q, mode: 'insensitive' } },
-      { bio: { contains: filters.q, mode: 'insensitive' } },
-      { city: { contains: filters.q, mode: 'insensitive' } },
-      { area: { contains: filters.q, mode: 'insensitive' } },
-    ];
-  }
-
-  if (filters.categoryId) {
-    where.offerings = {
-      some: { categoryId: filters.categoryId },
-    };
-  }
+  const where = buildArtisanWhere(filters);
 
   return db.artisanProfile.findMany({
     where,
-    orderBy: { createdAt: 'desc' },
+    orderBy: artisanOrderBy(filters.sort),
     take: pagination?.limit,
     skip: pagination?.skip,
     select: {
@@ -119,34 +158,7 @@ export const getArtisans = async (
 };
 
 export const countArtisans = async (filters: ArtisanFilters = {}) => {
-  const where: Prisma.ArtisanProfileWhereInput = filters.includeUnapproved
-    ? {}
-    : { verifyStatus: VerifyStatus.APPROVED };
-
-  if (filters.city) {
-    where.city = { equals: filters.city, mode: 'insensitive' };
-  }
-
-  if (filters.area) {
-    where.area = { equals: filters.area, mode: 'insensitive' };
-  }
-
-  if (filters.q) {
-    where.OR = [
-      { displayName: { contains: filters.q, mode: 'insensitive' } },
-      { bio: { contains: filters.q, mode: 'insensitive' } },
-      { city: { contains: filters.q, mode: 'insensitive' } },
-      { area: { contains: filters.q, mode: 'insensitive' } },
-    ];
-  }
-
-  if (filters.categoryId) {
-    where.offerings = {
-      some: { categoryId: filters.categoryId },
-    };
-  }
-
-  return db.artisanProfile.count({ where });
+  return db.artisanProfile.count({ where: buildArtisanWhere(filters) });
 };
 
 export const getArtisanById = async (id: string) => {

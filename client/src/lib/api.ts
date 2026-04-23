@@ -24,10 +24,21 @@ export async function api<T>(
     headers.set('Authorization', `Bearer ${options.token}`);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers,
+    });
+  } catch (error) {
+    throw new ApiError(
+      `Could not reach the API at ${API_BASE_URL}. Make sure the backend server is running.`,
+      0,
+      { cause: error instanceof Error ? error.message : 'Network error' }
+    );
+  }
+
   const text = await response.text();
   const data = text ? JSON.parse(text) : null;
 
