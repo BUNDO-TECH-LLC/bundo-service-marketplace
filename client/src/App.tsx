@@ -38,9 +38,30 @@ import bundoLogo from './assets/bundo-logo.png';
 
 type View = 'home' | 'marketplace' | 'workspace' | 'admin' | 'help' | 'artisan-profile';
 type WorkspaceSection = 'overview' | 'bookings' | 'messages' | 'offers' | 'notifications';
+type AdminSection = 'overview' | 'profiles' | 'jobs' | 'messages' | 'verification' | 'catalog';
 type ActionRunner = (action: () => Promise<void>, done?: string) => Promise<void>;
 type PushStatus = 'idle' | 'unsupported' | 'missing-config' | 'unavailable' | 'enabled' | 'denied';
 type MarketplaceSort = 'newest' | 'rating' | 'price_low' | 'price_high';
+type AdminUserRecord = ApiUser & {
+  artisanProfile?: {
+    id: string;
+    displayName: string;
+    verifyStatus: Artisan['verifyStatus'];
+  } | null;
+};
+type AdminArtisanRecord = Artisan & {
+  user?: Pick<ApiUser, 'firebaseUid' | 'email' | 'phone' | 'role' | 'status'>;
+  _count?: {
+    offerings: number;
+    bookingsReceived: number;
+    reviewsReceived: number;
+  };
+};
+type AdminCategoryRecord = Category & {
+  _count?: {
+    offerings: number;
+  };
+};
 
 const heroImage =
   'https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?auto=format&fit=crop&w=1300&q=80';
@@ -186,6 +207,7 @@ function relativeNotificationTime(value: string) {
 function App() {
   const [view, setView] = useState<View>('home');
   const [workspaceSection, setWorkspaceSection] = useState<WorkspaceSection>('overview');
+  const [adminSection, setAdminSection] = useState<AdminSection>('overview');
   const [activeHelpTopicId, setActiveHelpTopicId] = useState<string | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [token, setToken] = useState('');
@@ -203,6 +225,9 @@ function App() {
   const [adminStats, setAdminStats] = useState<Record<string, number> | null>(null);
   const [adminBookings, setAdminBookings] = useState<Booking[]>([]);
   const [adminKycSubmissions, setAdminKycSubmissions] = useState<ArtisanKycSubmission[]>([]);
+  const [adminUsers, setAdminUsers] = useState<AdminUserRecord[]>([]);
+  const [adminArtisans, setAdminArtisans] = useState<AdminArtisanRecord[]>([]);
+  const [adminCategories, setAdminCategories] = useState<AdminCategoryRecord[]>([]);
   const [selectedState, setSelectedState] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
@@ -353,18 +378,33 @@ function App() {
     }
 
     if (user.role === 'ADMIN') {
-      const [stats, conversationRes, bookingRes, notificationRes, kycRes] = await Promise.all([
+      const [
+        stats,
+        conversationRes,
+        bookingRes,
+        notificationRes,
+        kycRes,
+        userRes,
+        artisanRes,
+        categoryRes,
+      ] = await Promise.all([
         api<{ stats: Record<string, number> }>('/admin/stats', { token: authToken }),
         api<{ conversations: Conversation[] }>('/admin/conversations?page=1&limit=20', { token: authToken }),
         api<{ bookings: Booking[] }>('/admin/bookings?page=1&limit=12', { token: authToken }),
         api<{ notifications: Notification[] }>('/notifications', { token: authToken }),
         api<{ submissions: ArtisanKycSubmission[] }>('/admin/kyc-submissions?page=1&limit=12', { token: authToken }),
+        api<{ users: AdminUserRecord[] }>('/admin/users?page=1&limit=24', { token: authToken }),
+        api<{ artisans: AdminArtisanRecord[] }>('/admin/artisans?page=1&limit=24', { token: authToken }),
+        api<{ categories: AdminCategoryRecord[] }>('/admin/categories?page=1&limit=24', { token: authToken }),
       ]);
       setAdminStats(stats.stats);
       setAdminConversations(conversationRes.conversations);
       setAdminBookings(bookingRes.bookings);
       setNotifications(notificationRes.notifications);
       setAdminKycSubmissions(kycRes.submissions);
+      setAdminUsers(userRes.users);
+      setAdminArtisans(artisanRes.artisans);
+      setAdminCategories(categoryRes.categories);
     }
   }
 
@@ -401,6 +441,9 @@ function App() {
         setAdminConversations([]);
         setAdminBookings([]);
         setAdminKycSubmissions([]);
+        setAdminUsers([]);
+        setAdminArtisans([]);
+        setAdminCategories([]);
         setNotifications([]);
         setMyOfferings([]);
         setAdminStats(null);
@@ -477,6 +520,9 @@ function App() {
         setAdminConversations([]);
         setAdminBookings([]);
         setAdminKycSubmissions([]);
+        setAdminUsers([]);
+        setAdminArtisans([]);
+        setAdminCategories([]);
         setNotifications([]);
         setMyOfferings([]);
         setAdminStats(null);
@@ -943,39 +989,18 @@ function App() {
       )}
 
       {view === 'admin' && (
-        <main className="page">
-          <section className="section-head">
-            <p className="eyebrow">Admin</p>
-            <h1>Marketplace control center</h1>
-            <p>Track growth, moderation, trust signals, and operations health.</p>
-          </section>
-          <div className="grid stats">
-            {!adminStats && <EmptyState title="Admin stats unavailable" body="Sign in as an admin, then open this page again." />}
-            {adminStats &&
-              Object.entries(adminStats).map(([key, value]) => (
-                <article className="stat-card" key={key}>
-                  <strong>{value}</strong>
-                  <span>{key}</span>
-                </article>
-              ))}
-          </div>
-          <AdminChatPanel
-            token={token}
-            conversations={adminConversations}
-            busy={busy}
-            runAction={withNotice}
-            refresh={() => loadPrivateData()}
-          />
-          <AdminBookingsPanel
-            token={token}
+        <main className="admin-page">
+          <AdminConsole
+            section={adminSection}
+            setSection={setAdminSection}
+            stats={adminStats}
+            users={adminUsers}
+            artisans={adminArtisans}
             bookings={adminBookings}
-            busy={busy}
-            runAction={withNotice}
-            refresh={() => loadPrivateData()}
-          />
-          <AdminKycPanel
-            token={token}
+            conversations={adminConversations}
             submissions={adminKycSubmissions}
+            categories={adminCategories}
+            token={token}
             busy={busy}
             runAction={withNotice}
             refresh={() => loadPrivateData()}
@@ -3193,12 +3218,14 @@ function AdminBookingsPanel({
 function AdminKycPanel({
   token,
   submissions,
+  artisans: _artisans,
   busy,
   runAction,
   refresh,
 }: {
   token: string;
   submissions: ArtisanKycSubmission[];
+  artisans?: AdminArtisanRecord[];
   busy: boolean;
   runAction: ActionRunner;
   refresh: () => Promise<void>;
@@ -3523,6 +3550,548 @@ function NotificationsPanel({
         </div>
       )}
       </section>
+    </section>
+  );
+}
+
+function adminMetricLabel(key: string) {
+  return key
+    .replace(/([A-Z])/g, ' $1')
+    .trim()
+    .replace(/^./, (value) => value.toUpperCase());
+}
+
+function AdminConsole({
+  section,
+  setSection,
+  stats,
+  users,
+  artisans,
+  bookings,
+  conversations,
+  submissions,
+  categories,
+  token,
+  busy,
+  runAction,
+  refresh,
+}: {
+  section: AdminSection;
+  setSection: (section: AdminSection) => void;
+  stats: Record<string, number> | null;
+  users: AdminUserRecord[];
+  artisans: AdminArtisanRecord[];
+  bookings: Booking[];
+  conversations: Conversation[];
+  submissions: ArtisanKycSubmission[];
+  categories: AdminCategoryRecord[];
+  token: string;
+  busy: boolean;
+  runAction: ActionRunner;
+  refresh: () => Promise<void>;
+}) {
+  const sections: Array<{
+    id: AdminSection;
+    label: string;
+    description: string;
+    count?: number;
+  }> = [
+    { id: 'overview', label: 'Overview', description: 'Signals and open work' },
+    { id: 'profiles', label: 'Profiles', description: 'Users and artisans', count: users.length + artisans.length },
+    { id: 'jobs', label: 'Jobs', description: 'Bookings and payouts', count: bookings.length },
+    { id: 'messages', label: 'Messages', description: 'Threads and notes', count: conversations.length },
+    { id: 'verification', label: 'Verification', description: 'KYC and approvals', count: submissions.length },
+    { id: 'catalog', label: 'Catalog', description: 'Service categories', count: categories.length },
+  ];
+
+  return (
+    <section className="admin-shell">
+      <aside className="admin-sidebar">
+        <div className="admin-sidebar-head">
+          <p className="eyebrow">Admin console</p>
+          <h1>Bundo operations</h1>
+          <p>Manage trust, supply, support, and marketplace activity from one place.</p>
+        </div>
+        <nav className="admin-nav" aria-label="Admin sections">
+          {sections.map((item) => (
+            <button
+              key={item.id}
+              className={section === item.id ? 'active' : ''}
+              type="button"
+              onClick={() => setSection(item.id)}
+            >
+              <span>{item.label}</span>
+              <small>{item.description}</small>
+              {typeof item.count === 'number' ? <strong>{item.count}</strong> : null}
+            </button>
+          ))}
+        </nav>
+      </aside>
+
+      <section className="admin-main">
+        {section === 'overview' && (
+          <AdminOverviewPanel
+            stats={stats}
+            users={users}
+            artisans={artisans}
+            bookings={bookings}
+            conversations={conversations}
+            submissions={submissions}
+            setSection={setSection}
+          />
+        )}
+        {section === 'profiles' && (
+          <AdminProfilesPanel
+            token={token}
+            users={users}
+            artisans={artisans}
+            busy={busy}
+            runAction={runAction}
+            refresh={refresh}
+          />
+        )}
+        {section === 'jobs' && (
+          <AdminBookingsPanel
+            token={token}
+            bookings={bookings}
+            busy={busy}
+            runAction={runAction}
+            refresh={refresh}
+          />
+        )}
+        {section === 'messages' && (
+          <AdminChatPanel
+            token={token}
+            conversations={conversations}
+            busy={busy}
+            runAction={runAction}
+            refresh={refresh}
+          />
+        )}
+        {section === 'verification' && (
+          <AdminKycPanel
+            token={token}
+            submissions={submissions}
+            artisans={artisans}
+            busy={busy}
+            runAction={runAction}
+            refresh={refresh}
+          />
+        )}
+        {section === 'catalog' && (
+          <AdminCatalogPanel
+            token={token}
+            categories={categories}
+            busy={busy}
+            runAction={runAction}
+            refresh={refresh}
+          />
+        )}
+      </section>
+    </section>
+  );
+}
+
+function AdminOverviewPanel({
+  stats,
+  users,
+  artisans,
+  bookings,
+  conversations,
+  submissions,
+  setSection,
+}: {
+  stats: Record<string, number> | null;
+  users: AdminUserRecord[];
+  artisans: AdminArtisanRecord[];
+  bookings: Booking[];
+  conversations: Conversation[];
+  submissions: ArtisanKycSubmission[];
+  setSection: (section: AdminSection) => void;
+}) {
+  const priorityItems = [
+    {
+      title: 'Pending KYC reviews',
+      value: submissions.filter((submission) => submission.status === 'PENDING').length,
+      action: 'Open verification',
+      section: 'verification' as AdminSection,
+    },
+    {
+      title: 'Open booking issues',
+      value: bookings.filter((booking) =>
+        booking.disputes?.some((dispute) => dispute.status === 'OPEN' || dispute.status === 'UNDER_REVIEW')
+      ).length,
+      action: 'Open jobs',
+      section: 'jobs' as AdminSection,
+    },
+    {
+      title: 'Needs artisan review',
+      value: artisans.filter((artisan) => artisan.verifyStatus === 'PENDING').length,
+      action: 'Open profiles',
+      section: 'profiles' as AdminSection,
+    },
+  ];
+
+  return (
+    <section className="admin-panel">
+      <header className="admin-panel-head">
+        <div>
+          <p className="eyebrow">Overview</p>
+          <h2>Run the marketplace, not the customer UI</h2>
+          <p>Everything here is tuned for decisions, follow-up, and intervention.</p>
+        </div>
+      </header>
+
+      <div className="admin-stat-grid">
+        {!stats && <EmptyState title="Admin stats unavailable" body="Sign in as an admin, then reopen this page." />}
+        {stats &&
+          Object.entries(stats).map(([key, value]) => (
+            <article className="admin-stat-card" key={key}>
+              <span>{adminMetricLabel(key)}</span>
+              <strong>{value}</strong>
+            </article>
+          ))}
+      </div>
+
+      <div className="admin-overview-grid">
+        <article className="admin-surface">
+          <div className="admin-surface-head">
+            <div>
+              <p className="eyebrow">Priority queue</p>
+              <h3>What needs admin attention</h3>
+            </div>
+          </div>
+          <div className="admin-priority-list">
+            {priorityItems.map((item) => (
+              <button
+                key={item.title}
+                className="admin-priority-item"
+                type="button"
+                onClick={() => setSection(item.section)}
+              >
+                <div>
+                  <strong>{item.title}</strong>
+                  <small>{item.action}</small>
+                </div>
+                <span>{item.value}</span>
+              </button>
+            ))}
+          </div>
+        </article>
+
+        <article className="admin-surface">
+          <div className="admin-surface-head">
+            <div>
+              <p className="eyebrow">Coverage</p>
+              <h3>What the panel currently controls</h3>
+            </div>
+          </div>
+          <dl className="admin-summary-list">
+            <div>
+              <dt>User accounts</dt>
+              <dd>{users.length}</dd>
+            </div>
+            <div>
+              <dt>Artisan profiles</dt>
+              <dd>{artisans.length}</dd>
+            </div>
+            <div>
+              <dt>Bookings loaded</dt>
+              <dd>{bookings.length}</dd>
+            </div>
+            <div>
+              <dt>Support threads</dt>
+              <dd>{conversations.length}</dd>
+            </div>
+          </dl>
+        </article>
+      </div>
+    </section>
+  );
+}
+
+function AdminProfilesPanel({
+  token,
+  users,
+  artisans,
+  busy,
+  runAction,
+  refresh,
+}: {
+  token: string;
+  users: AdminUserRecord[];
+  artisans: AdminArtisanRecord[];
+  busy: boolean;
+  runAction: ActionRunner;
+  refresh: () => Promise<void>;
+}) {
+  async function updateStatus(firebaseUid: string, status: 'ACTIVE' | 'BANNED') {
+    await api(`/admin/users/${firebaseUid}/status`, {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify({ status }),
+    });
+    await refresh();
+  }
+
+  async function updateRole(firebaseUid: string, role: Role) {
+    await api(`/admin/users/${firebaseUid}/role`, {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify({ role }),
+    });
+    await refresh();
+  }
+
+  async function updateVerification(artisanId: string, verifyStatus: Artisan['verifyStatus']) {
+    await api(`/admin/artisans/${artisanId}/verify`, {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify({ verifyStatus }),
+    });
+    await refresh();
+  }
+
+  return (
+    <section className="admin-panel">
+      <header className="admin-panel-head">
+        <div>
+          <p className="eyebrow">Profiles</p>
+          <h2>Users and service providers</h2>
+          <p>Adjust account access, roles, and artisan verification without leaving the admin surface.</p>
+        </div>
+      </header>
+
+      <div className="admin-stack">
+        <article className="admin-surface">
+          <div className="admin-surface-head">
+            <div>
+              <p className="eyebrow">Accounts</p>
+              <h3>All users</h3>
+            </div>
+          </div>
+          <div className="admin-record-list">
+            {users.map((user) => (
+              <article className="admin-record-card" key={user.firebaseUid}>
+                <div className="admin-record-head">
+                  <div>
+                    <h4>{user.email || user.phone || user.firebaseUid}</h4>
+                    <p>{user.firebaseUid}</p>
+                  </div>
+                  <div className="admin-pill-row">
+                    <span className={`booking-status ${user.status.toLowerCase() === 'active' ? 'accepted' : 'cancelled'}`}>
+                      {user.status.toLowerCase()}
+                    </span>
+                    <span className="booking-status">{(user.role || 'UNASSIGNED').toLowerCase()}</span>
+                  </div>
+                </div>
+                <dl className="admin-inline-list">
+                  <div>
+                    <dt>Phone</dt>
+                    <dd>{user.phone || 'Not provided'}</dd>
+                  </div>
+                  <div>
+                    <dt>Artisan profile</dt>
+                    <dd>{user.artisanProfile?.displayName || 'None yet'}</dd>
+                  </div>
+                </dl>
+                <div className="admin-action-row">
+                  <button
+                    className="secondary-button"
+                    disabled={busy}
+                    onClick={() =>
+                      runAction(
+                        () => updateStatus(user.firebaseUid, user.status === 'ACTIVE' ? 'BANNED' : 'ACTIVE'),
+                        user.status === 'ACTIVE' ? 'User banned' : 'User reactivated'
+                      )
+                    }
+                  >
+                    {user.status === 'ACTIVE' ? 'Ban user' : 'Restore user'}
+                  </button>
+                  {(['CUSTOMER', 'ARTISAN', 'ADMIN'] as Role[]).map((role) => (
+                    <button
+                      key={role}
+                      className={user.role === role ? 'primary-button' : 'secondary-button'}
+                      disabled={busy}
+                      onClick={() => runAction(() => updateRole(user.firebaseUid, role), `Role changed to ${role.toLowerCase()}`)}
+                    >
+                      {role.toLowerCase()}
+                    </button>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        </article>
+
+        <article className="admin-surface">
+          <div className="admin-surface-head">
+            <div>
+              <p className="eyebrow">Supply</p>
+              <h3>Artisan profiles</h3>
+            </div>
+          </div>
+          <div className="admin-record-list">
+            {artisans.map((artisan) => (
+              <article className="admin-record-card" key={artisan.id}>
+                <div className="admin-record-head">
+                  <div>
+                    <h4>{artisan.displayName}</h4>
+                    <p>{artisan.user?.email || artisan.city}</p>
+                  </div>
+                  <div className="admin-pill-row">
+                    <span className={`booking-status ${artisan.verifyStatus.toLowerCase()}`}>
+                      {artisan.verifyStatus.toLowerCase()}
+                    </span>
+                    <span className="booking-status">
+                      {artisan.avgRating.toFixed(1)} ({artisan.ratingCount})
+                    </span>
+                  </div>
+                </div>
+                <dl className="admin-inline-list">
+                  <div>
+                    <dt>Location</dt>
+                    <dd>{[artisan.area, artisan.city].filter(Boolean).join(', ')}</dd>
+                  </div>
+                  <div>
+                    <dt>Activity</dt>
+                    <dd>
+                      {artisan._count?.offerings || 0} offers, {artisan._count?.bookingsReceived || 0} jobs
+                    </dd>
+                  </div>
+                </dl>
+                <div className="admin-action-row">
+                  {(['PENDING', 'APPROVED', 'REJECTED'] as Artisan['verifyStatus'][]).map((status) => (
+                    <button
+                      key={status}
+                      className={artisan.verifyStatus === status ? 'primary-button' : 'secondary-button'}
+                      disabled={busy}
+                      onClick={() =>
+                        runAction(
+                          () => updateVerification(artisan.id, status),
+                          `Artisan marked ${status.toLowerCase()}`
+                        )
+                      }
+                    >
+                      {status.toLowerCase()}
+                    </button>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        </article>
+      </div>
+    </section>
+  );
+}
+
+function AdminCatalogPanel({
+  token,
+  categories,
+  busy,
+  runAction,
+  refresh,
+}: {
+  token: string;
+  categories: AdminCategoryRecord[];
+  busy: boolean;
+  runAction: ActionRunner;
+  refresh: () => Promise<void>;
+}) {
+  async function createNewCategory() {
+    const name = window.prompt('Category name', '');
+    if (!name) return;
+    const slug = window.prompt('Category slug', name.toLowerCase().trim().replace(/\s+/g, '-'));
+    if (!slug) return;
+    const iconKey = window.prompt('Icon key', 'service');
+    if (!iconKey) return;
+
+    await api('/admin/categories', {
+      method: 'POST',
+      token,
+      body: JSON.stringify({ name, slug, iconKey }),
+    });
+    await refresh();
+  }
+
+  async function editCategory(category: AdminCategoryRecord) {
+    const name = window.prompt('Update category name', category.name);
+    if (!name) return;
+    const slug = window.prompt('Update category slug', category.slug);
+    if (!slug) return;
+    const iconKey = window.prompt('Update icon key', category.iconKey);
+    if (!iconKey) return;
+
+    await api(`/admin/categories/${category.id}`, {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify({ name, slug, iconKey }),
+    });
+    await refresh();
+  }
+
+  async function removeCategory(category: AdminCategoryRecord) {
+    if (!window.confirm(`Delete ${category.name}?`)) return;
+    await api(`/admin/categories/${category.id}`, {
+      method: 'DELETE',
+      token,
+    });
+    await refresh();
+  }
+
+  return (
+    <section className="admin-panel">
+      <header className="admin-panel-head">
+        <div>
+          <p className="eyebrow">Catalog</p>
+          <h2>Manage the public service menu</h2>
+          <p>Keep categories clean so search, onboarding, and discovery stay sharp.</p>
+        </div>
+        <button className="primary-button" disabled={busy} onClick={() => runAction(createNewCategory, 'Category created')}>
+          New category
+        </button>
+      </header>
+
+      <div className="admin-record-list">
+        {categories.map((category) => (
+          <article className="admin-record-card" key={category.id}>
+            <div className="admin-record-head">
+              <div>
+                <h4>{category.name}</h4>
+                <p>{category.slug}</p>
+              </div>
+              <span className="booking-status">{category._count?.offerings || 0} offerings</span>
+            </div>
+            <dl className="admin-inline-list">
+              <div>
+                <dt>Icon key</dt>
+                <dd>{category.iconKey}</dd>
+              </div>
+              <div>
+                <dt>Linked services</dt>
+                <dd>{category._count?.offerings || 0}</dd>
+              </div>
+            </dl>
+            <div className="admin-action-row">
+              <button
+                className="secondary-button"
+                disabled={busy}
+                onClick={() => runAction(() => editCategory(category), 'Category updated')}
+              >
+                Edit
+              </button>
+              <button
+                className="secondary-button"
+                disabled={busy}
+                onClick={() => runAction(() => removeCategory(category), 'Category deleted')}
+              >
+                Delete
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
     </section>
   );
 }

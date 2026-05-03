@@ -19,7 +19,14 @@ Bundo is a service marketplace that connects customers with artisans. The curren
 - Marketplace-style payments through Paystack
 - Held funds, disputes, and admin-controlled payout release
 
-The frontend lives in `client/` and the backend API lives in `src/`.
+The frontend lives in `client/`, the backend API lives in `server/src/`, and the Prisma/database assets live in `server/prisma/`.
+
+Current launch-oriented structure:
+
+- `client/` for the React/Vite frontend
+- `server/` for the Express API, Prisma schema, migrations, and backend environment files
+- `docs/` for operational and product documentation
+- root `package.json` as the shared entrypoint for running both sides cleanly
 
 ---
 
@@ -75,7 +82,7 @@ An admin can:
 
 The API entrypoint is:
 
-- [src/server.ts](/Users/macbook/bundo-api/src/server.ts)
+- [src/server.ts](/Users/macbook/bundo-api/server/src/server.ts)
 
 Mounted route groups:
 
@@ -93,15 +100,15 @@ Mounted route groups:
 ### Shared backend services
 
 - Firebase token verification middleware:
-  [src/middlewares/verifyFirebaseToken.ts](/Users/macbook/bundo-api/src/middlewares/verifyFirebaseToken.ts)
+  [src/middlewares/verifyFirebaseToken.ts](/Users/macbook/bundo-api/server/src/middlewares/verifyFirebaseToken.ts)
 - Role guard middleware:
-  [src/middlewares/requireRole.ts](/Users/macbook/bundo-api/src/middlewares/requireRole.ts)
+  [src/middlewares/requireRole.ts](/Users/macbook/bundo-api/server/src/middlewares/requireRole.ts)
 - Environment validation:
-  [src/config/env.ts](/Users/macbook/bundo-api/src/config/env.ts)
+  [src/config/env.ts](/Users/macbook/bundo-api/server/src/config/env.ts)
 - Firebase Admin boot:
-  [src/config/firebase.ts](/Users/macbook/bundo-api/src/config/firebase.ts)
+  [src/config/firebase.ts](/Users/macbook/bundo-api/server/src/config/firebase.ts)
 - Prisma client:
-  [src/db/client.ts](/Users/macbook/bundo-api/src/db/client.ts)
+  [src/db/client.ts](/Users/macbook/bundo-api/server/src/db/client.ts)
 
 ---
 
@@ -109,7 +116,7 @@ Mounted route groups:
 
 The Prisma schema is here:
 
-- [prisma/schema.prisma](/Users/macbook/bundo-api/prisma/schema.prisma)
+- [prisma/schema.prisma](/Users/macbook/bundo-api/server/prisma/schema.prisma)
 
 Main business entities:
 
@@ -176,7 +183,7 @@ The current frontend is a single-page React app that manages:
 - workspace by role
 - chat
 - bookings
-- admin control center
+- a dedicated admin operations console with its own navigation for overview, profiles, jobs, messages, verification, and catalog
 - payment actions in the booking flow
 - help-center and trust-policy content for payments, disputes, cancellations, KYC, privacy, and support
 
@@ -757,11 +764,11 @@ The smartest order from here is:
 
 If someone new joins the project, these are the best first reads:
 
-- [src/server.ts](/Users/macbook/bundo-api/src/server.ts)
-- [prisma/schema.prisma](/Users/macbook/bundo-api/prisma/schema.prisma)
-- [src/modules/payments/payments.service.ts](/Users/macbook/bundo-api/src/modules/payments/payments.service.ts)
-- [src/modules/admin/admin.routes.ts](/Users/macbook/bundo-api/src/modules/admin/admin.routes.ts)
-- [src/modules/bookings/bookings.routes.ts](/Users/macbook/bundo-api/src/modules/bookings/bookings.routes.ts)
-- [src/modules/artisans/artisans.routes.ts](/Users/macbook/bundo-api/src/modules/artisans/artisans.routes.ts)
+- [src/server.ts](/Users/macbook/bundo-api/server/src/server.ts)
+- [prisma/schema.prisma](/Users/macbook/bundo-api/server/prisma/schema.prisma)
+- [src/modules/payments/payments.service.ts](/Users/macbook/bundo-api/server/src/modules/payments/payments.service.ts)
+- [src/modules/admin/admin.routes.ts](/Users/macbook/bundo-api/server/src/modules/admin/admin.routes.ts)
+- [src/modules/bookings/bookings.routes.ts](/Users/macbook/bundo-api/server/src/modules/bookings/bookings.routes.ts)
+- [src/modules/artisans/artisans.routes.ts](/Users/macbook/bundo-api/server/src/modules/artisans/artisans.routes.ts)
 - [client/src/App.tsx](/Users/macbook/bundo-api/client/src/App.tsx)
 - [client/src/types.ts](/Users/macbook/bundo-api/client/src/types.ts)
