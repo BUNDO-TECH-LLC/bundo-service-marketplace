@@ -121,25 +121,25 @@ export function AuthPage({ mode }: AuthPageProps) {
   }
 
   return (
-    <AuthLayout title={title}>
-      <div className="grid gap-8">
-        <p className="m-0 text-center text-base text-[var(--color-text-subtle)]">
-          {mode === 'login' ? (
-            <>
-              Do not have an account?{' '}
-              <Link className="font-medium text-[var(--color-accent-link)] no-underline" to="/create-account">
-                Create account
-              </Link>
-            </>
-          ) : (
-            <>
-              Already have an account?{' '}
-              <Link className="font-medium text-[var(--color-accent-link)] no-underline" to="/login">
-                Log in
-              </Link>
-            </>
-          )}
-        </p>
+    <AuthLayout title={title}
+     subtitle={
+    mode === 'login' ? (
+      <>
+        Do not have an account?{' '}
+        <Link className="font-medium text-[var(--color-accent-link)] no-underline" to="/create-account">
+          Create account
+        </Link>
+      </>
+    ) : (
+      <>
+        Already have an account?{' '}
+        <Link className="font-medium text-[var(--color-accent-link)] no-underline" to="/login">
+          Log in
+        </Link>
+      </>
+    )
+  } >
+      
 
         <div className="grid gap-4">
           <button className="inline-flex min-h-14 items-center justify-center gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-white)] text-base font-bold text-[var(--color-ink-soft)] hover:bg-[var(--color-soft)]" type="button" onClick={() => setError('Google sign-in is not connected yet.')}>
@@ -156,7 +156,7 @@ export function AuthPage({ mode }: AuthPageProps) {
           </button>
         </div>
 
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 text-[var(--color-text-faint)] before:h-px before:bg-[var(--color-line-softer)] before:content-[''] after:h-px after:bg-[var(--color-line-softer)] after:content-['']">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 mt-4 mb-3 text-[var(--color-text-faint)] before:h-px before:bg-[var(--color-line-softer)] before:content-[''] after:h-px after:bg-[var(--color-line-softer)] after:content-['']">
           <span>Or</span>
         </div>
 
@@ -257,7 +257,6 @@ export function AuthPage({ mode }: AuthPageProps) {
             {submitting ? 'Please wait...' : action}
           </button>
         </form>
-      </div>
     </AuthLayout>
   );
 }

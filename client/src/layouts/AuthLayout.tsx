@@ -5,10 +5,11 @@ import LandingPage from '../pages/LandingPage';
 
 type AuthLayoutProps = {
   title: string;
+  subtitle: ReactNode;
   children: ReactNode;
 };
 
-export function AuthLayout({ title, children }: AuthLayoutProps) {
+export function AuthLayout({ title, subtitle, children }: AuthLayoutProps) {
   const navigate = useNavigate();
 
   return (
@@ -26,26 +27,33 @@ export function AuthLayout({ title, children }: AuthLayoutProps) {
         onClick={() => navigate('/')}
       >
         <div
-          className="grid w-full max-w-[440px] gap-1 rounded-[14px] border border-[var(--color-border)] bg-[var(--color-white)] p-4 shadow-[0_24px_80px_var(--shadow-modal)]"
+          className="grid w-full max-w-[440px] gap-4 rounded-[14px] border border-[var(--color-border)] bg-[var(--color-white)] p-4 shadow-[0_24px_80px_var(--shadow-modal)]"
           role="dialog"
         aria-modal="true"
           onClick={(event) => event.stopPropagation()}
         >
           <div className="grid gap-6">
             <span
-              className="grid h-[50px] w-[50px] place-items-center justify-self-center rounded-lg"
+              className="grid h-[40px] w-[40px] place-items-center justify-self-center rounded-lg"
               aria-hidden="true"
             >
               <img className="h-[34px] w-[34px] rounded-[5px] object-cover" src={bundoLogo} alt="Bundo logo" />
             </span>
-            <h2
-              id="auth-page-title"
-              className="m-0 text-center text-[25px] leading-tight font-medium text-[var(--color-ink-muted)]"
-            >
-              {title}
-            </h2>
+
+            <div className="grid gap-2 justify-items-center text-center">
+              <h2
+                id="auth-page-title"
+                className="m-0 text-[25px] leading-tight font-medium text-[var(--color-ink-muted)]"
+              >
+                {title}
+              </h2>
+
+              <p className="m-0 text-base text-[var(--color-text-subtle)]">
+                {subtitle}
+              </p>
+            </div>
           </div>
-          <div className="mt-3">{children}</div>
+          <div className="m-0">{children}</div>
         </div>
       </section>
     </main>
