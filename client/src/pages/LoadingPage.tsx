@@ -1,8 +1,22 @@
 import { useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import bundoLogo from "../assets/BundoLogo.png";
+
+
+type LoadingState = {
+  redirectTo?: string;
+};
+
 
 export default function LoadingPage() {
   const [progress, setProgress] = useState(0);
+
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const state = (location.state || {}) as LoadingState;
+
+  const redirectTo = state.redirectTo || "/";
 
   useEffect(() => {
     const duration = 2800;
@@ -20,11 +34,14 @@ export default function LoadingPage() {
 
       if (step >= steps) {
         clearInterval(timer);
+
+        navigate(redirectTo, { replace: true });
       }
     }, interval);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [navigate, redirectTo]);
+
 
   return (
     <main className="min-h-screen w-full bg-[var(--color-page)] flex items-center justify-center">

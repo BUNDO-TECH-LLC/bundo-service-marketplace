@@ -48,7 +48,7 @@ export function AuthLayout({ title, subtitle, children }: AuthLayoutProps) {
                 {title}
               </h2>
 
-              <p className="m-0 text-base text-[var(--color-text-subtle)]">
+              <p className="m-0 text-base text-[var(--color-text-sub)]">
                 {subtitle}
               </p>
             </div>
