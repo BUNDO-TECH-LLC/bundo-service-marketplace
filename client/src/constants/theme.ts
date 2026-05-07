@@ -44,6 +44,7 @@ export const colors = {
 
   muted: '#6f6f6f',
   textMuted: '#696970',
+  textSolid: '#141415',
   textSubtle: '#72727a',
   textFaint: '#8c8c94',
   textLight: '#b8b8b8',

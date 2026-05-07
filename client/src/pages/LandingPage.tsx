@@ -36,7 +36,7 @@ import {
   Role,
   AvailabilitySlot,
 } from '../types';
-import bundoLogo from '../assets/Bundo Logo.png';
+import bundoLogo from '../assets/BundoLogo.png';
 
 type View = 'home' | 'marketplace' | 'workspace' | 'admin' | 'help' | 'artisan-profile';
 type WorkspaceSection = 'overview' | 'bookings' | 'messages' | 'offers' | 'notifications';

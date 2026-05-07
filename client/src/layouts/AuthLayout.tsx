@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import bundoLogo from '../assets/Bundo Logo.png';
+import bundoLogo from '../assets/BundoLogo.png';
 import LandingPage from '../pages/LandingPage';
 
 type AuthLayoutProps = {
