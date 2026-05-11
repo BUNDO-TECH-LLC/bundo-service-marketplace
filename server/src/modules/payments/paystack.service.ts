@@ -43,7 +43,13 @@ export const verifyPaystackSignature = (rawBody: string, signature?: string) => 
     .update(rawBody)
     .digest('hex');
 
-  return hash === signature;
+  const expected = Buffer.from(hash, 'hex');
+  const received = Buffer.from(signature, 'hex');
+
+  return (
+    expected.length === received.length &&
+    crypto.timingSafeEqual(expected, received)
+  );
 };
 
 export const initializePaystackTransaction = async (input: {

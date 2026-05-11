@@ -1,6 +1,8 @@
 import express, { Request, Response } from 'express';
 import crypto from 'node:crypto';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { env } from './config/env';
 import { verifyFirebaseToken } from './middlewares/verifyFirebaseToken';
 import adminRoutes from './modules/admin/admin.routes';
@@ -17,14 +19,41 @@ import logger from './utils/logger';
 import db from './db/client';
 
 const app = express();
+const isProduction = env.NODE_ENV === 'production';
 const allowedOrigins = env.CORS_ORIGIN.split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+function isAllowedOrigin(origin?: string) {
+  if (!origin || allowedOrigins.includes(origin)) {
+    return true;
+  }
+
+  if (env.NODE_ENV === 'development') {
+    try {
+      const url = new URL(origin);
+      return ['localhost', '127.0.0.1'].includes(url.hostname);
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
+}
+
+app.set('trust proxy', isProduction ? 1 : false);
+app.disable('x-powered-by');
+
+app.use(
+  helmet({
+    crossOriginResourcePolicy: false,
+  })
+);
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (isAllowedOrigin(origin)) {
         callback(null, true);
         return;
       }
@@ -34,8 +63,30 @@ app.use(
     credentials: true,
   })
 );
+
+app.use(
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: isProduction ? 600 : 3000,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    skip: (req) => ['/health', '/ready'].includes(req.url.split('?')[0]),
+  })
+);
+
+app.use(
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: isProduction ? 120 : 1200,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    skip: (req) => ['GET', 'HEAD', 'OPTIONS'].includes(req.method),
+  })
+);
+
 app.use(
   express.json({
+    limit: '1mb',
     verify: (req, _res, buf) => {
       (req as any).rawBody = buf.toString('utf8');
     },
@@ -90,12 +141,14 @@ app.get('/ready', async (_req, res) => {
   }
 });
 
-app.get('/protected', verifyFirebaseToken, (req: Request, res: Response) => {
-  res.json({
-    message: 'You are authenticated',
-    user: (req as any).user,
+if (!isProduction) {
+  app.get('/protected', verifyFirebaseToken, (req: Request, res: Response) => {
+    res.json({
+      message: 'You are authenticated',
+      user: (req as any).user,
+    });
   });
-});
+}
 
 app.get('/me', verifyFirebaseToken, (req, res) => {
   res.json({

@@ -382,6 +382,8 @@ model Message {
   conversationId String       @map("conversation_id")
   senderId       String       @map("sender_id")
   body           String
+  imageUrl       String?      @map("image_url")
+  imageCloudinaryId String?   @map("image_cloudinary_id")
   readAt         DateTime?    @map("read_at")
   createdAt      DateTime     @default(now()) @map("created_at")
 

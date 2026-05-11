@@ -2,9 +2,14 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   createUserWithEmailAndPassword,
+  GoogleAuthProvider,
   onAuthStateChanged,
+  sendEmailVerification,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signOut,
+  updateProfile,
   User,
 } from 'firebase/auth';
 import { api, ApiError } from './lib/api';
@@ -37,11 +42,17 @@ import {
 import bundoLogo from './assets/bundo-logo.png';
 
 type View = 'home' | 'marketplace' | 'workspace' | 'admin' | 'help' | 'artisan-profile';
-type WorkspaceSection = 'overview' | 'bookings' | 'messages' | 'offers' | 'notifications';
+type WorkspaceSection = 'overview' | 'bookings' | 'messages' | 'offers' | 'notifications' | 'reviews' | 'profile';
 type AdminSection = 'overview' | 'profiles' | 'jobs' | 'messages' | 'verification' | 'catalog';
 type ActionRunner = (action: () => Promise<void>, done?: string) => Promise<void>;
 type PushStatus = 'idle' | 'unsupported' | 'missing-config' | 'unavailable' | 'enabled' | 'denied';
 type MarketplaceSort = 'newest' | 'rating' | 'price_low' | 'price_high';
+type SignupRole = Extract<Role, 'CUSTOMER' | 'ARTISAN'>;
+type BookingSuccessState = {
+  bookingId?: string;
+  serviceTitle: string;
+  artisanName: string;
+};
 type AdminUserRecord = ApiUser & {
   artisanProfile?: {
     id: string;
@@ -125,6 +136,45 @@ function formatMessageTime(value: string) {
   }).format(new Date(value));
 }
 
+async function uploadChatImage(token: string, file: File) {
+  if (!file.type.startsWith('image/')) {
+    throw new Error('Please choose an image file.');
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error('Chat images must be 5MB or smaller.');
+  }
+
+  const signatureResponse = await api<{ upload: CloudinarySignedUpload }>('/messages/sign-upload', {
+    method: 'POST',
+    token,
+  });
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('api_key', signatureResponse.upload.apiKey);
+  formData.append('timestamp', String(signatureResponse.upload.timestamp));
+  formData.append('folder', signatureResponse.upload.folder);
+  formData.append('signature', signatureResponse.upload.signature);
+
+  const uploadResponse = await fetch(
+    `https://api.cloudinary.com/v1_1/${signatureResponse.upload.cloudName}/image/upload`,
+    {
+      method: 'POST',
+      body: formData,
+    }
+  );
+  const uploadData = await uploadResponse.json();
+
+  if (!uploadResponse.ok) {
+    throw new Error(uploadData?.error?.message || 'Could not upload image');
+  }
+
+  return {
+    imageUrl: uploadData.secure_url as string,
+    imageCloudinaryId: uploadData.public_id as string,
+  };
+}
+
 function userDisplayName(firebaseUser: User | null, me: ApiUser | null) {
   const name = firebaseUser?.displayName?.trim();
 
@@ -145,6 +195,67 @@ function clearUrlSearch() {
   const url = new URL(window.location.href);
   url.search = '';
   window.history.replaceState({}, '', url.toString());
+}
+
+const routeStorageKey = 'bundo:last-route';
+const validStoredViews: View[] = ['home', 'marketplace', 'workspace', 'admin', 'help'];
+const validStoredWorkspaceSections: WorkspaceSection[] = [
+  'overview',
+  'bookings',
+  'messages',
+  'offers',
+  'notifications',
+  'reviews',
+  'profile',
+];
+
+function readStoredRoute(role: Role | null) {
+  try {
+    const rawRoute = window.localStorage.getItem(routeStorageKey);
+    if (!rawRoute) return null;
+
+    const parsed = JSON.parse(rawRoute) as {
+      view?: View;
+      workspaceSection?: WorkspaceSection;
+      adminSection?: AdminSection;
+    };
+
+    if (!parsed.view || !validStoredViews.includes(parsed.view)) {
+      return null;
+    }
+
+    if (parsed.view === 'admin' && role !== 'ADMIN') {
+      return null;
+    }
+
+    if (role === 'ARTISAN' && parsed.view === 'home') {
+      window.localStorage.removeItem(routeStorageKey);
+      return {
+        view: 'workspace' as View,
+        workspaceSection: 'overview' as WorkspaceSection,
+        adminSection: 'overview' as AdminSection,
+      };
+    }
+
+    return {
+      view: parsed.view,
+      workspaceSection:
+        parsed.workspaceSection && validStoredWorkspaceSections.includes(parsed.workspaceSection)
+          ? parsed.workspaceSection
+          : 'overview',
+      adminSection: parsed.adminSection || 'overview',
+    };
+  } catch {
+    return null;
+  }
+}
+
+function clearStoredRoute() {
+  window.localStorage.removeItem(routeStorageKey);
+}
+
+function needsEmailVerification(user: User) {
+  return user.providerData.some((provider) => provider.providerId === 'password') && !user.emailVerified;
 }
 
 function resetWorkspaceState() {
@@ -208,6 +319,7 @@ function App() {
   const [view, setView] = useState<View>('home');
   const [workspaceSection, setWorkspaceSection] = useState<WorkspaceSection>('overview');
   const [adminSection, setAdminSection] = useState<AdminSection>('overview');
+  const [routeHydrated, setRouteHydrated] = useState(false);
   const [activeHelpTopicId, setActiveHelpTopicId] = useState<string | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [token, setToken] = useState('');
@@ -234,8 +346,8 @@ function App() {
   const [priceMin, setPriceMin] = useState('');
   const [priceMax, setPriceMax] = useState('');
   const [marketplaceSort, setMarketplaceSort] = useState<MarketplaceSort>('rating');
-  const [authPromptSignal, setAuthPromptSignal] = useState(0);
   const [notice, setNotice] = useState('');
+  const [bookingSuccess, setBookingSuccess] = useState<BookingSuccessState | null>(null);
   const [busy, setBusy] = useState(false);
   const [pushStatus, setPushStatus] = useState<PushStatus>(hasPushConfig() ? 'idle' : 'missing-config');
   const [pushToken, setPushToken] = useState('');
@@ -366,8 +478,8 @@ function App() {
 
     if (user.role === 'ARTISAN') {
       const [bookingRes, offeringRes, conversationRes, notificationRes] = await Promise.all([
-        api<{ bookings: Booking[] }>('/bookings/artisan?page=1&limit=10', { token: authToken }),
-        api<{ offerings: Offering[] }>('/offerings/me', { token: authToken }),
+        api<{ bookings: Booking[] }>('/bookings/artisan?page=1&limit=10', { token: authToken }).catch(() => ({ bookings: [] })),
+        api<{ offerings: Offering[] }>('/offerings/me', { token: authToken }).catch(() => ({ offerings: [] })),
         api<{ conversations: Conversation[] }>('/conversations', { token: authToken }),
         api<{ notifications: Notification[] }>('/notifications', { token: authToken }),
       ]);
@@ -449,12 +561,41 @@ function App() {
         setAdminStats(null);
         setPushToken('');
         setPushStatus(hasPushConfig() ? 'idle' : 'missing-config');
+        setRouteHydrated(false);
         setWorkspaceSection(resetState.workspaceSection);
         setView(resetState.view);
         setActiveHelpTopicId(null);
         setSelectedArtisan(null);
         setSelectedArtisanReviews([]);
+        clearStoredRoute();
         clearUrlSearch();
+        return;
+      }
+
+      if (needsEmailVerification(user)) {
+        const resetState = resetWorkspaceState();
+        setToken('');
+        setMe(null);
+        setBookings([]);
+        setConversations([]);
+        setAdminConversations([]);
+        setAdminBookings([]);
+        setAdminKycSubmissions([]);
+        setAdminUsers([]);
+        setAdminArtisans([]);
+        setAdminCategories([]);
+        setNotifications([]);
+        setMyOfferings([]);
+        setAdminStats(null);
+        setPushToken('');
+        setPushStatus(hasPushConfig() ? 'idle' : 'missing-config');
+        setRouteHydrated(false);
+        setWorkspaceSection(resetState.workspaceSection);
+        setView(resetState.view);
+        setActiveHelpTopicId(null);
+        setSelectedArtisan(null);
+        setSelectedArtisanReviews([]);
+        clearStoredRoute();
         return;
       }
 
@@ -494,6 +635,14 @@ function App() {
           return;
         }
 
+        if (session.user.role === 'ADMIN') {
+          setAdminSection('overview');
+          setView('admin');
+          setRouteHydrated(true);
+          clearUrlSearch();
+          return;
+        }
+
         if (
           requestedView &&
           ['home', 'marketplace', 'workspace', 'admin', 'help'].includes(
@@ -503,14 +652,27 @@ function App() {
           setView(requestedView as View);
           if (
             requestedSection &&
-            ['overview', 'bookings', 'messages', 'offers', 'notifications'].includes(
+            ['overview', 'bookings', 'messages', 'offers', 'notifications', 'reviews', 'profile'].includes(
               requestedSection
             )
           ) {
             setWorkspaceSection(requestedSection as WorkspaceSection);
           }
+          setRouteHydrated(true);
           clearUrlSearch();
+          return;
         }
+
+        const storedRoute = readStoredRoute(session.user.role);
+        if (storedRoute) {
+          setWorkspaceSection(storedRoute.workspaceSection);
+          setAdminSection(storedRoute.adminSection);
+          setView(storedRoute.view);
+        } else if (session.user.role === 'ARTISAN') {
+          setWorkspaceSection('overview');
+          setView('workspace');
+        }
+        setRouteHydrated(true);
       } catch {
         const resetState = resetWorkspaceState();
         setToken('');
@@ -526,6 +688,7 @@ function App() {
         setNotifications([]);
         setMyOfferings([]);
         setAdminStats(null);
+        setRouteHydrated(false);
         setWorkspaceSection(resetState.workspaceSection);
         setView(resetState.view);
         setNotice('We could not finish account sync. Please make sure the backend is running, then sign in again.');
@@ -571,6 +734,28 @@ function App() {
     };
   }, [isAuthed, pushToken, token]);
 
+  useEffect(() => {
+    if (!isAuthed || !me?.role || !routeHydrated) return;
+
+    const routeToStore =
+      me.role === 'ARTISAN' && view === 'home'
+        ? {
+            view: 'workspace' as View,
+            workspaceSection: 'overview' as WorkspaceSection,
+            adminSection,
+          }
+        : {
+            view,
+            workspaceSection,
+            adminSection,
+          };
+
+    window.localStorage.setItem(
+      routeStorageKey,
+      JSON.stringify(routeToStore)
+    );
+  }, [adminSection, isAuthed, me?.role, routeHydrated, view, workspaceSection]);
+
   async function enablePushAlerts() {
     if (!token) {
       setNotice('Sign in first to enable alerts');
@@ -607,10 +792,23 @@ function App() {
     () => categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>),
     [categories]
   );
+  const isRestoringAuthedRoute = isAuthed && Boolean(me?.role) && !routeHydrated;
+  const usesArtisanSetupHeader = isAuthed && me?.role === 'ARTISAN' && view === 'home';
+  const usesArtisanWorkspaceHeader = isAuthed && me?.role === 'ARTISAN' && view === 'workspace';
+  const hideGlobalHeader = isAuthed && (me?.role === 'ADMIN' || usesArtisanSetupHeader || usesArtisanWorkspaceHeader);
+  const artisanHeaderActive =
+    workspaceSection === 'bookings'
+      ? 'Jobs'
+      : workspaceSection === 'messages'
+        ? 'Messages'
+        : workspaceSection === 'reviews'
+          ? 'Reviews'
+          : 'Dashboard';
 
   return (
     <div className="app-shell">
-      <header className="topbar">
+      {!hideGlobalHeader && (
+      <header className={`topbar ${isAuthed ? 'signed-in-topbar' : ''}`}>
         <button className="brand" onClick={() => setView('home')}>
           <img className="brand-logo" src={bundoLogo} alt="Bundo logo" />
           <span>Bundo</span>
@@ -618,16 +816,37 @@ function App() {
         <nav aria-label="Main navigation">
           {isAuthed && (
             <>
-              <button className={view === 'marketplace' ? 'active' : ''} onClick={() => setView('marketplace')}>Services</button>
+              <button className={view === 'home' ? 'active' : ''} onClick={() => setView('home')}>Dashboard</button>
+              <button className={view === 'marketplace' ? 'active' : ''} onClick={() => setView('marketplace')}>Categories</button>
               <button
-                className={view === 'workspace' ? 'active' : ''}
+                className={view === 'workspace' && workspaceSection === 'bookings' ? 'active' : ''}
                 onClick={() => {
-                  setWorkspaceSection('overview');
+                  setWorkspaceSection('bookings');
                   setView('workspace');
                 }}
               >
-                Dashboard
+                {me?.role === 'ARTISAN' ? 'Jobs' : 'Bookings'}
               </button>
+              <button
+                className={view === 'workspace' && workspaceSection === 'messages' ? 'active' : ''}
+                onClick={() => {
+                  setWorkspaceSection('messages');
+                  setView('workspace');
+                }}
+              >
+                Messages
+              </button>
+              {me?.role === 'ARTISAN' && (
+                <button
+                  className={view === 'workspace' && workspaceSection === 'reviews' ? 'active' : ''}
+                  onClick={() => {
+                    setWorkspaceSection('reviews');
+                    setView('workspace');
+                  }}
+                >
+                  Reviews
+                </button>
+              )}
             </>
           )}
           {me?.role === 'ADMIN' && <button className={view === 'admin' ? 'active' : ''} onClick={() => setView('admin')}>Admin</button>}
@@ -640,101 +859,190 @@ function App() {
           >
             Help
           </button>
-          <button
-            className="professional-link"
-            onClick={() => {
-              if (!me) {
-                setAuthPromptSignal((value) => value + 1);
-                setNotice('Create or sign in to an artisan account to start professional onboarding.');
-                setView('home');
-                return;
-              }
-
-              if (me.role === 'ADMIN') {
-                setNotice('Admin accounts already have marketplace control access.');
-                setView('admin');
-                return;
-              }
-
-              if (me.role === 'ARTISAN') {
-                setWorkspaceSection('offers');
-                setView('workspace');
-                setNotice('Welcome back to your artisan workspace.');
-                return;
-              }
-
-              withNotice(async () => {
-                await api('/users/role', {
-                  method: 'PATCH',
-                  token,
-                  body: JSON.stringify({ role: 'ARTISAN' }),
-                });
-                const nextUser = await refreshMe();
-                await loadPrivateData(token, nextUser || me);
-                setWorkspaceSection('overview');
-                setView('workspace');
-              }, 'Your account is now set up for artisan onboarding');
+        </nav>
+        {isAuthed && (
+          <form
+            className="topbar-search"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void withNotice(async () => {
+                await loadPublicData(selectedState, searchTerm);
+                setView('marketplace');
+              }, searchTerm.trim() ? `Searching for ${searchTerm.trim()}` : 'Showing available services');
             }}
           >
-            Register as a professional
-          </button>
-        </nav>
+            <label>
+              <span aria-hidden="true">⌕</span>
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Search for artisan"
+              />
+            </label>
+            <label>
+              <span aria-hidden="true">⌖</span>
+              <select
+                value={selectedState}
+                onChange={(event) => {
+                  setSelectedState(event.target.value);
+                }}
+              >
+                <option value="">Nigeria</option>
+                {nigeriaStates.map((state) => (
+                  <option key={state} value={state}>
+                    {state}, Nigeria
+                  </option>
+                ))}
+              </select>
+            </label>
+          </form>
+        )}
         <AuthBox
           firebaseUser={firebaseUser}
           me={me}
-          authPromptSignal={authPromptSignal}
           unreadCount={notifications.filter((notification) => !notification.readAt).length}
           onReady={(nextToken, nextUser) => {
             setToken(nextToken);
             setMe(nextUser);
             loadPrivateData(nextToken, nextUser).catch(() => undefined);
-            if (nextUser.role === 'CUSTOMER') {
+            if (nextUser.role === 'ADMIN') {
+              setView('admin');
+            } else if (nextUser.role === 'CUSTOMER') {
               setView('home');
             }
+            setRouteHydrated(true);
           }}
           onNavigate={setView}
           onWorkspaceSection={setWorkspaceSection}
           onNotice={setNotice}
         />
       </header>
+      )}
 
-      {notice && <div className="notice">{notice}</div>}
+      {notice && <div className={`notice ${usesArtisanSetupHeader ? 'setup-notice' : ''}`}>{notice}</div>}
+      {bookingSuccess && (
+        <BookingSuccessDialog
+          booking={bookingSuccess}
+          onClose={() => setBookingSuccess(null)}
+          onViewBookings={() => {
+            setBookingSuccess(null);
+            setWorkspaceSection('bookings');
+            setView('workspace');
+          }}
+        />
+      )}
 
-      {view === 'home' && (
-        <main>
-          <Hero
-            selectedState={selectedState}
-            states={nigeriaStates}
-            onStateChange={async (state) => {
-              setSelectedState(state);
-              await withNotice(async () => {
-                await loadPublicData(state, searchTerm);
-                setView('marketplace');
-              }, state ? `Showing services in ${state}` : 'Showing all services');
-            }}
-            searchTerm={searchTerm}
-            onSearchTermChange={setSearchTerm}
-            onSearch={async (state, queryText) => {
-              setSelectedState(state);
-              setSearchTerm(queryText);
-              await withNotice(async () => {
-                await loadPublicData(state, queryText);
-                setView('marketplace');
-              }, queryText.trim() ? `Searching for ${queryText.trim()}` : 'Showing available services');
-            }}
-            onBrowse={() => setView('marketplace')}
-          />
-          <WhySection />
-          <ServicesSection categories={categories} onBrowse={() => setView('marketplace')} />
-          <MarketplacePreview offerings={publicOfferings} onBrowse={() => setView('marketplace')} />
-          <AppPromo />
-          <Footer
-            onOpenHelpTopic={(topicId) => {
-              setActiveHelpTopicId(topicId);
-              setView('help');
-            }}
-          />
+      {isRestoringAuthedRoute && (
+        <main className="page route-loading">
+          <EmptyState title="Loading your workspace" body="Restoring the right page for your account." />
         </main>
+      )}
+
+      {!isRestoringAuthedRoute && view === 'home' && (
+        isAuthed && me ? (
+          me.role === 'ARTISAN' ? (
+            <ArtisanLanding
+              token={token}
+              categories={categories}
+              offerings={myOfferings}
+              bookings={bookings}
+              firebaseUser={firebaseUser}
+              busy={busy}
+              runAction={withNotice}
+              refresh={async () => {
+                await loadPublicData();
+                await loadPrivateData();
+              }}
+              openBookings={() => {
+                setWorkspaceSection('bookings');
+                setView('workspace');
+              }}
+              openMessages={() => {
+                setWorkspaceSection('messages');
+                setView('workspace');
+              }}
+              openReviews={() => {
+                setWorkspaceSection('reviews');
+                setView('workspace');
+              }}
+              openProfile={() => {
+                setWorkspaceSection('profile');
+                setView('workspace');
+              }}
+            />
+          ) : (
+            <LoggedInHome
+              me={me}
+              firebaseUser={firebaseUser}
+              categories={categories}
+              offerings={publicOfferings}
+              artisans={artisans}
+              selectedState={selectedState}
+              searchTerm={searchTerm}
+              token={token}
+              busy={busy}
+              onSearchTermChange={setSearchTerm}
+              onSelectedStateChange={setSelectedState}
+              onBrowse={async (categoryId) => {
+                setSelectedCategoryId(categoryId || '');
+                await withNotice(async () => {
+                  await loadPublicData(selectedState, searchTerm, { categoryId: categoryId || '' });
+                  setView('marketplace');
+                }, categoryId ? 'Category selected' : 'Opening marketplace');
+              }}
+              onSearch={async () => {
+                await withNotice(async () => {
+                  await loadPublicData(selectedState, searchTerm);
+                  setView('marketplace');
+                }, searchTerm.trim() ? `Searching for ${searchTerm.trim()}` : 'Showing available services');
+              }}
+              onViewProfile={openArtisanProfile}
+              runAction={withNotice}
+              reloadPrivate={() => loadPrivateData()}
+              onBookingSuccess={setBookingSuccess}
+              openBookings={() => {
+                setWorkspaceSection('bookings');
+                setView('workspace');
+              }}
+            />
+          )
+        ) : (
+          <main>
+            <Hero
+              selectedState={selectedState}
+              states={nigeriaStates}
+              onStateChange={async (state) => {
+                setSelectedState(state);
+                await withNotice(async () => {
+                  await loadPublicData(state, searchTerm);
+                  setView('marketplace');
+                }, state ? `Showing services in ${state}` : 'Showing all services');
+              }}
+              searchTerm={searchTerm}
+              onSearchTermChange={setSearchTerm}
+              onSearch={async (state, queryText) => {
+                setSelectedState(state);
+                setSearchTerm(queryText);
+                await withNotice(async () => {
+                  await loadPublicData(state, queryText);
+                  setView('marketplace');
+                }, queryText.trim() ? `Searching for ${queryText.trim()}` : 'Showing available services');
+              }}
+              onBrowse={() => setView('marketplace')}
+            />
+            <WhySection />
+            <ServicesSection categories={categories} onBrowse={() => setView('marketplace')} />
+            <MarketplacePreview offerings={publicOfferings} onBrowse={() => setView('marketplace')} />
+            <AppPromo />
+            <Footer
+              onOpenHelpTopic={(topicId) => {
+                setActiveHelpTopicId(topicId);
+                setView('help');
+              }}
+            />
+          </main>
+        )
       )}
 
       {view === 'marketplace' && (
@@ -815,6 +1123,7 @@ function App() {
             runAction={withNotice}
             reloadPrivate={() => loadPrivateData()}
             onViewProfile={openArtisanProfile}
+            onBookingSuccess={setBookingSuccess}
           />
 
           <section className="section-head compact">
@@ -850,6 +1159,7 @@ function App() {
           runAction={withNotice}
           onBack={() => setView('marketplace')}
           reloadPrivate={() => loadPrivateData()}
+          onBookingSuccess={setBookingSuccess}
         />
       )}
 
@@ -864,9 +1174,36 @@ function App() {
         />
       )}
 
+      {usesArtisanWorkspaceHeader && (
+        <ArtisanAppHeader
+          displayName={userDisplayName(firebaseUser, me)}
+          active={artisanHeaderActive}
+          onDashboard={() => {
+            setWorkspaceSection('overview');
+            setView('workspace');
+          }}
+          onJobs={() => {
+            setWorkspaceSection('bookings');
+            setView('workspace');
+          }}
+          onMessages={() => {
+            setWorkspaceSection('messages');
+            setView('workspace');
+          }}
+          onReviews={() => {
+            setWorkspaceSection('reviews');
+            setView('workspace');
+          }}
+          onProfile={() => {
+            setWorkspaceSection('profile');
+            setView('workspace');
+          }}
+        />
+      )}
+
       {view === 'workspace' && (
-        <main className={`page workspace-page ${workspaceSection === 'messages' ? 'messages-workspace' : ''}`}>
-          {workspaceSection !== 'messages' && (
+        <main className={`page workspace-page ${workspaceSection === 'messages' ? 'messages-workspace' : ''} ${me?.role === 'ARTISAN' ? 'artisan-workspace-page' : ''}`}>
+          {workspaceSection !== 'messages' && me?.role !== 'ARTISAN' && (
             <section className="section-head">
               <p className="eyebrow">Workspace</p>
               <h1>
@@ -883,7 +1220,7 @@ function App() {
                     ? 'Update your artisan profile and service listings.'
                     : firebaseUser
                       ? firebaseUser.email
-                      : 'Sign in to test roles, artisan setup, bookings, and chat from the web client.'}
+                      : 'Sign in to manage profile settings, bookings, messages, and account updates.'}
               </p>
             </section>
           )}
@@ -926,7 +1263,7 @@ function App() {
 
           {me && workspaceSection === 'offers' && me.role === 'ARTISAN' && (
             <div className="dashboard-grid">
-              <ArtisanPanel
+              <ArtisanOffersPanel
                 token={token}
                 categories={categoryOptions}
                 offerings={myOfferings}
@@ -941,7 +1278,10 @@ function App() {
           )}
 
           {me && workspaceSection === 'offers' && me.role !== 'ARTISAN' && (
-            <EmptyState title="Artisan tools" body="Choose the artisan role first to manage offers." />
+            <EmptyState
+              title="Artisan tools"
+              body="Apply as an artisan from profile settings, then complete KYC and wait for admin approval before listing offers."
+            />
           )}
 
           {me && workspaceSection === 'notifications' && (
@@ -957,33 +1297,50 @@ function App() {
             />
           )}
 
+          {me && workspaceSection === 'reviews' && me.role === 'ARTISAN' && (
+            <ArtisanReviewsPanel token={token} />
+          )}
+
+          {me && workspaceSection === 'profile' && me.role === 'ARTISAN' && (
+            <ArtisanProfileSettings
+              token={token}
+              firebaseUser={firebaseUser}
+              busy={busy}
+              runAction={withNotice}
+              refresh={() => loadPrivateData()}
+            />
+          )}
+
           {me && workspaceSection === 'overview' && (
-            <div className="dashboard-grid">
-              <RolePanel
+            me.role === 'ARTISAN' ? (
+              <ArtisanDashboard
                 token={token}
-                me={me}
+                bookings={bookings}
+                firebaseUser={firebaseUser}
                 busy={busy}
                 runAction={withNotice}
-                refresh={async () => {
-                  const user = await refreshMe();
-                  await loadPrivateData(token, user || me);
-                }}
+                refresh={() => loadPrivateData()}
+                openBookings={() => setWorkspaceSection('bookings')}
+                openMessages={() => setWorkspaceSection('messages')}
+                openReviews={() => setWorkspaceSection('reviews')}
+                openProfile={() => setWorkspaceSection('profile')}
+                openOffers={() => setWorkspaceSection('offers')}
               />
-              {me.role === 'ARTISAN' && (
-                <ArtisanPanel
+            ) : (
+              <div className="dashboard-grid">
+                <AccountSettingsPanel
                   token={token}
-                  categories={categoryOptions}
-                  offerings={myOfferings}
+                  me={me}
                   busy={busy}
                   runAction={withNotice}
                   refresh={async () => {
-                    await loadPublicData();
-                    await loadPrivateData();
+                    const user = await refreshMe();
+                    await loadPrivateData(token, user || me);
                   }}
                 />
-              )}
-              <BookingsSummary bookings={bookings} title={me.role === 'ARTISAN' ? 'Booking requests' : 'My bookings'} />
-            </div>
+                <BookingsSummary bookings={bookings} title="My bookings" />
+              </div>
+            )
           )}
         </main>
       )}
@@ -1001,9 +1358,16 @@ function App() {
             submissions={adminKycSubmissions}
             categories={adminCategories}
             token={token}
+            adminLabel={firebaseUser?.email || me?.email || 'Admin'}
             busy={busy}
             runAction={withNotice}
             refresh={() => loadPrivateData()}
+            onSignOut={() => {
+              setAdminSection('overview');
+              setView('home');
+              setNotice('Signed out');
+              auth && signOut(auth);
+            }}
           />
         </main>
       )}
@@ -1014,7 +1378,6 @@ function App() {
 function AuthBox({
   firebaseUser,
   me,
-  authPromptSignal,
   unreadCount,
   onReady,
   onNavigate,
@@ -1023,7 +1386,6 @@ function AuthBox({
 }: {
   firebaseUser: User | null;
   me: ApiUser | null;
-  authPromptSignal: number;
   unreadCount: number;
   onReady: (token: string, user: ApiUser) => void;
   onNavigate: (view: View) => void;
@@ -1031,23 +1393,161 @@ function AuthBox({
   onNotice: (message: string) => void;
 }) {
   const [email, setEmail] = useState('');
+  const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
+  const [authStep, setAuthStep] = useState<'role' | 'account' | 'verify'>('account');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [preferredRole, setPreferredRole] = useState<Role | null>(null);
+  const [preferredRole, setPreferredRole] = useState<SignupRole | null>(null);
+  const [pendingAuthUser, setPendingAuthUser] = useState<User | null>(null);
+  const [pendingEmailVerificationUser, setPendingEmailVerificationUser] = useState<User | null>(null);
 
-  useEffect(() => {
-    if (!authPromptSignal) return;
-    setPreferredRole('ARTISAN');
-    setMode('signup');
-    setDrawerOpen(true);
-  }, [authPromptSignal]);
+  async function finishAuth(firebaseAuthUser: User, authMode = mode, roleOverride = preferredRole) {
+    let session = await resolveApiSession(firebaseAuthUser);
+
+    if (
+      roleOverride &&
+      session.user.role !== roleOverride &&
+      session.user.role !== 'ADMIN' &&
+      !(session.user.role === 'ARTISAN' && roleOverride === 'CUSTOMER')
+    ) {
+      await api('/users/role', {
+        method: 'PATCH',
+        token: session.token,
+        body: JSON.stringify({ role: roleOverride }),
+      });
+      const refreshed = await api<{ user: ApiUser }>('/me', { token: session.token });
+      session = {
+        token: session.token,
+        user: refreshed.user,
+      };
+    }
+
+    if (!session.user.role && session.user.role !== 'ADMIN') {
+      setPendingAuthUser(firebaseAuthUser);
+      setPreferredRole(null);
+      setMode('signup');
+      setAuthStep('role');
+      setDrawerOpen(true);
+      onNotice('Choose client or artisan to finish setting up your Bundo account.');
+      return;
+    }
+
+    onReady(session.token, session.user);
+    if (session.user.role === 'ARTISAN') {
+      onWorkspaceSection('overview');
+      onNavigate(authMode === 'signup' ? 'home' : 'workspace');
+      onNotice(
+        'Your artisan onboarding is ready. Complete your profile, KYC, and offerings for admin review.'
+      );
+    } else if (authMode === 'signup') {
+      onNotice('Account created. Welcome to Bundo.');
+    } else {
+      onNotice('Signed in');
+    }
+
+    setDrawerOpen(false);
+    setPassword('');
+    setConfirmPassword('');
+    setFullName('');
+    setPreferredRole(null);
+    setPendingAuthUser(null);
+    setPendingEmailVerificationUser(null);
+    setAuthStep('account');
+  }
+
+  async function sendVerification(user: User) {
+    await sendEmailVerification(user);
+    setPendingEmailVerificationUser(user);
+    setAuthStep('verify');
+    onNotice('Verification email sent. Check your inbox, then come back to continue.');
+  }
+
+  async function confirmEmailVerification() {
+    const user = pendingEmailVerificationUser || auth?.currentUser;
+
+    if (!user) {
+      onNotice('Sign in again so we can check your verification status.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await user.reload();
+      const refreshedUser = auth?.currentUser || user;
+
+      if (!refreshedUser.emailVerified) {
+        onNotice('Email is not verified yet. Open the verification link, then try again.');
+        return;
+      }
+
+      await finishAuth(refreshedUser, 'signup');
+    } catch (error) {
+      onNotice(error instanceof Error ? error.message : 'Could not check verification status');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function resendVerification() {
+    const user = pendingEmailVerificationUser || auth?.currentUser;
+
+    if (!user) {
+      onNotice('Sign in again so we can send a verification email.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await sendVerification(user);
+    } catch (error) {
+      onNotice(error instanceof Error ? error.message : 'Could not send verification email');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function resetPassword(event: FormEvent) {
+    event.preventDefault();
+    if (!auth) return;
+
+    if (!email.trim()) {
+      onNotice('Enter your email address first.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      onNotice('Password reset email sent. Check your inbox.');
+      setMode('login');
+      setAuthStep('account');
+      setPassword('');
+    } catch (error) {
+      onNotice(error instanceof Error ? error.message : 'Could not send password reset email');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!auth) return;
+
+    if (mode === 'signup' && !preferredRole) {
+      setAuthStep('role');
+      onNotice('Choose how you want to use Bundo first.');
+      return;
+    }
+
+    if (mode === 'signup' && password !== confirmPassword) {
+      onNotice('Passwords do not match. Please retype them and try again.');
+      return;
+    }
+
     setSubmitting(true);
     onNotice('');
     try {
@@ -1055,47 +1555,107 @@ function AuthBox({
         mode === 'login'
           ? await signInWithEmailAndPassword(auth, email, password)
           : await createUserWithEmailAndPassword(auth, email, password);
-      let session = await resolveApiSession(credential.user);
 
-      if (
-        preferredRole === 'ARTISAN' &&
-        session.user.role !== 'ARTISAN' &&
-        session.user.role !== 'ADMIN'
-      ) {
-        await api('/users/role', {
-          method: 'PATCH',
-          token: session.token,
-          body: JSON.stringify({ role: 'ARTISAN' }),
-        });
-        const refreshed = await api<{ user: ApiUser }>('/me', { token: session.token });
-        session = {
-          token: session.token,
-          user: refreshed.user,
-        };
+      if (mode === 'signup' && fullName.trim()) {
+        await updateProfile(credential.user, { displayName: fullName.trim() });
       }
 
-      onReady(session.token, session.user);
-      if (preferredRole === 'ARTISAN') {
-        onWorkspaceSection('overview');
-        onNavigate('workspace');
-        onNotice(
-          session.user.role === 'ARTISAN'
-            ? 'Your artisan onboarding is ready. Complete your profile, KYC, and offerings for admin review.'
-            : mode === 'login'
-              ? 'Signed in'
-              : 'Account created'
-        );
-      } else {
-        onNotice(mode === 'login' ? 'Signed in' : 'Account created');
+      if (mode === 'signup' && !credential.user.emailVerified) {
+        await sendVerification(credential.user);
+        return;
       }
-      setDrawerOpen(false);
-      setPassword('');
-      setPreferredRole(null);
+
+      if (mode === 'login' && credential.user.providerData.some((provider) => provider.providerId === 'password') && !credential.user.emailVerified) {
+        setPendingEmailVerificationUser(credential.user);
+        setAuthStep('verify');
+        onNotice('Please verify your email before continuing.');
+        return;
+      }
+
+      await finishAuth(credential.user);
     } catch (error) {
       onNotice(error instanceof Error ? error.message : 'Could not sign in');
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function continueWithGoogle() {
+    if (!auth) return;
+
+    if (mode === 'signup' && !preferredRole) {
+      setAuthStep('role');
+      onNotice('Choose how you want to use Bundo first.');
+      return;
+    }
+
+    setSubmitting(true);
+    onNotice('');
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const credential = await signInWithPopup(auth, provider);
+      await finishAuth(credential.user);
+    } catch (error) {
+      onNotice(error instanceof Error ? error.message : 'Could not continue with Google');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function chooseRole(role: SignupRole) {
+    setPreferredRole(role);
+
+    if (pendingAuthUser) {
+      void finishAuth(pendingAuthUser, 'signup', role);
+      return;
+    }
+
+    setAuthStep('account');
+    onNotice('');
+  }
+
+  function openLogin() {
+    setPreferredRole(null);
+    setConfirmPassword('');
+    setPendingAuthUser(null);
+    setPendingEmailVerificationUser(null);
+    setMode('login');
+    setAuthStep('account');
+    setDrawerOpen(true);
+  }
+
+  function openSignup(role: SignupRole | null = null) {
+    setPreferredRole(role);
+    setConfirmPassword('');
+    setPendingAuthUser(null);
+    setPendingEmailVerificationUser(null);
+    setMode('signup');
+    setAuthStep(role ? 'account' : 'role');
+    setDrawerOpen(true);
+  }
+
+  function openResetPassword() {
+    setPassword('');
+    setConfirmPassword('');
+    setPendingAuthUser(null);
+    setPendingEmailVerificationUser(null);
+    setMode('reset');
+    setAuthStep('account');
+  }
+
+  function switchMode() {
+    if (mode === 'login' || mode === 'reset') {
+      openSignup();
+      return;
+    }
+
+    setMode('login');
+    setPreferredRole(null);
+    setConfirmPassword('');
+    setPendingAuthUser(null);
+    setPendingEmailVerificationUser(null);
+    setAuthStep('account');
   }
 
   if (firebaseUser && me) {
@@ -1144,9 +1704,11 @@ function AuthBox({
             {role === 'ARTISAN' ? (
               <>
                 <button onClick={() => goToWorkspace('overview')}>Dashboard</button>
+                <button onClick={() => goToWorkspace('profile')}>Your profile</button>
                 <button onClick={() => goToWorkspace('offers')}>Manage offers</button>
                 <button onClick={() => goToWorkspace('bookings')}>Booking requests</button>
                 <button onClick={() => goToWorkspace('messages')}>Messages</button>
+                <button onClick={() => goToWorkspace('reviews')}>Reviews</button>
                 <button onClick={() => goToWorkspace('notifications')}>Notifications</button>
               </>
             ) : role === 'ADMIN' ? (
@@ -1186,25 +1748,10 @@ function AuthBox({
 
   return (
     <div className="auth-entry">
-      <button
-        type="button"
-        onClick={() => {
-          setPreferredRole(null);
-          setMode('login');
-          setDrawerOpen(true);
-        }}
-      >
+      <button type="button" onClick={openLogin}>
         Login
       </button>
-      <button
-        type="button"
-        className="signup-link"
-        onClick={() => {
-          setPreferredRole(null);
-          setMode('signup');
-          setDrawerOpen(true);
-        }}
-      >
+      <button type="button" className="signup-link" onClick={() => openSignup()}>
         Sign up
       </button>
 
@@ -1221,49 +1768,1068 @@ function AuthBox({
               <img className="drawer-logo" src={bundoLogo} alt="Bundo logo" />
               <button type="button" onClick={() => setDrawerOpen(false)}>Close</button>
             </div>
-            <p className="eyebrow">{preferredRole === 'ARTISAN' ? 'Join as a professional' : 'Welcome to Bundo'}</p>
+
+            {authStep === 'verify' ? (
+              <>
+                <p className="eyebrow">Verify your email</p>
+                <h2>Check your inbox</h2>
+                <p className="drawer-copy">
+                  We sent a verification link to {pendingEmailVerificationUser?.email || email || 'your email address'}.
+                  Open that link, then return here to continue into your Bundo account.
+                </p>
+                <div className="auth-status-card">
+                  <strong>Email verification required</strong>
+                  <span>
+                    This helps protect bookings, messages, payments, and artisan verification from fake or mistyped accounts.
+                  </span>
+                </div>
+                <div className="auth-action-stack">
+                  <button type="button" onClick={confirmEmailVerification} disabled={submitting}>
+                    {submitting ? 'Checking...' : "I've verified my email"}
+                  </button>
+                  <button type="button" className="secondary-button" onClick={resendVerification} disabled={submitting}>
+                    Resend verification email
+                  </button>
+                  <button type="button" className="mode-switch" onClick={openLogin}>
+                    Back to login
+                  </button>
+                </div>
+              </>
+            ) : mode === 'signup' && authStep === 'role' ? (
+              <>
+                <p className="eyebrow">Create your account</p>
+                <h2>How will you use Bundo?</h2>
+                <p className="drawer-copy">
+                  Choose the account type that matches your first workflow. You can manage your setup from the dashboard after login.
+                </p>
+
+                <div className="role-choice-grid" aria-label="Choose account type">
+                  <button type="button" className="role-choice-card" onClick={() => chooseRole('CUSTOMER')}>
+                    <span>Client</span>
+                    <strong>Find and book trusted services</strong>
+                    <small>Browse professionals, message artisans, request bookings, and track jobs.</small>
+                  </button>
+                  <button type="button" className="role-choice-card artisan" onClick={() => chooseRole('ARTISAN')}>
+                    <span>Artisan</span>
+                    <strong>Offer services on Bundo</strong>
+                    <small>Create a profile, add offerings, complete verification, and receive bookings.</small>
+                  </button>
+                </div>
+
+                <button type="button" className="mode-switch" onClick={switchMode}>
+                  Already have an account? Login
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="eyebrow">
+                  {mode === 'reset'
+                    ? 'Reset access'
+                    : mode === 'login'
+                    ? 'Welcome back'
+                    : preferredRole === 'ARTISAN'
+                      ? 'Join as an artisan'
+                      : 'Join as a client'}
+                </p>
             <h2>
-              {preferredRole === 'ARTISAN'
-                ? mode === 'login'
-                  ? 'Login as a professional'
-                  : 'Create your artisan account'
-                : mode === 'login'
-                  ? 'Login to your account'
-                  : 'Create your account'}
+                  {mode === 'reset'
+                    ? 'Reset your password'
+                    : mode === 'login'
+                    ? 'Login to your account'
+                    : preferredRole === 'ARTISAN'
+                      ? 'Create your artisan account'
+                      : 'Create your client account'}
             </h2>
             <p className="drawer-copy">
-              {preferredRole === 'ARTISAN'
-                ? 'Sign up or log in, then we will place you on the artisan path so you can complete profile setup, KYC, offerings, and admin verification.'
-                : 'Continue as a customer, artisan, or admin and pick up your marketplace workflow.'}
+                  {mode === 'reset'
+                    ? 'Enter your account email and Firebase will send a secure password reset link.'
+                    : mode === 'login'
+                    ? 'Continue with Google or your email to pick up your marketplace workflow.'
+                    : preferredRole === 'ARTISAN'
+                      ? 'Start with your login, then complete profile setup, verification, offerings, and admin review from your workspace.'
+                      : 'Start with your login, then browse, message, book, and manage service requests from your dashboard.'}
             </p>
 
-            <form className="auth-form" onSubmit={submit}>
+                {mode === 'signup' && (
+                  <div className="selected-role-banner">
+                    <span>{preferredRole === 'ARTISAN' ? 'Artisan account' : 'Client account'}</span>
+                    <button type="button" onClick={() => setAuthStep('role')}>Change</button>
+                  </div>
+                )}
+
+                {mode !== 'reset' && (
+                  <>
+                    <button type="button" className="google-auth-button" onClick={continueWithGoogle} disabled={!firebaseReady || submitting}>
+                      <span aria-hidden="true">G</span>
+                      Continue with Google
+                    </button>
+
+                    <div className="auth-divider"><span>or</span></div>
+                  </>
+                )}
+
+            <form className="auth-form" onSubmit={mode === 'reset' ? resetPassword : submit}>
+                  {mode === 'signup' && (
+                    <label>
+                      Full name
+                      <input
+                        value={fullName}
+                        onChange={(event) => setFullName(event.target.value)}
+                        placeholder="Your full name"
+                        type="text"
+                        autoComplete="name"
+                        required
+                      />
+                    </label>
+                  )}
               <label>
                 Email
-                <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" type="email" required />
+                    <input
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      placeholder="you@example.com"
+                      type="email"
+                      autoComplete="email"
+                      required
+                    />
               </label>
-              <label>
-                Password
-                <input value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Your password" type="password" required />
-              </label>
+                  {mode !== 'reset' && (
+                    <label>
+                      Password
+                      <input
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
+                        placeholder="Your password"
+                        type="password"
+                        autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                        minLength={6}
+                        required
+                      />
+                    </label>
+                  )}
+                  {mode === 'signup' && (
+                    <label>
+                      Verify password
+                      <input
+                        value={confirmPassword}
+                        onChange={(event) => setConfirmPassword(event.target.value)}
+                        placeholder="Retype your password"
+                        type="password"
+                        autoComplete="new-password"
+                        minLength={6}
+                        required
+                      />
+                    </label>
+                  )}
               <button disabled={!firebaseReady || submitting}>
-                {preferredRole === 'ARTISAN'
-                  ? mode === 'login'
-                    ? 'Continue as professional'
-                    : 'Create artisan account'
-                  : mode === 'login'
-                    ? 'Login'
-                    : 'Create account'}
+                    {submitting
+                      ? 'Please wait'
+                      : mode === 'reset'
+                        ? 'Send reset link'
+                      : mode === 'login'
+                        ? 'Login'
+                        : preferredRole === 'ARTISAN'
+                          ? 'Create artisan account'
+                          : 'Create client account'}
               </button>
             </form>
 
-            <button type="button" className="mode-switch" onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}>
-              {mode === 'login' ? 'New here? Sign up' : 'Already have an account? Login'}
+                {mode === 'login' && (
+                  <button type="button" className="forgot-password-link" onClick={openResetPassword}>
+                    Forgot password?
+                  </button>
+                )}
+
+                <button type="button" className="mode-switch" onClick={switchMode}>
+              {mode === 'login' || mode === 'reset' ? 'New here? Sign up' : 'Already have an account? Login'}
             </button>
+              </>
+            )}
           </aside>
         </div>
       )}
     </div>
+  );
+}
+
+function categoryIcon(iconKey?: string) {
+  const icons: Record<string, string> = {
+    broom: '▤',
+    cake: '◐',
+    camera: '◉',
+    needle: '⌁',
+    scissors: '✂',
+    sparkles: '✦',
+    wrench: '⌁',
+  };
+
+  return icons[iconKey || ''] || '■';
+}
+
+function StatCard({ label, value, hint }: { label: string; value: string | number; hint: string }) {
+  return (
+    <article className="artisan-stat-card">
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{hint}</small>
+    </article>
+  );
+}
+
+function ArtisanAppHeader({
+  displayName,
+  active,
+  onDashboard,
+  onJobs,
+  onMessages,
+  onReviews,
+  onProfile,
+}: {
+  displayName: string;
+  active: 'Dashboard' | 'Jobs' | 'Messages' | 'Reviews';
+  onDashboard: () => void;
+  onJobs: () => void;
+  onMessages: () => void;
+  onReviews: () => void;
+  onProfile: () => void;
+}) {
+  const navItems = [
+    ['Dashboard', onDashboard],
+    ['Jobs', onJobs],
+    ['Messages', onMessages],
+    ['Reviews', onReviews],
+  ] as const;
+
+  return (
+    <header className="artisan-app-header">
+      <button className="brand" onClick={onDashboard}>
+        <img className="brand-logo" src={bundoLogo} alt="Bundo logo" />
+        <span>Bundo</span>
+      </button>
+      <nav aria-label="Artisan navigation">
+        {navItems.map(([label, action]) => (
+          <button
+            key={label}
+            className={active === label ? 'active' : ''}
+            onClick={action}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+      <div className="artisan-header-actions">
+        <button aria-label="Notifications">⌂</button>
+        <button className="artisan-user-chip" onClick={onProfile}>
+          <span>{displayName.slice(0, 1).toUpperCase()}</span>
+          {displayName.split(' ')[0]}
+        </button>
+      </div>
+    </header>
+  );
+}
+
+function ArtisanLanding({
+  token,
+  categories,
+  offerings,
+  bookings,
+  firebaseUser,
+  busy,
+  runAction,
+  refresh,
+  openBookings,
+  openMessages,
+  openReviews,
+  openProfile,
+}: {
+  token: string;
+  categories: Category[];
+  offerings: Offering[];
+  bookings: Booking[];
+  firebaseUser: User | null;
+  busy: boolean;
+  runAction: ActionRunner;
+  refresh: () => Promise<void>;
+  openBookings: () => void;
+  openMessages: () => void;
+  openReviews: () => void;
+  openProfile: () => void;
+}) {
+  const [profile, setProfile] = useState<Artisan | null>(null);
+  const [portfolioImages, setPortfolioImages] = useState<PortfolioImage[]>([]);
+  const [availabilitySlots, setAvailabilitySlots] = useState<AvailabilitySlot[]>([]);
+  const [kycSubmission, setKycSubmission] = useState<ArtisanKycSubmission | null>(null);
+  const [step, setStep] = useState(1);
+  const [uploadingPortfolio, setUploadingPortfolio] = useState(false);
+  const [setup, setSetup] = useState({
+    fullName: firebaseUser?.displayName || '',
+    businessName: '',
+    categoryId: '',
+    location: 'Lagos',
+    area: 'Lekki',
+    lat: '6.5244',
+    lng: '3.3792',
+    title: 'Basic inspection',
+    priceFrom: '',
+    description: '',
+    documentNumber: '',
+    address: 'Lagos',
+  });
+  const [servicePackages, setServicePackages] = useState([
+    {
+      localId: 'package-1',
+      categoryId: '',
+      title: 'Basic inspection',
+      priceFrom: '',
+      description: '',
+    },
+  ]);
+  const [selectedDays, setSelectedDays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [startTime, setStartTime] = useState('08:00');
+  const [endTime, setEndTime] = useState('12:00');
+  const [agreed, setAgreed] = useState(false);
+  const [submitAgreed, setSubmitAgreed] = useState(false);
+  const kycStatus = kycSubmission?.status ?? 'NOT_SUBMITTED';
+  const approved = profile?.verifyStatus === 'APPROVED' && kycStatus === 'APPROVED';
+  const displayName = profile?.displayName || firebaseUser?.displayName || 'Artisan';
+
+  useEffect(() => {
+    let mounted = true;
+
+    Promise.all([
+      api<{ profile: Artisan }>('/artisans/me', { token }).catch(() => ({ profile: null as unknown as Artisan })),
+      api<{ images: PortfolioImage[] }>('/artisans/portfolio-images/me', { token }).catch(() => ({ images: [] })),
+      api<{ slots: AvailabilitySlot[] }>('/artisans/availability-slots/me', { token }).catch(() => ({ slots: [] })),
+      api<{ submission: ArtisanKycSubmission | null }>('/artisans/kyc', { token }),
+    ]).then(([profileResponse, imageResponse, slotResponse, kycResponse]) => {
+      if (!mounted) return;
+      const nextProfile = profileResponse.profile || null;
+      setProfile(nextProfile);
+      setPortfolioImages(imageResponse.images);
+      setAvailabilitySlots(slotResponse.slots);
+      setKycSubmission(kycResponse.submission);
+      setSetup((current) => ({
+        ...current,
+        fullName: current.fullName || nextProfile?.displayName || firebaseUser?.displayName || '',
+        businessName: nextProfile?.displayName || current.businessName,
+        location: nextProfile?.city || current.location,
+        area: nextProfile?.area || current.area,
+        lat: String(nextProfile?.lat ?? current.lat),
+        lng: String(nextProfile?.lng ?? current.lng),
+        address: kycResponse.submission?.address || current.address,
+        documentNumber: kycResponse.submission?.documentNumber || current.documentNumber,
+      }));
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, [firebaseUser, token]);
+
+  async function hydrateOnboarding() {
+    const [profileResponse, imageResponse, slotResponse, kycResponse] = await Promise.all([
+      api<{ profile: Artisan }>('/artisans/me', { token }).catch(() => ({ profile: null as unknown as Artisan })),
+      api<{ images: PortfolioImage[] }>('/artisans/portfolio-images/me', { token }).catch(() => ({ images: [] })),
+      api<{ slots: AvailabilitySlot[] }>('/artisans/availability-slots/me', { token }).catch(() => ({ slots: [] })),
+      api<{ submission: ArtisanKycSubmission | null }>('/artisans/kyc', { token }),
+    ]);
+    setProfile(profileResponse.profile || null);
+    setPortfolioImages(imageResponse.images);
+    setAvailabilitySlots(slotResponse.slots);
+    setKycSubmission(kycResponse.submission);
+  }
+
+  function updateSetup(field: keyof typeof setup, value: string) {
+    setSetup((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateServicePackage(
+    localId: string,
+    field: 'categoryId' | 'title' | 'priceFrom' | 'description',
+    value: string
+  ) {
+    setServicePackages((current) =>
+      current.map((servicePackage) =>
+        servicePackage.localId === localId
+          ? { ...servicePackage, [field]: value }
+          : servicePackage
+      )
+    );
+  }
+
+  function addServicePackage() {
+    setServicePackages((current) => [
+      ...current,
+      {
+        localId: `package-${Date.now()}`,
+        categoryId: setup.categoryId,
+        title: '',
+        priceFrom: '',
+        description: '',
+      },
+    ]);
+  }
+
+  function removeServicePackage(localId: string) {
+    setServicePackages((current) =>
+      current.length === 1
+        ? current
+        : current.filter((servicePackage) => servicePackage.localId !== localId)
+    );
+  }
+
+  async function saveBasicInfo() {
+    await api('/artisans/profile', {
+      method: profile ? 'PATCH' : 'POST',
+      token,
+      body: JSON.stringify({
+        displayName: setup.businessName.trim() || setup.fullName.trim(),
+        bio: categories.find((category) => category.id === setup.categoryId)?.name || 'Bundo artisan',
+        city: setup.location.trim(),
+        area: setup.area.trim(),
+        lat: Number(setup.lat),
+        lng: Number(setup.lng),
+      }),
+    });
+    await hydrateOnboarding();
+    await refresh();
+    setStep(2);
+  }
+
+  async function saveOffering() {
+    const packagesToSave = servicePackages
+      .map((servicePackage) => ({
+        ...servicePackage,
+        categoryId: servicePackage.categoryId || setup.categoryId || categories[0]?.id || '',
+        title: servicePackage.title.trim(),
+        description: servicePackage.description.trim(),
+        priceFrom: Number(servicePackage.priceFrom.replace(/[^\d]/g, '')),
+      }))
+      .filter((servicePackage) => servicePackage.categoryId && servicePackage.title && servicePackage.priceFrom > 0);
+
+    if (!packagesToSave.length) {
+      throw new Error('Add at least one service package with a category, name, and price.');
+    }
+
+    for (const servicePackage of packagesToSave) {
+      const alreadyExists = offerings.some(
+        (offering) =>
+          offering.categoryId === servicePackage.categoryId &&
+          offering.title.trim().toLowerCase() === servicePackage.title.toLowerCase() &&
+          offering.priceFrom === servicePackage.priceFrom
+      );
+
+      if (alreadyExists) continue;
+
+      await api('/offerings', {
+        method: 'POST',
+        token,
+        body: JSON.stringify({
+          categoryId: servicePackage.categoryId,
+          title: servicePackage.title,
+          description: servicePackage.description || undefined,
+          priceFrom: servicePackage.priceFrom,
+        }),
+      });
+    }
+
+    await refresh();
+    setStep(3);
+  }
+
+  async function uploadPortfolioFile(file: File, displayOrder: number) {
+    if (!file.type.startsWith('image/')) {
+      throw new Error('Please choose an image file.');
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      throw new Error('Each image must be 5MB or smaller.');
+    }
+
+    setUploadingPortfolio(true);
+    try {
+      const signatureResponse = await api<{ upload: CloudinarySignedUpload }>(
+        '/artisans/portfolio-images/sign-upload',
+        { method: 'POST', token }
+      );
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('api_key', signatureResponse.upload.apiKey);
+      formData.append('timestamp', String(signatureResponse.upload.timestamp));
+      formData.append('folder', signatureResponse.upload.folder);
+      formData.append('signature', signatureResponse.upload.signature);
+
+      const uploadResponse = await fetch(
+        `https://api.cloudinary.com/v1_1/${signatureResponse.upload.cloudName}/image/upload`,
+        { method: 'POST', body: formData }
+      );
+      const uploadData = await uploadResponse.json();
+
+      if (!uploadResponse.ok) {
+        throw new Error(uploadData?.error?.message || 'Could not upload image');
+      }
+
+      await api('/artisans/portfolio-images', {
+        method: 'POST',
+        token,
+        body: JSON.stringify({
+          cloudinaryId: uploadData.public_id,
+          url: uploadData.secure_url,
+          displayOrder,
+        }),
+      });
+      await hydrateOnboarding();
+    } finally {
+      setUploadingPortfolio(false);
+    }
+  }
+
+  async function uploadPortfolioFiles(files: File[]) {
+    if (!files.length) return;
+
+    const remainingSlots = Math.max(0, 12 - portfolioImages.length);
+    const selectedFiles = files.slice(0, remainingSlots);
+
+    if (!selectedFiles.length) {
+      throw new Error('You can upload up to 12 portfolio images.');
+    }
+
+    for (const [index, file] of selectedFiles.entries()) {
+      await uploadPortfolioFile(file, portfolioImages.length + index);
+    }
+  }
+
+  async function submitForVerification() {
+    await Promise.all(
+      selectedDays
+        .filter(
+          (dayOfWeek) =>
+            !availabilitySlots.some(
+              (slot) =>
+                slot.dayOfWeek === dayOfWeek &&
+                slot.startTime === startTime &&
+                slot.endTime === endTime
+            )
+        )
+        .map((dayOfWeek) =>
+          api('/artisans/availability-slots', {
+            method: 'POST',
+            token,
+            body: JSON.stringify({ dayOfWeek, startTime, endTime }),
+          })
+        )
+    );
+
+    const response = await api<{ submission: ArtisanKycSubmission }>('/artisans/kyc', {
+      method: 'POST',
+      token,
+      body: JSON.stringify({
+        legalName: setup.fullName || displayName,
+        documentType: 'NIN',
+        documentNumber: setup.documentNumber,
+        documentImageUrl: `pending-manual-review:${setup.documentNumber}`,
+        address: setup.address || setup.location,
+        city: setup.location,
+      }),
+    });
+    setKycSubmission(response.submission);
+    await hydrateOnboarding();
+    await refresh();
+  }
+
+  if (approved) {
+    const requestedBookings = bookings.filter((booking) => booking.status === 'REQUESTED');
+    const activeBookings = bookings.filter((booking) => ['ACCEPTED', 'COMPLETED'].includes(booking.status));
+
+    return (
+      <>
+      <ArtisanAppHeader
+        displayName={displayName}
+        active="Dashboard"
+        onDashboard={() => undefined}
+        onJobs={openBookings}
+        onMessages={openMessages}
+        onReviews={openReviews}
+        onProfile={openProfile}
+      />
+      <main className="artisan-dashboard-page">
+        <section className="artisan-dashboard-hero">
+          <h1>Good morning, {displayName.split(' ')[0]}</h1>
+          <div className="artisan-stat-grid">
+            <StatCard label="Total bookings" value={bookings.length} hint="All time" />
+            <StatCard label="Ratings" value={`${profile?.avgRating || 0}/5.0`} hint={`${profile?.ratingCount || 0} reviews`} />
+            <StatCard label="Active jobs" value={activeBookings.length} hint="This week" />
+            <StatCard label="New requests" value={requestedBookings.length} hint="Needs your response" />
+          </div>
+        </section>
+
+        <section className="artisan-dashboard-grid">
+          <div className="artisan-request-stack">
+            <div className="logged-section-head">
+              <h2>New Requests</h2>
+              <button type="button" onClick={openBookings}>view all</button>
+            </div>
+            {requestedBookings.length === 0 && <EmptyState title="No new requests" body="New booking requests will appear here." />}
+            {requestedBookings.slice(0, 2).map((booking) => (
+              <article className="artisan-request-card" key={booking.id}>
+                <span className="recommended-avatar">{(booking.customerUser?.email || 'C').slice(0, 1).toUpperCase()}</span>
+                <div>
+                  <h3>{booking.customerUser?.email?.split('@')[0] || 'Customer'}</h3>
+                  <small>{booking.offering?.title || 'Service request'}</small>
+                  <p>{bookingDate(booking.scheduledAt)} · {booking.artisan?.area || profile?.area || 'Lagos'}</p>
+                  <div className="actions">
+                    <button className="secondary-button" disabled={busy}>Decline</button>
+                    <button disabled={busy}>Accept</button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+          <aside className="artisan-side-stack">
+            <article className="artisan-soft-card">
+              <div className="logged-section-head">
+                <h2>Availability</h2>
+                <button type="button" onClick={() => setStep(4)}>Edit</button>
+              </div>
+              <div className="availability-dots">
+                {dayLabels.slice(1).concat(dayLabels[0]).map((day, index) => {
+                  const dayIndex = index === 6 ? 0 : index + 1;
+                  return (
+                    <span key={day} className={availabilitySlots.some((slot) => slot.dayOfWeek === dayIndex) ? 'active' : ''}>
+                      {day.slice(0, 1)}
+                    </span>
+                  );
+                })}
+              </div>
+            </article>
+            <article className="artisan-soft-card">
+              <h2>This week</h2>
+              <dl className="summary-list">
+                <div><dt>Jobs Completed</dt><dd>{bookings.filter((booking) => booking.status === 'COMPLETED').length}</dd></div>
+                <div><dt>Jobs Upcoming</dt><dd>{activeBookings.length}</dd></div>
+                <div><dt>Earnings</dt><dd>{money(0)}</dd></div>
+              </dl>
+            </article>
+            <article className="artisan-soft-card quick-links">
+              <h2>Quick links</h2>
+              <button onClick={() => setStep(4)}>Update availability</button>
+              <button onClick={() => setStep(2)}>Edit pricing</button>
+              <button onClick={openBookings}>View jobs</button>
+            </article>
+          </aside>
+        </section>
+      </main>
+      </>
+    );
+  }
+
+  return (
+    <main className="artisan-setup-page">
+      <div className="artisan-setup-topline">
+        <button className="brand setup-brand" type="button" onClick={() => setStep(1)}>
+          <img className="brand-logo" src={bundoLogo} alt="Bundo logo" />
+          <span>Bundo</span>
+        </button>
+      </div>
+
+      <section className="artisan-setup-head">
+        <div>
+          <h1>Set up your artisan profile</h1>
+          <p className="muted">Follow the steps below. Your profile goes live only after KYC and admin approval.</p>
+        </div>
+        <strong>Step {step} of 4</strong>
+      </section>
+
+      <div className="artisan-stepper" aria-label="Artisan setup steps">
+        {['Basic info', 'Services & pricing', 'Portfolio', 'Availability & submit'].map((label, index) => {
+          const number = index + 1;
+          return (
+            <button
+              key={label}
+              type="button"
+              className={number <= step ? 'active' : ''}
+              onClick={() => setStep(number)}
+            >
+              <span>{number}</span>
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
+      {kycSubmission && (
+        <div className={`payment-note artisan-review-note ${kycSubmission.status === 'APPROVED' ? 'success' : ''}`}>
+          <strong>KYC status: {kycSubmission.status.toLowerCase().replace(/_/g, ' ')}</strong>
+          <span>{kycSubmission.reviewNote || 'Admin will review your profile before it appears publicly.'}</span>
+        </div>
+      )}
+
+      {step === 1 && (
+        <section className="artisan-setup-card">
+          <h2>Basic Information</h2>
+          <p>Tell us a bit about yourself so customers can find and trust you.</p>
+          <label>Full Name<span>*</span><input value={setup.fullName} onChange={(event) => updateSetup('fullName', event.target.value)} placeholder="Enter your name" required /></label>
+          <small>As in any legal documentation</small>
+          <label>Business Name<span>(Optional)</span><input value={setup.businessName} onChange={(event) => updateSetup('businessName', event.target.value)} placeholder="e.g Plumber, Hair stylist...etc" /></label>
+          <small>Leave blank to use your full name</small>
+          <label>Service Category<span>(Required)</span>
+            <select value={setup.categoryId} onChange={(event) => updateSetup('categoryId', event.target.value)} required>
+              <option value="">Select a category</option>
+              {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+            </select>
+          </label>
+          <small>E.g Plumbing, Carpentry, Make-up Artist</small>
+          <label>Location<span>(Required)</span><input value={setup.location} onChange={(event) => updateSetup('location', event.target.value)} placeholder="Search for your city or area" required /></label>
+          <button className="location-link" type="button">⌖ Use your current location</button>
+          <label className="terms-row"><input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} /> <span>By continuing, you agree to our Terms of Service and Privacy Policy.</span></label>
+        </section>
+      )}
+
+      {step === 2 && (
+        <section className="artisan-setup-card wide">
+          <h2>Set your pricing</h2>
+          <p>Give customers a clear idea of what to expect before they book. You can update this any time.</p>
+          <div className="setup-package-stack">
+            {servicePackages.map((servicePackage, index) => (
+              <article className="setup-package-card" key={servicePackage.localId}>
+                <div className="setup-package-head">
+                  <h3>Package {index + 1}</h3>
+                  {servicePackages.length > 1 && (
+                    <button type="button" onClick={() => removeServicePackage(servicePackage.localId)}>
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <label>
+                  Primary Service
+                  <select
+                    value={servicePackage.categoryId || setup.categoryId}
+                    onChange={(event) => updateServicePackage(servicePackage.localId, 'categoryId', event.target.value)}
+                    required
+                  >
+                    <option value="">Select a category</option>
+                    {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                  </select>
+                </label>
+                <div className="setup-two-col">
+                  <label>
+                    Service name
+                    <input
+                      value={servicePackage.title}
+                      onChange={(event) => updateServicePackage(servicePackage.localId, 'title', event.target.value)}
+                      placeholder="Basic inspection"
+                      required
+                    />
+                  </label>
+                  <label>
+                    Price(₦)
+                    <input
+                      value={servicePackage.priceFrom}
+                      onChange={(event) => updateServicePackage(servicePackage.localId, 'priceFrom', event.target.value)}
+                      placeholder="5,000"
+                      inputMode="numeric"
+                      required
+                    />
+                  </label>
+                </div>
+                <label>
+                  Description
+                  <textarea
+                    value={servicePackage.description}
+                    onChange={(event) => updateServicePackage(servicePackage.localId, 'description', event.target.value)}
+                    placeholder="Diagnosis and minor fixes"
+                  />
+                </label>
+              </article>
+            ))}
+          </div>
+          <p className="orange-note">Packages help customers understand your offering upfront. You can still negotiate pricing directly with customers after a booking request is made.</p>
+          <button type="button" className="full-orange" onClick={addServicePackage}>＋ Add another Package</button>
+        </section>
+      )}
+
+      {step === 3 && (
+        <section className="artisan-setup-card media-step">
+          <h2>Add your photos</h2>
+          <p>A great profile photo and strong portfolio help customers choose you with confidence.</p>
+          <label className="profile-upload">
+            <span>Upload a photo <small>JPG or PNG · Max 5MB · Square crop recommended</small></span>
+            <strong>Choose file</strong>
+            <input type="file" accept="image/*" multiple disabled={busy || uploadingPortfolio} onChange={(event) => {
+              const files = Array.from(event.target.files || []);
+              if (!files.length) return;
+              void runAction(() => uploadPortfolioFiles(files), files.length > 1 ? 'Photos uploaded' : 'Photo uploaded');
+              event.currentTarget.value = '';
+            }} />
+          </label>
+          <h3>Portfolio images</h3>
+          <small>Show customers examples of your past work. Upload up to 12 photos.</small>
+          <div className="setup-portfolio-grid">
+            <label className="portfolio-upload-tile">
+              <span>⇧</span>
+              Upload a photo
+              <input type="file" accept="image/*" multiple disabled={busy || uploadingPortfolio || portfolioImages.length >= 12} onChange={(event) => {
+                const files = Array.from(event.target.files || []);
+                if (!files.length) return;
+                void runAction(() => uploadPortfolioFiles(files), files.length > 1 ? 'Portfolio images uploaded' : 'Portfolio image uploaded');
+                event.currentTarget.value = '';
+              }} />
+            </label>
+            {portfolioImages.slice(0, 11).map((image) => <img key={image.id} src={image.url} alt="Portfolio" />)}
+            {Array.from({ length: Math.max(0, 11 - portfolioImages.length) }).map((_, index) => <div className="portfolio-placeholder" key={index}>▧</div>)}
+          </div>
+          <p className="muted">Artisans with 6+ portfolio photos get up to 3x more booking requests.</p>
+        </section>
+      )}
+
+      {step === 4 && (
+        <section className="artisan-setup-card availability-step">
+          <h2>When are you available?</h2>
+          <p>Customers will only be able to book you on days and times you select. You can update this anytime from your dashboard.</p>
+          <h3>Days available</h3>
+          <div className="day-picker">
+            {[1, 2, 3, 4, 5, 6, 0].map((day) => (
+              <button
+                key={day}
+                type="button"
+                className={selectedDays.includes(day) ? 'active' : ''}
+                onClick={() => setSelectedDays((current) => current.includes(day) ? current.filter((value) => value !== day) : [...current, day])}
+              >
+                {dayLabels[day].slice(0, 1)}
+              </button>
+            ))}
+          </div>
+          <div className="setup-two-col">
+            <label>From<input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} /></label>
+            <label>To<input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} /></label>
+          </div>
+          <label>Residential address<input value={setup.address} onChange={(event) => updateSetup('address', event.target.value)} placeholder="Address for manual verification" /></label>
+          <label>NIN or ID number<input value={setup.documentNumber} onChange={(event) => updateSetup('documentNumber', event.target.value)} placeholder="Required for verification" /></label>
+          <label className="terms-row"><input type="checkbox" checked={submitAgreed} onChange={(event) => setSubmitAgreed(event.target.checked)} /> <span>Submitting for verification means our team will review your profile before it goes live.</span></label>
+        </section>
+      )}
+
+      <div className="artisan-setup-actions">
+        <button type="button" className="secondary-button" onClick={() => setStep((current) => Math.max(1, current - 1))}>{step === 1 ? 'Back' : 'Skip'}</button>
+        {step === 1 && <button disabled={busy || !agreed || !setup.fullName || !setup.categoryId || !setup.location} onClick={() => runAction(saveBasicInfo, 'Basic profile saved')}>Next</button>}
+        {step === 2 && <button disabled={busy || !servicePackages.some((servicePackage) => servicePackage.title.trim() && servicePackage.priceFrom.trim())} onClick={() => runAction(saveOffering, servicePackages.length > 1 ? 'Service packages saved' : 'Service package saved')}>Next</button>}
+        {step === 3 && <button disabled={busy || uploadingPortfolio} onClick={() => setStep(4)}>Next</button>}
+        {step === 4 && <button disabled={busy || !submitAgreed || !setup.documentNumber || selectedDays.length === 0} onClick={() => runAction(submitForVerification, 'Submitted for verification')}>Submit for verification</button>}
+      </div>
+    </main>
+  );
+}
+
+function LoggedInHome({
+  me,
+  firebaseUser,
+  categories,
+  offerings,
+  artisans,
+  selectedState,
+  searchTerm,
+  token,
+  busy,
+  onSearchTermChange,
+  onSelectedStateChange,
+  onBrowse,
+  onSearch,
+  onViewProfile,
+  runAction,
+  reloadPrivate,
+  onBookingSuccess,
+  openBookings,
+}: {
+  me: ApiUser;
+  firebaseUser: User | null;
+  categories: Category[];
+  offerings: Offering[];
+  artisans: Artisan[];
+  selectedState: string;
+  searchTerm: string;
+  token: string;
+  busy: boolean;
+  onSearchTermChange: (value: string) => void;
+  onSelectedStateChange: (value: string) => void;
+  onBrowse: (categoryId?: string) => Promise<void>;
+  onSearch: () => Promise<void>;
+  onViewProfile: (artisanId: string) => Promise<void>;
+  runAction: ActionRunner;
+  reloadPrivate: () => Promise<void>;
+  onBookingSuccess: (booking: BookingSuccessState) => void;
+  openBookings: () => void;
+}) {
+  const displayName = userDisplayName(firebaseUser, me);
+  const recommendedOfferings = offerings.slice(0, 3);
+  const featuredArtisan = artisans[0];
+  const [activeOfferingAction, setActiveOfferingAction] = useState<string | null>(null);
+
+  async function submitSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await onSearch();
+  }
+
+  async function bookRecommendedOffering(offering: Offering) {
+    const actionKey = `book:${offering.id}`;
+    setActiveOfferingAction(actionKey);
+
+    try {
+      await runAction(async () => {
+        const response = await api<{ booking: Booking }>('/bookings', {
+          method: 'POST',
+          token,
+          body: JSON.stringify({
+            offeringId: offering.id,
+            note: 'Booked from dashboard',
+          }),
+        });
+        await reloadPrivate();
+        onBookingSuccess({
+          bookingId: response.booking.id,
+          serviceTitle: offering.title,
+          artisanName: offering.artisan?.displayName || 'this artisan',
+        });
+      }, 'Booking requested');
+    } finally {
+      setActiveOfferingAction(null);
+    }
+  }
+
+  return (
+    <main className="logged-home">
+      <section className="logged-hero">
+        <div className="logged-hero-copy">
+          <p className="eyebrow">Welcome back, {displayName}</p>
+          <h1>
+            Connect with artisans who <span>deliver.</span>
+          </h1>
+          <form className="logged-hero-search" onSubmit={submitSearch}>
+            <label>
+              Search
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={(event) => onSearchTermChange(event.target.value)}
+                placeholder="Cleaning, tailoring, repairs"
+              />
+            </label>
+            <label>
+              Location
+              <select value={selectedState} onChange={(event) => onSelectedStateChange(event.target.value)}>
+                <option value="">All Nigeria</option>
+                {nigeriaStates.map((state) => (
+                  <option key={state} value={state}>
+                    {state}, Nigeria
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="submit">Search</button>
+          </form>
+          <div className="quick-service-grid" aria-label="Quick service picks">
+            {categories.slice(0, 6).map((category) => (
+              <button key={category.id} type="button" onClick={() => void onBrowse(category.id)}>
+                <span>{categoryIcon(category.iconKey)}</span>
+                {category.name}
+              </button>
+            ))}
+            <button className="wide" type="button" onClick={() => void onBrowse()}>
+              Browse marketplace
+            </button>
+            <button className="wide" type="button" onClick={openBookings}>
+              My bookings
+            </button>
+          </div>
+        </div>
+
+        <div className="logged-hero-media">
+          <img src={heroImage} alt="Bundo artisan completing a home service" />
+          <div>
+            <strong>{featuredArtisan?.displayName || 'Trusted professionals'}</strong>
+            <span>
+              {featuredArtisan
+                ? `${featuredArtisan.city}${featuredArtisan.area ? `, ${featuredArtisan.area}` : ''}`
+                : 'Available across your marketplace'}
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <section className="logged-section">
+        <div className="logged-section-head">
+          <h2>Categories</h2>
+          <button type="button" onClick={() => void onBrowse()}>View all categories</button>
+        </div>
+        <div className="logged-category-row">
+          {categories.length === 0 && <span className="muted">Categories will appear here after seeding.</span>}
+          {categories.slice(0, 7).map((category) => (
+            <button key={category.id} type="button" onClick={() => void onBrowse(category.id)}>
+              <span>{categoryIcon(category.iconKey)}</span>
+              {category.name}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="logged-section">
+        <div className="logged-section-head">
+          <h2>Recommended</h2>
+          <button type="button" onClick={() => void onBrowse()}>Browse artisans</button>
+        </div>
+        <div className="recommended-row">
+          {recommendedOfferings.length === 0 && (
+            <EmptyState
+              title="No recommendations yet"
+              body="Approved artisan offerings will appear here as your marketplace grows."
+            />
+          )}
+          {recommendedOfferings.map((offering) => {
+            const actionKey = `book:${offering.id}`;
+            const isBookingThisOffering = activeOfferingAction === actionKey;
+
+            return (
+              <article className="recommended-card" key={offering.id}>
+                <div className="recommended-card-head">
+                  <span className="recommended-avatar">
+                    {(offering.artisan?.displayName || 'B').slice(0, 1).toUpperCase()}
+                  </span>
+                  <div>
+                    <h3>{offering.artisan?.displayName || 'Approved artisan'}</h3>
+                    <p>{offering.artisan?.area || offering.artisan?.city || 'Nearby'}</p>
+                  </div>
+                  <small>{offering.artisan?.city || 'Bundo'}</small>
+                </div>
+                <div className="recommended-tags">
+                  <span>{offering.category?.name || 'Service'}</span>
+                  <span>{offering.title}</span>
+                </div>
+                <div className="recommended-meta">
+                  <span className="rating">★★★★★</span>
+                  <span>{(offering.artisan?.avgRating || 0).toFixed(1)}({offering.artisan?.ratingCount || 0})</span>
+                  <strong>From {money(offering.priceFrom)}</strong>
+                </div>
+                <button
+                  className="primary-button"
+                  disabled={me.role !== 'CUSTOMER' || isBookingThisOffering}
+                  onClick={() => void bookRecommendedOffering(offering)}
+                >
+                  {isBookingThisOffering ? 'Booking...' : 'Book'}
+                </button>
+                {offering.artisan?.id && (
+                  <button
+                    className="text-button"
+                    type="button"
+                    onClick={() => void onViewProfile(offering.artisan!.id)}
+                  >
+                    View profile
+                  </button>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    </main>
   );
 }
 
@@ -1387,6 +2953,41 @@ function ServicesSection({ categories, onBrowse }: { categories: Category[]; onB
         ))}
       </div>
     </section>
+  );
+}
+
+function BookingSuccessDialog({
+  booking,
+  onClose,
+  onViewBookings,
+}: {
+  booking: BookingSuccessState;
+  onClose: () => void;
+  onViewBookings: () => void;
+}) {
+  return (
+    <div className="success-overlay" role="presentation" onClick={onClose}>
+      <section
+        className="booking-success-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="booking-success-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <span className="success-mark" aria-hidden="true">✓</span>
+        <p className="eyebrow">Booking request sent</p>
+        <h2 id="booking-success-title">Your request is with {booking.artisanName}</h2>
+        <p>
+          We created a booking for {booking.serviceTitle}. You can track the request,
+          continue to chat, and pay after the artisan responds.
+        </p>
+        {booking.bookingId && <small>Booking #{booking.bookingId.slice(0, 8)}</small>}
+        <div className="booking-success-actions">
+          <button type="button" onClick={onViewBookings}>View my bookings</button>
+          <button type="button" className="secondary-button" onClick={onClose}>Continue browsing</button>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -1526,6 +3127,7 @@ function OfferingGrid({
   runAction,
   reloadPrivate,
   onViewProfile,
+  onBookingSuccess,
 }: {
   offerings: Offering[];
   isAuthed: boolean;
@@ -1535,72 +3137,114 @@ function OfferingGrid({
   runAction: ActionRunner;
   reloadPrivate: () => Promise<void>;
   onViewProfile: (artisanId: string) => Promise<void>;
+  onBookingSuccess: (booking: BookingSuccessState) => void;
 }) {
+  const [activeOfferingAction, setActiveOfferingAction] = useState<string | null>(null);
+
+  async function runOfferingAction(actionKey: string, action: () => Promise<void>, done: string) {
+    setActiveOfferingAction(actionKey);
+
+    try {
+      await runAction(action, done);
+    } finally {
+      setActiveOfferingAction(null);
+    }
+  }
+
   return (
     <div className="grid two">
       {offerings.length === 0 && <EmptyState title="No services yet" body="Approved artisan offerings will appear here." />}
-      {offerings.map((offering) => (
-        <article className="service-card" key={offering.id}>
-          <div className="card-topline">
-            <p className="pill">{offering.category?.name || 'Service'}</p>
-            <span>{offering.artisan?.city || 'Nearby'}</span>
-          </div>
-          <h3>{offering.title}</h3>
-          <p>{offering.description || 'Professional home service'}</p>
-          <p className="price">
-            {money(offering.priceFrom)}
-            {offering.priceTo ? ` - ${money(offering.priceTo)}` : ''}
-          </p>
-          <p className="muted">{offering.artisan?.displayName || 'Approved artisan'} · {offering.artisan?.area || 'Bundo'}</p>
-          <div className="actions">
-            <button
-              className="secondary-button"
-              disabled={!offering.artisan?.id || busy}
-              onClick={() => offering.artisan?.id && onViewProfile(offering.artisan.id)}
-            >
-              View profile
-            </button>
-            <button
-              disabled={!isAuthed || role !== 'CUSTOMER' || busy}
-              onClick={() =>
-                runAction(async () => {
-                  await api('/bookings', {
-                    method: 'POST',
-                    token,
-                    body: JSON.stringify({
-                      offeringId: offering.id,
-                      scheduledAt: new Date(Date.now() + 86400000).toISOString(),
-                      note: 'Booked from web client',
-                    }),
-                  });
-                  await reloadPrivate();
-                }, 'Booking requested')
-              }
-            >
-              Book
-            </button>
-            <button
-              className="secondary-button"
-              disabled={!isAuthed || busy || !offering.artisan?.id}
-              onClick={() =>
-                runAction(async () => {
-                  await api('/messages', {
-                    method: 'POST',
-                    token,
-                    body: JSON.stringify({
-                      artisanId: offering.artisan!.id,
-                      body: 'Hello, I am interested in this service.',
-                    }),
-                  });
-                  await reloadPrivate();
-                }, 'Message sent')
-              }
-            >
-              Message
-            </button>
-          </div>
-        </article>
-      ))}
+      {offerings.map((offering) => {
+        const bookActionKey = `book:${offering.id}`;
+        const messageActionKey = `message:${offering.id}`;
+        const viewActionKey = `view:${offering.artisan?.id || offering.id}`;
+        const isBookingThisOffering = activeOfferingAction === bookActionKey;
+        const isMessagingThisOffering = activeOfferingAction === messageActionKey;
+        const isViewingThisArtisan = activeOfferingAction === viewActionKey;
+
+        return (
+          <article className="service-card" key={offering.id}>
+            <div className="card-topline">
+              <p className="pill">{offering.category?.name || 'Service'}</p>
+              <span>{offering.artisan?.city || 'Nearby'}</span>
+            </div>
+            <h3>{offering.title}</h3>
+            <p>{offering.description || 'Professional home service'}</p>
+            <p className="price">
+              {money(offering.priceFrom)}
+              {offering.priceTo ? ` - ${money(offering.priceTo)}` : ''}
+            </p>
+            <p className="muted">{offering.artisan?.displayName || 'Approved artisan'} · {offering.artisan?.area || 'Bundo'}</p>
+            <div className="actions">
+              <button
+                className="secondary-button"
+                disabled={!offering.artisan?.id || isViewingThisArtisan}
+                onClick={() =>
+                  offering.artisan?.id &&
+                  void runOfferingAction(
+                    viewActionKey,
+                    () => onViewProfile(offering.artisan!.id),
+                    'Artisan profile loaded'
+                  )
+                }
+              >
+                {isViewingThisArtisan ? 'Opening...' : 'View profile'}
+              </button>
+              <button
+                disabled={!isAuthed || role !== 'CUSTOMER' || isBookingThisOffering}
+                onClick={() =>
+                  void runOfferingAction(
+                    bookActionKey,
+                    async () => {
+                      const response = await api<{ booking: Booking }>('/bookings', {
+                        method: 'POST',
+                        token,
+                        body: JSON.stringify({
+                          offeringId: offering.id,
+                          scheduledAt: new Date(Date.now() + 86400000).toISOString(),
+                          note: 'Booked from web client',
+                        }),
+                      });
+                      await reloadPrivate();
+                      onBookingSuccess({
+                        bookingId: response.booking.id,
+                        serviceTitle: offering.title,
+                        artisanName: offering.artisan?.displayName || 'this artisan',
+                      });
+                    },
+                    'Booking requested'
+                  )
+                }
+              >
+                {isBookingThisOffering ? 'Booking...' : 'Book'}
+              </button>
+              <button
+                className="secondary-button"
+                disabled={!isAuthed || !offering.artisan?.id || isMessagingThisOffering}
+                onClick={() =>
+                  void runOfferingAction(
+                    messageActionKey,
+                    async () => {
+                      await api('/messages', {
+                        method: 'POST',
+                        token,
+                        body: JSON.stringify({
+                          artisanId: offering.artisan!.id,
+                          body: 'Hello, I am interested in this service.',
+                        }),
+                      });
+                      await reloadPrivate();
+                    },
+                    'Message sent'
+                  )
+                }
+              >
+                {isMessagingThisOffering ? 'Sending...' : 'Message'}
+              </button>
+            </div>
+          </article>
+        );
+      })}
     </div>
   );
 }
@@ -1615,6 +3259,7 @@ function ArtisanProfilePage({
   runAction,
   onBack,
   reloadPrivate,
+  onBookingSuccess,
 }: {
   artisan: Artisan;
   reviews: Review[];
@@ -1625,6 +3270,7 @@ function ArtisanProfilePage({
   runAction: ActionRunner;
   onBack: () => void;
   reloadPrivate: () => Promise<void>;
+  onBookingSuccess: (booking: BookingSuccessState) => void;
 }) {
   const offerings = artisan.offerings || [];
   const firstOffering = offerings[0];
@@ -1646,7 +3292,7 @@ function ArtisanProfilePage({
     event.preventDefault();
     if (!selectedOffering || !date) return;
 
-    await api('/bookings', {
+    const response = await api<{ booking: Booking }>('/bookings', {
       method: 'POST',
       token,
       body: JSON.stringify({
@@ -1656,6 +3302,11 @@ function ArtisanProfilePage({
       }),
     });
     await reloadPrivate();
+    onBookingSuccess({
+      bookingId: response.booking.id,
+      serviceTitle: selectedOffering.title,
+      artisanName: artisan.displayName,
+    });
   }
 
   async function sendMessage() {
@@ -1893,8 +3544,8 @@ const helpTopics = [
       {
         heading: 'Account setup',
         questions: [
-          ['How do I create an account?', 'Use Login or Sign up in the top navigation. After signing in, choose whether you want to continue as a customer or artisan from your dashboard.'],
-          ['Can one account become an artisan?', 'Yes. Choose the artisan role, create a public artisan profile, then add offerings customers can book.'],
+          ['How do I create an account?', 'Use Login or Sign up in the top navigation, then choose client or artisan during signup.'],
+          ['Can one account become an artisan?', 'Yes. Apply from profile settings, create a public artisan profile, submit KYC, and wait for admin approval before listing services.'],
         ],
       },
     ],
@@ -1928,14 +3579,14 @@ const helpTopics = [
       {
         heading: 'Profile setup',
         questions: [
-          ['How do I become an artisan?', 'Sign in, choose the artisan role, then create your artisan profile with display name, bio, state or city, area, latitude, and longitude.'],
-          ['When will customers see my profile?', 'Your profile becomes publicly discoverable after admin approval. This helps keep the marketplace trustworthy.'],
+          ['How do I become an artisan?', 'Choose artisan during signup or apply from profile settings, then create your profile and submit KYC.'],
+          ['When will customers see my profile?', 'Your profile becomes publicly discoverable after KYC and admin approval. This helps keep the marketplace trustworthy.'],
         ],
       },
       {
         heading: 'Offerings',
         questions: [
-          ['How do I list a service?', 'From the artisan dashboard, choose a category, add the service title, description, and price range, then create the offering.'],
+          ['How do I list a service?', 'After KYC and admin approval, use the artisan dashboard to choose a category, add service details, and create the offering.'],
           ['Can customers message me?', 'Yes. Customer messages appear in your conversations, and you can reply back inside the thread.'],
         ],
       },
@@ -2146,7 +3797,7 @@ function HelpCenter({
   );
 }
 
-function RolePanel({
+function AccountSettingsPanel({
   token,
   me,
   busy,
@@ -2159,32 +3810,483 @@ function RolePanel({
   runAction: ActionRunner;
   refresh: () => Promise<void>;
 }) {
+  const canApplyAsArtisan = me.role !== 'ARTISAN' && me.role !== 'ADMIN';
+
   return (
     <article className="panel-card">
-      <p className="eyebrow">Identity</p>
-      <h2>Role</h2>
-      <p>Current role: <strong>{me.role || 'Not selected'}</strong></p>
-      <div className="actions">
-        {(['CUSTOMER', 'ARTISAN'] as Role[]).map((role) => (
+      <p className="eyebrow">Profile settings</p>
+      <h2>Account type</h2>
+      <p>
+        Current account: <strong>{me.role ? me.role.toLowerCase() : 'not selected'}</strong>
+      </p>
+      {me.role === 'ARTISAN' ? (
+        <p className="muted">
+          Artisan access is controlled by KYC and admin approval. Complete verification
+          before listing services.
+        </p>
+      ) : me.role === 'ADMIN' ? (
+        <p className="muted">Admin access is managed from the admin console.</p>
+      ) : (
+        <p className="muted">
+          Client accounts can apply to become artisans. Listing services remains locked
+          until profile setup, KYC, and admin approval are complete.
+        </p>
+      )}
+      {canApplyAsArtisan && (
+        <div className="actions">
+          {!me.role && (
+            <button
+              disabled={busy}
+              onClick={() =>
+                runAction(async () => {
+                  await api('/users/role', {
+                    method: 'PATCH',
+                    token,
+                    body: JSON.stringify({ role: 'CUSTOMER' }),
+                  });
+                  await refresh();
+                }, 'Client account selected')
+              }
+            >
+              Continue as client
+            </button>
+          )}
           <button
-            key={role}
             disabled={busy}
             onClick={() =>
               runAction(async () => {
                 await api('/users/role', {
                   method: 'PATCH',
                   token,
-                  body: JSON.stringify({ role }),
+                  body: JSON.stringify({ role: 'ARTISAN' }),
                 });
                 await refresh();
-              }, `Role changed to ${role.toLowerCase()}`)
+              }, 'Artisan application started')
             }
           >
-            Use as {role.toLowerCase()}
+            Apply as artisan
           </button>
+        </div>
+      )}
+    </article>
+  );
+}
+
+function ArtisanReviewsPanel({ token }: { token: string }) {
+  const [profile, setProfile] = useState<Artisan | null>(null);
+  const [reviews, setReviews] = useState<Review[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    api<{ profile: Artisan }>('/artisans/me', { token })
+      .then(async (profileResponse) => {
+        const reviewResponse = await api<{ reviews: Review[] }>(`/artisans/${profileResponse.profile.id}/reviews`);
+        if (!mounted) return;
+        setProfile(profileResponse.profile);
+        setReviews(reviewResponse.reviews);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setProfile(null);
+        setReviews([]);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [token]);
+
+  const average = profile?.avgRating || 0;
+
+  return (
+    <section className="artisan-reviews-page">
+      <h2>Reviews</h2>
+      <div className="reviews-summary">
+        <div className="reviews-score">
+          <strong>{average.toFixed(1)}</strong>
+          <span>★★★★★</span>
+          <p>{reviews.length ? 'Based on customer reviews' : 'No reviews yet'}</p>
+        </div>
+        <div className="reviews-bars">
+          {[5, 4, 3, 2, 1].map((rating) => {
+            const count = reviews.filter((review) => review.rating === rating).length;
+            const percent = reviews.length ? (count / reviews.length) * 100 : 0;
+            return (
+              <div key={rating}>
+                <span>{rating} Stars</span>
+                <i><b style={{ width: `${percent}%` }} /></i>
+                <small>{count}</small>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div className="reviews-list">
+        {reviews.length === 0 && <EmptyState title="No reviews yet" body="Reviews from completed jobs will appear here." />}
+        {reviews.map((review) => (
+          <article className="review-card artisan-review-card" key={review.id}>
+            <div className="review-head">
+              <span className="recommended-avatar">{(review.customer?.email || 'C').slice(0, 1).toUpperCase()}</span>
+              <div>
+                <strong>{review.customer?.email?.split('@')[0] || 'Customer'}</strong>
+                <span className="verified-hire">Verified hire</span>
+                <p>{'★'.repeat(review.rating)} <small>{bookingDate(review.createdAt)}</small></p>
+              </div>
+            </div>
+            <p>{review.comment || 'Customer left a rating for this completed job.'}</p>
+            <small>JOB: {review.booking?.offering?.title || 'Service booking'}</small>
+          </article>
         ))}
       </div>
-    </article>
+    </section>
+  );
+}
+
+function ArtisanProfileSettings({
+  token,
+  firebaseUser,
+  busy,
+  runAction,
+  refresh,
+}: {
+  token: string;
+  firebaseUser: User | null;
+  busy: boolean;
+  runAction: ActionRunner;
+  refresh: () => Promise<void>;
+}) {
+  const [profile, setProfile] = useState<Artisan | null>(null);
+  const [payoutAccount, setPayoutAccount] = useState<ProviderPayoutAccount | null>(null);
+  const [banks, setBanks] = useState<PayoutBank[]>([]);
+  const [kycSubmission, setKycSubmission] = useState<ArtisanKycSubmission | null>(null);
+  const kycStatus = kycSubmission?.status ?? 'NOT_SUBMITTED';
+  const approved = profile?.verifyStatus === 'APPROVED' && kycStatus === 'APPROVED';
+
+  useEffect(() => {
+    let mounted = true;
+    Promise.all([
+      api<{ profile: Artisan }>('/artisans/me', { token }).catch(() => ({ profile: null as unknown as Artisan })),
+      api<{ account: ProviderPayoutAccount | null }>('/artisans/payout-account', { token }),
+      api<{ banks: PayoutBank[] }>('/payments/banks', { token }),
+      api<{ submission: ArtisanKycSubmission | null }>('/artisans/kyc', { token }).catch(() => ({ submission: null })),
+    ])
+      .then(([profileResponse, accountResponse, bankResponse, kycResponse]) => {
+        if (!mounted) return;
+        setProfile(profileResponse.profile || null);
+        setPayoutAccount(accountResponse.account);
+        setBanks(bankResponse.banks);
+        setKycSubmission(kycResponse.submission);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setProfile(null);
+        setPayoutAccount(null);
+        setBanks([]);
+        setKycSubmission(null);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [token]);
+
+  async function hydrateSettings() {
+    const [profileResponse, accountResponse, kycResponse] = await Promise.all([
+      api<{ profile: Artisan }>('/artisans/me', { token }).catch(() => ({ profile: null as unknown as Artisan })),
+      api<{ account: ProviderPayoutAccount | null }>('/artisans/payout-account', { token }),
+      api<{ submission: ArtisanKycSubmission | null }>('/artisans/kyc', { token }).catch(() => ({ submission: null })),
+    ]);
+    setProfile(profileResponse.profile || null);
+    setPayoutAccount(accountResponse.account);
+    setKycSubmission(kycResponse.submission);
+  }
+
+  async function saveProfile(formElement: HTMLFormElement) {
+    const form = new FormData(formElement);
+    await api('/artisans/profile', {
+      method: profile ? 'PATCH' : 'POST',
+      token,
+      body: JSON.stringify({
+        displayName: form.get('displayName'),
+        bio: profile?.bio || 'Bundo artisan',
+        city: form.get('city'),
+        area: form.get('area'),
+        lat: profile?.lat ?? 6.5244,
+        lng: profile?.lng ?? 3.3792,
+      }),
+    });
+    const response = await api<{ profile: Artisan }>('/artisans/me', { token });
+    setProfile(response.profile);
+    await refresh();
+  }
+
+  async function submitKyc(formElement: HTMLFormElement) {
+    const form = new FormData(formElement);
+    const response = await api<{ submission: ArtisanKycSubmission }>('/artisans/kyc', {
+      method: 'POST',
+      token,
+      body: JSON.stringify({
+        legalName: form.get('legalName'),
+        documentType: form.get('documentType'),
+        documentNumber: form.get('documentNumber'),
+        documentImageUrl: form.get('documentImageUrl'),
+        selfieImageUrl: form.get('selfieImageUrl') || undefined,
+        address: form.get('address'),
+        city: form.get('city'),
+      }),
+    });
+    setKycSubmission(response.submission);
+    await refresh();
+  }
+
+  async function savePayoutAccount(formElement: HTMLFormElement) {
+    const form = new FormData(formElement);
+    const selectedBank = banks.find(
+      (bank) => bank.code === String(form.get('bankCode') || '')
+    );
+    const response = await api<{ account: ProviderPayoutAccount }>('/artisans/payout-account', {
+      method: 'POST',
+      token,
+      body: JSON.stringify({
+        bankCode: form.get('bankCode'),
+        bankName: selectedBank?.name,
+        accountNumber: form.get('accountNumber'),
+        accountName: form.get('accountName'),
+      }),
+    });
+    setPayoutAccount(response.account);
+    await hydrateSettings();
+  }
+
+  return (
+    <section className="artisan-profile-settings-page">
+      <aside className="artisan-settings-sidebar">
+        <span className="recommended-avatar large">{(profile?.displayName || 'A').slice(0, 1).toUpperCase()}</span>
+        <h2>{profile?.displayName || 'Your profile'}</h2>
+        <p>@{(firebaseUser?.email || 'artisan').split('@')[0]}</p>
+        <span className={`booking-status ${approved ? 'completed' : 'pending'}`}>
+          {approved ? 'Approved' : kycStatus.toLowerCase().replace(/_/g, ' ')}
+        </span>
+        <button>Edit Profile</button>
+        {['Your Profile', 'KYC verification', 'Bank information', 'Business information', 'Job history', 'Service and pricing', 'Settings', 'Notifications'].map((item, index) => (
+          <span className={index === 0 ? 'active' : ''} key={item}>{item}</span>
+        ))}
+        <button className="danger-outline">Log out</button>
+      </aside>
+
+      <div className="artisan-settings-stack">
+        <form
+          className="artisan-settings-card"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const form = event.currentTarget;
+            runAction(() => saveProfile(form), 'Profile saved');
+          }}
+        >
+          <h2>Edit Personal Information</h2>
+          <p>Update the public profile details customers see on Bundo.</p>
+          <div className="profile-picture-row">
+            <span className="recommended-avatar large">{(profile?.displayName || 'A').slice(0, 1).toUpperCase()}</span>
+            <div>
+              <strong>Profile Picture</strong>
+              <p>JPG, GIF or PNG. Max size of 800K</p>
+              <button type="button" className="text-button">Upload new</button>
+            </div>
+          </div>
+          <label>Full Name<input name="displayName" defaultValue={profile?.displayName || ''} required /></label>
+          <label>Email Address<input defaultValue={firebaseUser?.email || ''} disabled /></label>
+          <label>Phone Number<input placeholder="+234" disabled /></label>
+          <label>Location<input name="city" defaultValue={profile?.city || 'Lagos'} required /></label>
+          <label>Area<input name="area" defaultValue={profile?.area || ''} /></label>
+          <div className="settings-actions">
+            <button type="button" className="secondary-button">Cancel</button>
+            <button disabled={busy}>Save Changes</button>
+          </div>
+        </form>
+
+        <form
+          className="artisan-settings-card"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const form = event.currentTarget;
+            runAction(() => submitKyc(form), 'KYC submission saved');
+          }}
+        >
+          <h2>KYC verification</h2>
+          <p>Identity details stay in settings and are reviewed by admin before your profile is fully approved.</p>
+          {kycSubmission && (
+            <div className={`payment-note ${kycSubmission.status === 'APPROVED' ? 'success' : ''}`}>
+              <strong>KYC status: {kycSubmission.status.toLowerCase().replace(/_/g, ' ')}</strong>
+              <span>{kycSubmission.reviewNote || 'Admin will review your submission.'}</span>
+            </div>
+          )}
+          <label>Legal Name<input name="legalName" defaultValue={kycSubmission?.legalName || ''} required /></label>
+          <label>Document Type
+            <select name="documentType" defaultValue={kycSubmission?.documentType || 'NIN'} required>
+              <option value="NIN">NIN</option>
+              <option value="BVN">BVN</option>
+              <option value="DRIVERS_LICENSE">Driver's license</option>
+              <option value="INTERNATIONAL_PASSPORT">International passport</option>
+            </select>
+          </label>
+          <label>Document Number<input name="documentNumber" defaultValue={kycSubmission?.documentNumber || ''} required /></label>
+          <label>Document Image URL<input name="documentImageUrl" defaultValue={kycSubmission?.documentImageUrl || ''} required /></label>
+          <label>Selfie Image URL<input name="selfieImageUrl" defaultValue={kycSubmission?.selfieImageUrl || ''} /></label>
+          <label>Residential Address<input name="address" defaultValue={kycSubmission?.address || ''} required /></label>
+          <label>City<input name="city" defaultValue={kycSubmission?.city || profile?.city || 'Lagos'} required /></label>
+          <button disabled={busy}>Save KYC details</button>
+        </form>
+
+        <form
+          className="artisan-settings-card"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const form = event.currentTarget;
+            runAction(() => savePayoutAccount(form), 'Payout account saved');
+          }}
+        >
+          <h2>Bank information</h2>
+          <p>Add the Nigerian bank account where approved completed-service payouts should be sent.</p>
+          {payoutAccount && (
+            <div className="payment-note success">
+              <strong>{payoutAccount.accountName || 'Saved payout account'}</strong>
+              <span>
+                {payoutAccount.bankName || payoutAccount.bankCode} · ****{payoutAccount.accountNumber.slice(-4)}
+              </span>
+            </div>
+          )}
+          <label>Bank
+            <select name="bankCode" defaultValue={payoutAccount?.bankCode || ''} required>
+              <option value="" disabled>Select bank</option>
+              {banks.map((bank) => (
+                <option key={bank.code} value={bank.code}>
+                  {bank.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>Account Number<input name="accountNumber" defaultValue={payoutAccount?.accountNumber || ''} required /></label>
+          <label>Account Name<input name="accountName" defaultValue={payoutAccount?.accountName || ''} /></label>
+          <button disabled={busy}>Save bank information</button>
+        </form>
+      </div>
+    </section>
+  );
+}
+
+function ArtisanOffersPanel({
+  token,
+  categories,
+  offerings,
+  busy,
+  runAction,
+  refresh,
+}: {
+  token: string;
+  categories: ReactNode[];
+  offerings: Offering[];
+  busy: boolean;
+  runAction: ActionRunner;
+  refresh: () => Promise<void>;
+}) {
+  const [profile, setProfile] = useState<Artisan | null>(null);
+  const [kycSubmission, setKycSubmission] = useState<ArtisanKycSubmission | null>(null);
+  const kycStatus = kycSubmission?.status ?? 'NOT_SUBMITTED';
+  const artisanApproved = profile?.verifyStatus === 'APPROVED' && kycStatus === 'APPROVED';
+  const reviewMessage = !profile
+    ? 'Create your artisan profile in Profile settings before listing services.'
+    : kycStatus === 'APPROVED' && profile.verifyStatus !== 'APPROVED'
+      ? 'Your KYC is approved. Admin approval for your artisan profile is still pending.'
+      : kycStatus === 'APPROVED'
+        ? 'Your artisan account is approved. Add service offers that match your profile.'
+        : 'Service offers unlock after KYC and admin approval.';
+
+  useEffect(() => {
+    let mounted = true;
+    Promise.all([
+      api<{ profile: Artisan }>('/artisans/me', { token }).catch(() => ({ profile: null as unknown as Artisan })),
+      api<{ submission: ArtisanKycSubmission | null }>('/artisans/kyc', { token }).catch(() => ({ submission: null })),
+    ]).then(([profileResponse, kycResponse]) => {
+      if (!mounted) return;
+      setProfile(profileResponse.profile || null);
+      setKycSubmission(kycResponse.submission);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [token]);
+
+  async function createOffering(formElement: HTMLFormElement) {
+    const form = new FormData(formElement);
+    await api('/offerings', {
+      method: 'POST',
+      token,
+      body: JSON.stringify({
+        categoryId: form.get('categoryId'),
+        title: form.get('title'),
+        description: form.get('description'),
+        priceFrom: Number(form.get('priceFrom')),
+        priceTo: form.get('priceTo') ? Number(form.get('priceTo')) : undefined,
+      }),
+    });
+    await refresh();
+    formElement.reset();
+  }
+
+  return (
+    <>
+      <section className="section-head compact">
+        <p className="eyebrow">Services</p>
+        <h1>Service offers</h1>
+        <p>{reviewMessage}</p>
+      </section>
+
+      {!artisanApproved && (
+        <article className="panel-card locked-card">
+          <p className="eyebrow">Locked until approval</p>
+          <h2>Offer creation is not available yet</h2>
+          <div className="approval-steps">
+            <span className={profile ? 'complete' : ''}>Profile</span>
+            <span className={kycStatus !== 'NOT_SUBMITTED' ? 'complete' : ''}>KYC submitted</span>
+            <span className={kycStatus === 'APPROVED' ? 'complete' : ''}>KYC approved</span>
+            <span className={profile?.verifyStatus === 'APPROVED' ? 'complete' : ''}>Admin approved</span>
+          </div>
+        </article>
+      )}
+
+      {artisanApproved && (
+        <form
+          className="panel-card form-card"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const form = event.currentTarget;
+            runAction(() => createOffering(form), 'Offering created');
+          }}
+        >
+          <p className="eyebrow">Create offer</p>
+          <h2>Add a service package</h2>
+          <select name="categoryId" required>{categories}</select>
+          <input name="title" placeholder="Service title" required />
+          <input name="description" placeholder="Description" />
+          <input name="priceFrom" placeholder="Price from" required />
+          <input name="priceTo" placeholder="Price to" />
+          <button disabled={busy}>Create offering</button>
+        </form>
+      )}
+
+      <article className="panel-card">
+        <p className="eyebrow">Services</p>
+        <h2>My offerings</h2>
+        {offerings.length === 0 && <p>No offerings created yet.</p>}
+        {offerings.map((offering) => (
+          <div className="list-item" key={offering.id}>
+            <strong>{offering.title}</strong>
+            <span>
+              {money(offering.priceFrom)}
+              {offering.category?.name ? ` · ${offering.category.name}` : ''}
+            </span>
+          </div>
+        ))}
+      </article>
+    </>
   );
 }
 
@@ -2210,6 +4312,22 @@ function ArtisanPanel({
   const [banks, setBanks] = useState<PayoutBank[]>([]);
   const [kycSubmission, setKycSubmission] = useState<ArtisanKycSubmission | null>(null);
   const [uploadingPortfolio, setUploadingPortfolio] = useState(false);
+  const kycStatus = kycSubmission?.status ?? 'NOT_SUBMITTED';
+  const artisanApproved =
+    profile?.verifyStatus === 'APPROVED' && kycStatus === 'APPROVED';
+  const reviewMessage = !profile
+    ? 'Create your artisan profile first, then submit KYC for admin review.'
+    : kycStatus === 'NOT_SUBMITTED'
+      ? 'Submit KYC so admin can verify your identity before you list services.'
+      : kycStatus === 'APPROVED' && profile.verifyStatus !== 'APPROVED'
+        ? 'Your KYC is approved. Admin approval for your artisan profile is still pending.'
+        : kycStatus === 'APPROVED'
+          ? 'Your artisan account is approved. You can now create offers for matching categories.'
+          : kycStatus === 'REJECTED'
+            ? 'Your KYC was rejected. Review the admin note, update your details, and resubmit.'
+            : kycStatus === 'CHANGES_REQUESTED'
+              ? 'Admin requested changes. Update your KYC details and resubmit for review.'
+              : 'Your KYC is under admin review. Offer creation unlocks after approval.';
 
   useEffect(() => {
     let mounted = true;
@@ -2449,23 +4567,6 @@ function ArtisanPanel({
         onSubmit={(event) => {
           event.preventDefault();
           const form = event.currentTarget;
-          runAction(() => createOffering(form), 'Offering created');
-        }}
-      >
-        <p className="eyebrow">Services</p>
-        <h2>Create offering</h2>
-        <select name="categoryId" required>{categories}</select>
-        <input name="title" placeholder="Service title" required />
-        <input name="description" placeholder="Description" />
-        <input name="priceFrom" placeholder="Price from" required />
-        <input name="priceTo" placeholder="Price to" />
-        <button disabled={busy}>Create offering</button>
-      </form>
-      <form
-        className="panel-card form-card"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const form = event.currentTarget;
           runAction(() => submitKyc(form), 'KYC submission saved');
         }}
       >
@@ -2527,6 +4628,37 @@ function ArtisanPanel({
         />
         <button disabled={busy}>Submit KYC</button>
       </form>
+      {!artisanApproved ? (
+        <article className="panel-card locked-card">
+          <p className="eyebrow">Locked until approval</p>
+          <h2>Offers are not available yet</h2>
+          <p>{reviewMessage}</p>
+          <div className="approval-steps">
+            <span className={profile ? 'complete' : ''}>Profile</span>
+            <span className={kycStatus !== 'NOT_SUBMITTED' ? 'complete' : ''}>KYC submitted</span>
+            <span className={kycStatus === 'APPROVED' ? 'complete' : ''}>KYC approved</span>
+            <span className={profile?.verifyStatus === 'APPROVED' ? 'complete' : ''}>Admin approved</span>
+          </div>
+        </article>
+      ) : (
+        <>
+          <form
+            className="panel-card form-card"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const form = event.currentTarget;
+              runAction(() => createOffering(form), 'Offering created');
+            }}
+          >
+            <p className="eyebrow">Services</p>
+            <h2>Create offering</h2>
+            <select name="categoryId" required>{categories}</select>
+            <input name="title" placeholder="Service title" required />
+            <input name="description" placeholder="Description" />
+            <input name="priceFrom" placeholder="Price from" required />
+            <input name="priceTo" placeholder="Price to" />
+            <button disabled={busy}>Create offering</button>
+          </form>
       <form
         className="panel-card form-card"
         onSubmit={(event) => {
@@ -2660,6 +4792,160 @@ function ArtisanPanel({
           </div>
         ))}
       </article>
+        </>
+      )}
+    </>
+  );
+}
+
+function ArtisanDashboard({
+  token,
+  bookings,
+  firebaseUser,
+  busy,
+  runAction,
+  refresh,
+  openBookings,
+  openMessages,
+  openReviews,
+  openProfile,
+  openOffers,
+}: {
+  token: string;
+  bookings: Booking[];
+  firebaseUser: User | null;
+  busy: boolean;
+  runAction: ActionRunner;
+  refresh: () => Promise<void>;
+  openBookings: () => void;
+  openMessages: () => void;
+  openReviews: () => void;
+  openProfile: () => void;
+  openOffers: () => void;
+}) {
+  const [profile, setProfile] = useState<Artisan | null>(null);
+  const [availabilitySlots, setAvailabilitySlots] = useState<AvailabilitySlot[]>([]);
+  const [kycSubmission, setKycSubmission] = useState<ArtisanKycSubmission | null>(null);
+  const displayName = profile?.displayName || firebaseUser?.displayName || userDisplayName(firebaseUser, null) || 'Artisan';
+  const requestedBookings = bookings.filter((booking) => booking.status === 'REQUESTED');
+  const activeBookings = bookings.filter((booking) => ['ACCEPTED', 'COMPLETED'].includes(booking.status));
+  const isApproved = profile?.verifyStatus === 'APPROVED' && kycSubmission?.status === 'APPROVED';
+
+  useEffect(() => {
+    let mounted = true;
+    Promise.all([
+      api<{ profile: Artisan }>('/artisans/me', { token }).catch(() => ({ profile: null as unknown as Artisan })),
+      api<{ slots: AvailabilitySlot[] }>('/artisans/availability-slots/me', { token }).catch(() => ({ slots: [] })),
+      api<{ submission: ArtisanKycSubmission | null }>('/artisans/kyc', { token }).catch(() => ({ submission: null })),
+    ]).then(([profileResponse, slotResponse, kycResponse]) => {
+      if (!mounted) return;
+      setProfile(profileResponse.profile || null);
+      setAvailabilitySlots(slotResponse.slots);
+      setKycSubmission(kycResponse.submission);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [token]);
+
+  async function updateBookingStatus(bookingId: string, status: 'ACCEPTED' | 'DECLINED' | 'COMPLETED') {
+    await api(`/bookings/${bookingId}/status`, {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify({ status }),
+    });
+    await refresh();
+  }
+
+  return (
+    <>
+      <section className="artisan-dashboard-hero">
+        <div>
+          <h1>Good morning, {displayName.split(' ')[0]}</h1>
+          <p className="muted">
+            {isApproved
+              ? 'Your profile is approved. Manage jobs, service offers, messages, and reviews from here.'
+              : 'Your profile is still being reviewed. Complete profile settings while admin approval is pending.'}
+          </p>
+        </div>
+        <span className={`booking-status ${isApproved ? 'completed' : 'pending'}`}>
+          {isApproved ? 'Approved' : kycSubmission?.status?.toLowerCase().replace(/_/g, ' ') || 'Pending review'}
+        </span>
+        <div className="artisan-stat-grid">
+          <StatCard label="Total bookings" value={bookings.length} hint="All time" />
+          <StatCard label="Ratings" value={`${profile?.avgRating || 0}/5.0`} hint={`${profile?.ratingCount || 0} reviews`} />
+          <StatCard label="Active jobs" value={activeBookings.length} hint="This week" />
+          <StatCard label="New requests" value={requestedBookings.length} hint="Needs your response" />
+        </div>
+      </section>
+
+      <section className="artisan-dashboard-grid">
+        <div className="artisan-request-stack">
+          <div className="logged-section-head">
+            <h2>New Requests</h2>
+            <button type="button" onClick={openBookings}>view all</button>
+          </div>
+          {requestedBookings.length === 0 && <EmptyState title="No new requests" body="New booking requests will appear here." />}
+          {requestedBookings.slice(0, 2).map((booking) => (
+            <article className="artisan-request-card" key={booking.id}>
+              <span className="recommended-avatar">{(booking.customerUser?.email || 'C').slice(0, 1).toUpperCase()}</span>
+              <div>
+                <h3>{booking.customerUser?.email?.split('@')[0] || 'Customer'}</h3>
+                <small>{booking.offering?.title || 'Service request'}</small>
+                <p>{bookingDate(booking.scheduledAt)} · {booking.artisan?.area || profile?.area || 'Lagos'}</p>
+                <div className="actions">
+                  <button
+                    className="secondary-button"
+                    disabled={busy}
+                    onClick={() => runAction(() => updateBookingStatus(booking.id, 'DECLINED'), 'Booking request declined')}
+                  >
+                    Decline
+                  </button>
+                  <button
+                    disabled={busy}
+                    onClick={() => runAction(() => updateBookingStatus(booking.id, 'ACCEPTED'), 'Booking request accepted')}
+                  >
+                    Accept
+                  </button>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+        <aside className="artisan-side-stack">
+          <article className="artisan-soft-card">
+            <div className="logged-section-head">
+              <h2>Availability</h2>
+              <button type="button" onClick={openProfile}>Edit</button>
+            </div>
+            <div className="availability-dots">
+              {dayLabels.slice(1).concat(dayLabels[0]).map((day, index) => {
+                const dayIndex = index === 6 ? 0 : index + 1;
+                return (
+                  <span key={day} className={availabilitySlots.some((slot) => slot.dayOfWeek === dayIndex) ? 'active' : ''}>
+                    {day.slice(0, 1)}
+                  </span>
+                );
+              })}
+            </div>
+          </article>
+          <article className="artisan-soft-card">
+            <h2>This week</h2>
+            <dl className="summary-list">
+              <div><dt>Jobs Completed</dt><dd>{bookings.filter((booking) => booking.status === 'COMPLETED').length}</dd></div>
+              <div><dt>Jobs Upcoming</dt><dd>{activeBookings.length}</dd></div>
+              <div><dt>Earnings</dt><dd>{money(0)}</dd></div>
+            </dl>
+          </article>
+          <article className="artisan-soft-card quick-links">
+            <h2>Quick links</h2>
+            <button onClick={openProfile}>Profile settings</button>
+            <button onClick={openOffers}>Service offers</button>
+            <button onClick={openMessages}>Messages</button>
+            <button onClick={openReviews}>Reviews</button>
+          </article>
+        </aside>
+      </section>
     </>
   );
 }
@@ -2725,6 +5011,135 @@ function BookingsSummary({ bookings, title = 'My bookings' }: { bookings: Bookin
   );
 }
 
+function bookingContactName(booking: Booking) {
+  return booking.customerUser?.email?.split('@')[0] || 'Customer';
+}
+
+function bookingLocation(booking: Booking) {
+  return booking.artisan?.area || booking.offering?.artisan?.area || 'Lagos';
+}
+
+function ArtisanJobsPage({
+  bookings,
+  visibleBookings,
+  selectedBooking,
+  filter,
+  tabs,
+  busy,
+  setFilter,
+  selectBooking,
+  openMessages,
+  updateBookingStatus,
+}: {
+  bookings: Booking[];
+  visibleBookings: Booking[];
+  selectedBooking: Booking | null;
+  filter: 'ALL' | Booking['status'];
+  tabs: Array<{ label: string; value: 'ALL' | Booking['status'] }>;
+  busy: boolean;
+  setFilter: (filter: 'ALL' | Booking['status']) => void;
+  selectBooking: (bookingId: string | null) => void;
+  openMessages: () => void;
+  updateBookingStatus: (bookingId: string, status: Booking['status']) => Promise<void>;
+}) {
+  if (selectedBooking) {
+    const isAccepted = selectedBooking.status === 'ACCEPTED';
+    const customerName = bookingContactName(selectedBooking);
+    const serviceName = selectedBooking.offering?.title || 'Basic inspection';
+
+    return (
+      <section className="artisan-job-detail-page">
+        <div className="artisan-job-detail-head">
+          <div>
+            <h2>Active bookings</h2>
+            <p>
+              {isAccepted ? 'Accepted' : statusLabel(selectedBooking.status)} · Booking #{selectedBooking.id.slice(0, 6)}
+            </p>
+          </div>
+          <span className={`booking-status ${selectedBooking.status.toLowerCase()}`}>
+            {statusLabel(selectedBooking.status)}
+          </span>
+        </div>
+
+        <div className="artisan-job-customer">
+          <small>Customer</small>
+          <div className="booking-person">
+            <span>{customerName.slice(0, 1).toUpperCase()}</span>
+            <div>
+              <h3>{customerName}</h3>
+              <p>{bookingLocation(selectedBooking)} · 3 past bookings</p>
+            </div>
+          </div>
+        </div>
+
+        <article className="artisan-job-detail-card">
+          <h3>Booking Details</h3>
+          <dl>
+            <div><dt>Service type</dt><dd>{serviceName}</dd></div>
+            <div><dt>Date</dt><dd>{bookingDate(selectedBooking.scheduledAt)}</dd></div>
+            <div><dt>Time slot</dt><dd>{selectedBooking.scheduledAt ? formatMessageTime(selectedBooking.scheduledAt) : 'To be confirmed'}</dd></div>
+            <div className="full"><dt>NOTE</dt><dd>{selectedBooking.note || 'No note added'}</dd></div>
+          </dl>
+        </article>
+
+        <div className="artisan-job-actions">
+          {selectedBooking.status === 'REQUESTED' && (
+            <button disabled={busy} onClick={() => updateBookingStatus(selectedBooking.id, 'ACCEPTED')}>
+              Accept request
+            </button>
+          )}
+          {selectedBooking.status === 'ACCEPTED' && (
+            <button disabled={busy} onClick={() => updateBookingStatus(selectedBooking.id, 'COMPLETED')}>
+              Mark as completed
+            </button>
+          )}
+          <button className="secondary-button" onClick={openMessages}>Open Chat</button>
+          <button className="text-button" onClick={() => selectBooking(null)}>Back to jobs</button>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="artisan-jobs-page">
+      <div className="artisan-jobs-head">
+        <h2>Active bookings</h2>
+        <p>You have {bookings.length} Active bookings</p>
+      </div>
+      <div className="booking-tabs artisan-tabs" role="tablist" aria-label="Booking filters">
+        {tabs.map((tab) => (
+          <button key={tab.value} className={filter === tab.value ? 'active' : ''} onClick={() => setFilter(tab.value)}>
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      <div className="artisan-job-list">
+        {visibleBookings.length === 0 && <EmptyState title="No jobs here" body="Bookings matching this status will appear here." />}
+        {visibleBookings.map((booking) => {
+          const customerName = bookingContactName(booking);
+          return (
+            <article className="artisan-job-row" key={booking.id}>
+              <div className="booking-person">
+                <span>{customerName.slice(0, 1).toUpperCase()}</span>
+                <div>
+                  <h3>{customerName}</h3>
+                  <p>{booking.offering?.title || 'Service booking'}</p>
+                </div>
+              </div>
+              <p>{bookingDate(booking.scheduledAt)} · {bookingLocation(booking)}</p>
+              <span className={`booking-status ${booking.status.toLowerCase()}`}>{statusLabel(booking.status)}</span>
+              <button onClick={() => selectBooking(booking.id)}>
+                {booking.status === 'REQUESTED' ? 'View booking request' : 'View active bookings'}
+              </button>
+              <button className="secondary-button" onClick={openMessages}>Open Chat</button>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function BookingsPage({
   bookings,
   mode,
@@ -2751,6 +5166,8 @@ function BookingsPage({
     { label: 'Declined', value: 'DECLINED' },
   ];
   const visibleBookings = filter === 'ALL' ? bookings : bookings.filter((booking) => booking.status === filter);
+  const [selectedArtisanBookingId, setSelectedArtisanBookingId] = useState<string | null>(null);
+  const selectedArtisanBooking = bookings.find((booking) => booking.id === selectedArtisanBookingId) || null;
 
   async function cancelBooking(bookingId: string) {
     await api(`/bookings/${bookingId}/cancel`, {
@@ -2827,12 +5244,31 @@ function BookingsPage({
     await refresh();
   }
 
+  if (mode === 'artisan') {
+    return (
+      <ArtisanJobsPage
+        bookings={bookings}
+        visibleBookings={visibleBookings}
+        selectedBooking={selectedArtisanBooking}
+        filter={filter}
+        tabs={tabs}
+        busy={busy}
+        setFilter={setFilter}
+        selectBooking={setSelectedArtisanBookingId}
+        openMessages={openMessages}
+        updateBookingStatus={(bookingId, status) =>
+          runAction(() => updateBookingStatus(bookingId, status), `Booking ${status.toLowerCase()}`)
+        }
+      />
+    );
+  }
+
   return (
     <section className="bookings-page">
       <div className="bookings-toolbar">
         <div>
           <p className="eyebrow">Booking details</p>
-          <h2>{mode === 'artisan' ? 'Booking requests' : 'My bookings'}</h2>
+          <h2>My bookings</h2>
         </div>
         <span>{bookings.length} total</span>
       </div>
@@ -2852,16 +5288,14 @@ function BookingsPage({
       {visibleBookings.length === 0 && (
         <EmptyState
           title="No bookings yet"
-          body={mode === 'artisan' ? 'Customer booking requests will appear here.' : 'Your service bookings will appear here after you request a service.'}
+          body="Your service bookings will appear here after you request a service."
         />
       )}
 
       <div className="booking-list">
         {visibleBookings.map((booking) => {
           const contactName =
-            mode === 'artisan'
-              ? booking.customerUser?.email?.split('@')[0] || 'Customer'
-              : booking.artisan?.displayName || booking.offering?.artisan?.displayName || 'Bundo professional';
+            booking.artisan?.displayName || booking.offering?.artisan?.displayName || 'Bundo professional';
           const contactInitials = contactName
             .split(' ')
             .map((part) => part[0])
@@ -2944,17 +5378,17 @@ function BookingsPage({
                     Pay securely
                   </button>
                 )}
-                {mode === 'customer' && paymentStatus === 'PAID_HELD' && (
+                {paymentStatus === 'PAID_HELD' && (
                   <button className="secondary-button" disabled>
                     Payment secured
                   </button>
                 )}
-                {mode === 'customer' && paymentStatus === 'RELEASED' && (
+                {paymentStatus === 'RELEASED' && (
                   <button className="secondary-button" disabled>
                     Payment released
                   </button>
                 )}
-                {mode === 'customer' && ['REQUESTED', 'ACCEPTED'].includes(booking.status) && (
+                {['REQUESTED', 'ACCEPTED'].includes(booking.status) && (
                   <button
                     disabled={busy}
                     onClick={() => runAction(() => cancelBooking(booking.id), 'Booking cancelled')}
@@ -2971,7 +5405,7 @@ function BookingsPage({
                     Reschedule
                   </button>
                 )}
-                {mode === 'customer' && booking.status === 'COMPLETED' && (
+                {booking.status === 'COMPLETED' && (
                   <button disabled={busy} onClick={() => runAction(async () => undefined, 'Reviews are created from completed booking flow')}>
                     Leave review
                   </button>
@@ -2988,31 +5422,6 @@ function BookingsPage({
                     onClick={() => runAction(() => openDispute(booking.id), 'Dispute opened')}
                   >
                     Raise dispute
-                  </button>
-                )}
-                {mode === 'artisan' && booking.status === 'REQUESTED' && (
-                  <>
-                    <button
-                      disabled={busy}
-                      onClick={() => runAction(() => updateBookingStatus(booking.id, 'ACCEPTED'), 'Booking accepted')}
-                    >
-                      Accept
-                    </button>
-                    <button
-                      className="secondary-button"
-                      disabled={busy}
-                      onClick={() => runAction(() => updateBookingStatus(booking.id, 'DECLINED'), 'Booking declined')}
-                    >
-                      Decline
-                    </button>
-                  </>
-                )}
-                {mode === 'artisan' && booking.status === 'ACCEPTED' && (
-                  <button
-                    disabled={busy}
-                    onClick={() => runAction(() => updateBookingStatus(booking.id, 'COMPLETED'), 'Booking completed')}
-                  >
-                    Mark completed
                   </button>
                 )}
               </div>
@@ -3572,9 +5981,11 @@ function AdminConsole({
   submissions,
   categories,
   token,
+  adminLabel,
   busy,
   runAction,
   refresh,
+  onSignOut,
 }: {
   section: AdminSection;
   setSection: (section: AdminSection) => void;
@@ -3586,9 +5997,11 @@ function AdminConsole({
   submissions: ArtisanKycSubmission[];
   categories: AdminCategoryRecord[];
   token: string;
+  adminLabel: string;
   busy: boolean;
   runAction: ActionRunner;
   refresh: () => Promise<void>;
+  onSignOut: () => void;
 }) {
   const sections: Array<{
     id: AdminSection;
@@ -3611,6 +6024,11 @@ function AdminConsole({
           <p className="eyebrow">Admin console</p>
           <h1>Bundo operations</h1>
           <p>Manage trust, supply, support, and marketplace activity from one place.</p>
+        </div>
+        <div className="admin-operator-card">
+          <span>Signed in as</span>
+          <strong>{adminLabel}</strong>
+          <button type="button" onClick={onSignOut}>Log out</button>
         </div>
         <nav className="admin-nav" aria-label="Admin sections">
           {sections.map((item) => (
@@ -4116,7 +6534,10 @@ function ChatPanel({
   const [filter, setFilter] = useState<'all' | 'incoming'>('all');
 
   const incomingConversations = useMemo(
-    () => conversations.filter((conversation) => conversation.messages?.[0]?.senderId !== currentUserId),
+    () => conversations.filter((conversation) => {
+      const latest = conversation.messages?.[0];
+      return Boolean(latest && latest.senderId !== currentUserId);
+    }),
     [conversations, currentUserId]
   );
   const visibleConversations = filter === 'incoming' ? incomingConversations : conversations;
@@ -4133,12 +6554,21 @@ function ChatPanel({
   async function reply(formElement: HTMLFormElement) {
     if (!activeConversation) return;
     const form = new FormData(formElement);
-    const body = String(form.get('body') || '');
+    const body = String(form.get('body') || '').trim();
+    const imageFile = form.get('image');
+    const imagePayload =
+      imageFile instanceof File && imageFile.size > 0
+        ? await uploadChatImage(token, imageFile)
+        : {};
+
+    if (!body && !('imageUrl' in imagePayload)) {
+      throw new Error('Write a message or attach an image.');
+    }
 
     await api(`/conversations/${activeConversation.id}/messages`, {
       method: 'POST',
       token,
-      body: JSON.stringify({ body }),
+      body: JSON.stringify({ body, ...imagePayload }),
     });
     formElement.reset();
     await openConversation(activeConversation.id);
@@ -4154,7 +6584,8 @@ function ChatPanel({
   }
 
   function latestMessage(conversation: Conversation) {
-    return conversation.messages?.[0]?.body || 'Open chat';
+    const latest = conversation.messages?.[0];
+    return latest?.body || (latest?.imageUrl ? 'Photo attachment' : 'Booking conversation ready');
   }
 
   return (
@@ -4176,12 +6607,12 @@ function ChatPanel({
           {visibleConversations.length === 0 && (
             <div className="conversation-empty">
               <strong>No {filter === 'incoming' ? 'incoming ' : ''}messages yet</strong>
-              <span>Conversations will appear here when a message is started.</span>
+              <span>Booking conversations appear here automatically when a job is opened.</span>
             </div>
           )}
           {visibleConversations.map((conversation) => {
             const latest = conversation.messages?.[0];
-            const isIncoming = latest?.senderId !== currentUserId;
+            const isIncoming = Boolean(latest && latest.senderId !== currentUserId);
 
             return (
               <button
@@ -4228,7 +6659,10 @@ function ChatPanel({
                     <div className={`chat-message-row ${mine ? 'mine' : 'theirs'}`} key={message.id}>
                       {!mine && <span className="conversation-avatar">{conversationInitial(activeConversation)}</span>}
                       <div className="chat-message">
-                        <p>{message.body}</p>
+                        {message.imageUrl && (
+                          <img className="chat-image" src={message.imageUrl} alt="Chat attachment" />
+                        )}
+                        {message.body && <p>{message.body}</p>}
                         <small>{formatMessageTime(message.createdAt)}{mine ? ' Sent' : ''}</small>
                       </div>
                     </div>
@@ -4244,7 +6678,11 @@ function ChatPanel({
                   runAction(() => reply(form), 'Reply sent');
                 }}
               >
-                <input name="body" placeholder="Write a message" required />
+                <label className="chat-attach-button">
+                  Photo
+                  <input name="image" type="file" accept="image/*" disabled={busy} />
+                </label>
+                <input name="body" placeholder="Write a message" />
                 <button disabled={busy}>Send</button>
               </form>
             </>
@@ -4290,12 +6728,36 @@ function AdminChatPanel({
     await refresh();
   }
 
+  async function sendAdminReply(formElement: HTMLFormElement) {
+    if (!activeConversation) return;
+    const form = new FormData(formElement);
+    const body = String(form.get('body') || '').trim();
+    const imageFile = form.get('image');
+    const imagePayload =
+      imageFile instanceof File && imageFile.size > 0
+        ? await uploadChatImage(token, imageFile)
+        : {};
+
+    if (!body && !('imageUrl' in imagePayload)) {
+      throw new Error('Write a message or attach an image.');
+    }
+
+    await api(`/admin/conversations/${activeConversation.id}/messages`, {
+      method: 'POST',
+      token,
+      body: JSON.stringify({ body, ...imagePayload }),
+    });
+    formElement.reset();
+    await openConversation(activeConversation.id);
+    await refresh();
+  }
+
   return (
     <section className="admin-chat">
       <section className="section-head compact">
         <p className="eyebrow">Support</p>
         <h2>Conversation access</h2>
-        <p>Admins can inspect customer/artisan chats and leave private operational notes.</p>
+        <p>Admins can inspect customer/artisan chats, reply as Bundo support, and leave private operational notes.</p>
       </section>
       <div className="dashboard-grid">
         <article className="panel-card">
@@ -4318,10 +6780,29 @@ function AdminChatPanel({
                 {activeConversation.messages?.map((message) => (
                   <div className="message-bubble" key={message.id}>
                     <strong>{message.sender?.email || message.sender?.role || 'User'}</strong>
-                    <p>{message.body}</p>
+                    {message.imageUrl && (
+                      <img className="chat-image" src={message.imageUrl} alt="Chat attachment" />
+                    )}
+                    {message.body && <p>{message.body}</p>}
                   </div>
                 ))}
               </div>
+
+              <form
+                className="reply-form admin-reply-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const form = event.currentTarget;
+                  runAction(() => sendAdminReply(form), 'Admin reply sent');
+                }}
+              >
+                <label className="chat-attach-button">
+                  Photo
+                  <input name="image" type="file" accept="image/*" disabled={busy} />
+                </label>
+                <input name="body" placeholder="Reply in this customer-artisan chat as Bundo support" />
+                <button disabled={busy}>Send reply</button>
+              </form>
 
               <h3>Admin notes</h3>
               {(activeConversation.adminNotes || []).length === 0 && <p>No notes yet.</p>}
