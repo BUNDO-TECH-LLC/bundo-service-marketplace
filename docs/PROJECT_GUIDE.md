@@ -735,6 +735,8 @@ For local development, the API now accepts both:
 - `http://localhost:5173`
 - `http://127.0.0.1:5173`
 
+For production and web-mobile testing, the API accepts explicitly configured `CORS_ORIGIN` entries and Vercel deployment subdomains ending in `.vercel.app`. This keeps production and preview deployments usable after email verification redirects or Vercel preview testing.
+
 ---
 
 ## Frontend Push Setup
