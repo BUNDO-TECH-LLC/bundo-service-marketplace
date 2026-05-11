@@ -254,6 +254,28 @@ function clearStoredRoute() {
   window.localStorage.removeItem(routeStorageKey);
 }
 
+const pendingSignupRoleStorageKey = 'bundo:pending-signup-role';
+
+function pendingSignupRoleKey(emailAddress: string) {
+  return `${pendingSignupRoleStorageKey}:${emailAddress.trim().toLowerCase()}`;
+}
+
+function savePendingSignupRole(emailAddress: string | null, role: SignupRole | null) {
+  if (!emailAddress || !role) return;
+  window.localStorage.setItem(pendingSignupRoleKey(emailAddress), role);
+}
+
+function readPendingSignupRole(emailAddress: string | null) {
+  if (!emailAddress) return null;
+  const storedRole = window.localStorage.getItem(pendingSignupRoleKey(emailAddress));
+  return storedRole === 'CUSTOMER' || storedRole === 'ARTISAN' ? storedRole : null;
+}
+
+function clearPendingSignupRole(emailAddress: string | null) {
+  if (!emailAddress) return;
+  window.localStorage.removeItem(pendingSignupRoleKey(emailAddress));
+}
+
 function needsEmailVerification(user: User) {
   return user.providerData.some((provider) => provider.providerId === 'password') && !user.emailVerified;
 }
@@ -265,8 +287,8 @@ function resetWorkspaceState() {
   };
 }
 
-async function resolveApiSession(user: User) {
-  let idToken = await user.getIdToken();
+async function resolveApiSession(user: User, forceRefresh = false) {
+  let idToken = await user.getIdToken(forceRefresh);
 
   try {
     const response = await api<{ user: ApiUser }>('/me', { token: idToken });
@@ -1405,19 +1427,26 @@ function AuthBox({
   const [pendingAuthUser, setPendingAuthUser] = useState<User | null>(null);
   const [pendingEmailVerificationUser, setPendingEmailVerificationUser] = useState<User | null>(null);
 
-  async function finishAuth(firebaseAuthUser: User, authMode = mode, roleOverride = preferredRole) {
-    let session = await resolveApiSession(firebaseAuthUser);
+  async function finishAuth(
+    firebaseAuthUser: User,
+    authMode = mode,
+    roleOverride = preferredRole,
+    forceTokenRefresh = false
+  ) {
+    const rememberedRole = readPendingSignupRole(firebaseAuthUser.email);
+    const intendedRole = roleOverride || rememberedRole;
+    let session = await resolveApiSession(firebaseAuthUser, forceTokenRefresh);
 
     if (
-      roleOverride &&
-      session.user.role !== roleOverride &&
+      intendedRole &&
+      session.user.role !== intendedRole &&
       session.user.role !== 'ADMIN' &&
-      !(session.user.role === 'ARTISAN' && roleOverride === 'CUSTOMER')
+      !(session.user.role === 'ARTISAN' && intendedRole === 'CUSTOMER')
     ) {
       await api('/users/role', {
         method: 'PATCH',
         token: session.token,
-        body: JSON.stringify({ role: roleOverride }),
+        body: JSON.stringify({ role: intendedRole }),
       });
       const refreshed = await api<{ user: ApiUser }>('/me', { token: session.token });
       session = {
@@ -1428,18 +1457,19 @@ function AuthBox({
 
     if (!session.user.role && session.user.role !== 'ADMIN') {
       setPendingAuthUser(firebaseAuthUser);
-      setPreferredRole(null);
+      setPreferredRole(rememberedRole);
       setMode('signup');
-      setAuthStep('role');
+      setAuthStep(rememberedRole ? 'account' : 'role');
       setDrawerOpen(true);
       onNotice('Choose client or artisan to finish setting up your Bundo account.');
       return;
     }
 
+    clearPendingSignupRole(firebaseAuthUser.email);
     onReady(session.token, session.user);
     if (session.user.role === 'ARTISAN') {
       onWorkspaceSection('overview');
-      onNavigate(authMode === 'signup' ? 'home' : 'workspace');
+      onNavigate(authMode === 'signup' || intendedRole === 'ARTISAN' ? 'home' : 'workspace');
       onNotice(
         'Your artisan onboarding is ready. Complete your profile, KYC, and offerings for admin review.'
       );
@@ -1460,6 +1490,7 @@ function AuthBox({
   }
 
   async function sendVerification(user: User) {
+    savePendingSignupRole(user.email, preferredRole);
     await sendEmailVerification(user);
     setPendingEmailVerificationUser(user);
     setAuthStep('verify');
@@ -1484,7 +1515,7 @@ function AuthBox({
         return;
       }
 
-      await finishAuth(refreshedUser, 'signup');
+      await finishAuth(refreshedUser, 'signup', readPendingSignupRole(refreshedUser.email) || preferredRole, true);
     } catch (error) {
       onNotice(error instanceof Error ? error.message : 'Could not check verification status');
     } finally {

@@ -207,14 +207,15 @@ The current frontend is a single-page React app that manages:
 3. User can continue with Google or email/name/password. Email signup requires a standard password and verify-password confirmation before the Firebase account is created.
 4. Email/password signup sends a Firebase email verification link before the user is synced into the Bundo backend.
 5. Unverified email/password users stay on the verification screen and can resend the verification email or confirm after clicking the email link.
-6. Password reset is handled from the login drawer through Firebase password reset email.
-7. Google sign-in uses Firebase Google Auth. Returning Google users continue directly; brand-new Google users choose client or artisan before their Bundo role is finalized.
-8. Frontend gets a Firebase ID token after sign-in/verification.
-9. Frontend calls `/me`.
-10. Backend verifies the Firebase token.
-11. Backend creates the user in the database if they do not exist.
-12. Frontend stores the selected role through `/users/role` when needed.
-13. A newly created artisan account is routed directly to the artisan profile/KYC setup surface.
+6. The selected signup role is remembered locally during email verification, so an artisan who verifies in another tab and returns to login still continues into artisan onboarding.
+7. Password reset is handled from the login drawer through Firebase password reset email.
+8. Google sign-in uses Firebase Google Auth. Returning Google users continue directly; brand-new Google users choose client or artisan before their Bundo role is finalized.
+9. Frontend gets a refreshed Firebase ID token after sign-in/verification.
+10. Frontend calls `/me`.
+11. Backend verifies the Firebase token.
+12. Backend creates the user in the database if they do not exist.
+13. Frontend stores the selected role through `/users/role` when needed.
+14. A newly created artisan account is routed directly to the artisan profile/KYC setup surface.
 
 Result:
 
@@ -222,6 +223,7 @@ Result:
 - synchronized user exists in database
 - role is stored in Bundo
 - email/password users verify their email before entering the marketplace workspace
+- verified artisan signups keep their selected role across the email verification handoff
 - password reset stays with Firebase Auth email templates
 - casual client/artisan switching is not exposed in the profile UI
 - artisan-to-client switching through the public role endpoint is blocked and should go through admin/support if needed
