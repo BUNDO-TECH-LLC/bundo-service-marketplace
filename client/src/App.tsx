@@ -625,6 +625,16 @@ function App() {
         const session = await resolveApiSession(user);
         setToken(session.token);
         setMe(session.user);
+
+        if (!session.user.role) {
+          setRouteHydrated(true);
+          setView('home');
+          setWorkspaceSection('overview');
+          setNotice('Choose client or artisan to finish setting up your Bundo account before booking.');
+          clearUrlSearch();
+          return;
+        }
+
         await loadPrivateData(session.token, session.user);
 
         const params = new URLSearchParams(window.location.search);
@@ -1687,6 +1697,66 @@ function AuthBox({
     setPendingAuthUser(null);
     setPendingEmailVerificationUser(null);
     setAuthStep('account');
+  }
+
+  if (firebaseUser && me && !me.role) {
+    return (
+      <div className="auth-entry role-completion-entry">
+        <button
+          type="button"
+          onClick={() => {
+            setMode('signup');
+            setAuthStep('role');
+            setDrawerOpen(true);
+            onNotice('Choose client or artisan to finish setting up your Bundo account.');
+          }}
+        >
+          Complete setup
+        </button>
+
+        {drawerOpen && (
+          <div className="auth-overlay" role="presentation" onClick={() => setDrawerOpen(false)}>
+            <aside
+              className="auth-drawer"
+              aria-label="Complete account setup"
+              aria-modal="true"
+              role="dialog"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="drawer-head">
+                <img className="drawer-logo" src={bundoLogo} alt="Bundo logo" />
+                <button type="button" onClick={() => setDrawerOpen(false)}>Close</button>
+              </div>
+              <p className="eyebrow">Finish setup</p>
+              <h2>How will you use Bundo?</h2>
+              <p className="drawer-copy">Choose your account type so we can unlock the right marketplace actions.</p>
+              <div className="role-choice-grid" aria-label="Choose account type">
+                <button type="button" className="role-choice-card" onClick={() => void finishAuth(firebaseUser, 'signup', 'CUSTOMER', true)}>
+                  <span>Client</span>
+                  <strong>Find and book trusted services</strong>
+                  <small>Browse professionals, message artisans, request bookings, and track jobs.</small>
+                </button>
+                <button type="button" className="role-choice-card artisan" onClick={() => void finishAuth(firebaseUser, 'signup', 'ARTISAN', true)}>
+                  <span>Artisan</span>
+                  <strong>Offer services on Bundo</strong>
+                  <small>Create a profile, add offerings, complete verification, and receive bookings.</small>
+                </button>
+              </div>
+              <button
+                type="button"
+                className="mode-switch"
+                onClick={() => {
+                  onNotice('Signed out');
+                  auth && signOut(auth);
+                }}
+              >
+                Use another account
+              </button>
+            </aside>
+          </div>
+        )}
+      </div>
+    );
   }
 
   if (firebaseUser && me) {

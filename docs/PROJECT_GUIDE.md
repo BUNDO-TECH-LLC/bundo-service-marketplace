@@ -216,6 +216,7 @@ The current frontend is a single-page React app that manages:
 12. Backend creates the user in the database if they do not exist.
 13. Frontend stores the selected role through `/users/role` when needed.
 14. A newly created artisan account is routed directly to the artisan profile/KYC setup surface.
+15. If a verified account is restored without a Bundo role, the UI shows a role-completion prompt before marketplace actions such as booking are enabled.
 
 Result:
 
@@ -224,6 +225,7 @@ Result:
 - role is stored in Bundo
 - email/password users verify their email before entering the marketplace workspace
 - verified artisan signups keep their selected role across the email verification handoff
+- role-less verified users cannot silently enter a disabled booking state; they must finish client/artisan setup first
 - password reset stays with Firebase Auth email templates
 - casual client/artisan switching is not exposed in the profile UI
 - artisan-to-client switching through the public role endpoint is blocked and should go through admin/support if needed
