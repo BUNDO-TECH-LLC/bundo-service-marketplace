@@ -1359,19 +1359,37 @@ function App() {
                 openOffers={() => setWorkspaceSection('offers')}
               />
             ) : (
-              <div className="dashboard-grid">
-                <AccountSettingsPanel
-                  token={token}
-                  me={me}
-                  busy={busy}
-                  runAction={withNotice}
-                  refresh={async () => {
-                    const user = await refreshMe();
-                    await loadPrivateData(token, user || me);
-                  }}
-                />
-                <BookingsSummary bookings={bookings} title="My bookings" />
-              </div>
+              <LoggedInHome
+                me={me}
+                firebaseUser={firebaseUser}
+                categories={categories}
+                offerings={publicOfferings}
+                artisans={artisans}
+                selectedState={selectedState}
+                searchTerm={searchTerm}
+                token={token}
+                busy={busy}
+                onSearchTermChange={setSearchTerm}
+                onSelectedStateChange={setSelectedState}
+                onBrowse={async (categoryId) => {
+                  setSelectedCategoryId(categoryId || '');
+                  await withNotice(async () => {
+                    await loadPublicData(selectedState, searchTerm, { categoryId: categoryId || '' });
+                    setView('marketplace');
+                  }, categoryId ? 'Category selected' : 'Opening marketplace');
+                }}
+                onSearch={async () => {
+                  await withNotice(async () => {
+                    await loadPublicData(selectedState, searchTerm);
+                    setView('marketplace');
+                  }, searchTerm.trim() ? `Searching for ${searchTerm.trim()}` : 'Showing available services');
+                }}
+                onViewProfile={openArtisanProfile}
+                runAction={withNotice}
+                reloadPrivate={() => loadPrivateData()}
+                onBookingSuccess={setBookingSuccess}
+                openBookings={() => setWorkspaceSection('bookings')}
+              />
             )
           )}
         </main>
@@ -1821,7 +1839,7 @@ function AuthBox({
               </>
             ) : (
               <>
-                <button onClick={() => goToWorkspace('overview')}>Dashboard</button>
+                <button onClick={() => goTo('home')}>Dashboard</button>
                 <button onClick={() => goToWorkspace('bookings')}>My bookings</button>
                 <button onClick={() => goToWorkspace('messages')}>Messages</button>
                 <button onClick={() => goToWorkspace('notifications')}>Notifications</button>

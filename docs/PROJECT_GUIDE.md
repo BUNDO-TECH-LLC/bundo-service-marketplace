@@ -185,7 +185,7 @@ The current frontend is a single-page React app that manages:
 - discovery and artisan profile viewing
 - workspace by role
 - signup role choice for client or artisan
-- logged-in customer dashboard
+- logged-in customer home dashboard
 - 4-step artisan onboarding wizard
 - approved-artisan dashboard with jobs, active booking detail, reviews, and profile settings
 - artisan setup uses a simple sticky Bundo setup header and does not show dashboard navigation before approval
@@ -319,6 +319,7 @@ Result:
 - booking connects customer, artisan, and offering
 - every opened job has a standard message thread in both inboxes
 - customers get a clear success state instead of only a toast notification
+- customer dashboard navigation returns to the logged-in home dashboard; bookings, messages, and notifications remain separate workspace sections
 
 ## 4. Marketplace payment flow
 
