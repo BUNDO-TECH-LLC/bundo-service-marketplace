@@ -957,9 +957,9 @@ function App() {
         <BookingSuccessDialog
           booking={bookingSuccess}
           onClose={() => setBookingSuccess(null)}
-          onViewBookings={() => {
+          onGoToMessages={() => {
             setBookingSuccess(null);
-            setWorkspaceSection('bookings');
+            setWorkspaceSection('messages');
             setView('workspace');
           }}
         />
@@ -3060,11 +3060,11 @@ function ServicesSection({ categories, onBrowse }: { categories: Category[]; onB
 function BookingSuccessDialog({
   booking,
   onClose,
-  onViewBookings,
+  onGoToMessages,
 }: {
   booking: BookingSuccessState;
   onClose: () => void;
-  onViewBookings: () => void;
+  onGoToMessages: () => void;
 }) {
   return (
     <div className="success-overlay" role="presentation" onClick={onClose}>
@@ -3079,12 +3079,12 @@ function BookingSuccessDialog({
         <p className="eyebrow">Booking request sent</p>
         <h2 id="booking-success-title">Your request is with {booking.artisanName}</h2>
         <p>
-          We created a booking for {booking.serviceTitle}. You can track the request,
-          continue to chat, and pay after the artisan responds.
+          We created a booking for {booking.serviceTitle}. You can message the artisan now,
+          or continue browsing while the request stays active.
         </p>
         {booking.bookingId && <small>Booking #{booking.bookingId.slice(0, 8)}</small>}
         <div className="booking-success-actions">
-          <button type="button" onClick={onViewBookings}>View my bookings</button>
+          <button type="button" onClick={onGoToMessages}>Go to messages</button>
           <button type="button" className="secondary-button" onClick={onClose}>Continue browsing</button>
         </div>
       </section>

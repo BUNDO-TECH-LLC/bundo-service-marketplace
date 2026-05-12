@@ -309,7 +309,7 @@ Result:
 3. Customer creates a booking for an offering.
 4. Booking starts in `REQUESTED`.
 5. Backend creates or updates the customer-artisan conversation and inserts an automatic booking message.
-6. Frontend shows a booking success confirmation with actions to view bookings or continue browsing.
+6. Frontend shows a booking success confirmation with actions to go directly to messages or continue browsing while the request stays active.
 7. Artisan accepts or declines.
 8. Customer or artisan can reschedule while the booking is still `REQUESTED` or `ACCEPTED`.
 9. If accepted, customer can chat and pay.
