@@ -185,7 +185,7 @@ The current frontend is a single-page React app that manages:
 - discovery and artisan profile viewing
 - workspace by role
 - signup role choice for client or artisan
-- logged-in customer dashboard
+- logged-in customer home dashboard
 - 4-step artisan onboarding wizard
 - approved-artisan dashboard with jobs, active booking detail, reviews, and profile settings
 - artisan setup uses a simple sticky Bundo setup header and does not show dashboard navigation before approval
@@ -216,6 +216,7 @@ The current frontend is a single-page React app that manages:
 12. Backend creates the user in the database if they do not exist.
 13. Frontend stores the selected role through `/users/role` when needed.
 14. A newly created artisan account is routed directly to the artisan profile/KYC setup surface.
+15. If a verified account is restored without a Bundo role, the UI shows a role-completion prompt before marketplace actions such as booking are enabled.
 
 Result:
 
@@ -224,6 +225,7 @@ Result:
 - role is stored in Bundo
 - email/password users verify their email before entering the marketplace workspace
 - verified artisan signups keep their selected role across the email verification handoff
+- role-less verified users cannot silently enter a disabled booking state; they must finish client/artisan setup first
 - password reset stays with Firebase Auth email templates
 - casual client/artisan switching is not exposed in the profile UI
 - artisan-to-client switching through the public role endpoint is blocked and should go through admin/support if needed
@@ -307,7 +309,7 @@ Result:
 3. Customer creates a booking for an offering.
 4. Booking starts in `REQUESTED`.
 5. Backend creates or updates the customer-artisan conversation and inserts an automatic booking message.
-6. Frontend shows a booking success confirmation with actions to view bookings or continue browsing.
+6. Frontend shows a booking success confirmation with actions to go directly to messages or continue browsing while the request stays active.
 7. Artisan accepts or declines.
 8. Customer or artisan can reschedule while the booking is still `REQUESTED` or `ACCEPTED`.
 9. If accepted, customer can chat and pay.
@@ -317,6 +319,7 @@ Result:
 - booking connects customer, artisan, and offering
 - every opened job has a standard message thread in both inboxes
 - customers get a clear success state instead of only a toast notification
+- customer dashboard navigation returns to the logged-in home dashboard; bookings, messages, and notifications remain separate workspace sections
 
 ## 4. Marketplace payment flow
 
@@ -734,6 +737,8 @@ For local development, the API now accepts both:
 
 - `http://localhost:5173`
 - `http://127.0.0.1:5173`
+
+For production and web-mobile testing, the API accepts explicitly configured `CORS_ORIGIN` entries and Vercel deployment subdomains ending in `.vercel.app`. This keeps production and preview deployments usable after email verification redirects or Vercel preview testing.
 
 ---
 

@@ -29,13 +29,18 @@ function isAllowedOrigin(origin?: string) {
     return true;
   }
 
-  if (env.NODE_ENV === 'development') {
-    try {
-      const url = new URL(origin);
-      return ['localhost', '127.0.0.1'].includes(url.hostname);
-    } catch {
-      return false;
+  try {
+    const url = new URL(origin);
+
+    if (isProduction && url.protocol === 'https:' && url.hostname.endsWith('.vercel.app')) {
+      return true;
     }
+
+    if (env.NODE_ENV === 'development') {
+      return ['localhost', '127.0.0.1'].includes(url.hostname);
+    }
+  } catch {
+    return false;
   }
 
   return false;

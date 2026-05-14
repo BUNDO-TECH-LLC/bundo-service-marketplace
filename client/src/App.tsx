@@ -419,6 +419,16 @@ function App() {
         const session = await resolveApiSession(user);
         setToken(session.token);
         setMe(session.user);
+
+        if (!session.user.role) {
+          setRouteHydrated(true);
+          setView('home');
+          setWorkspaceSection('overview');
+          setNotice('Choose client or artisan to finish setting up your Bundo account before booking.');
+          clearUrlSearch();
+          return;
+        }
+
         await loadPrivateData(session.token, session.user);
 
         const params = new URLSearchParams(window.location.search);
@@ -652,43 +662,129 @@ function App() {
         />
       </header>
 
-      {notice && <div className="notice">{notice}</div>}
+      {notice && <div className={`notice ${usesArtisanSetupHeader ? 'setup-notice' : ''}`}>{notice}</div>}
+      {bookingSuccess && (
+        <BookingSuccessDialog
+          booking={bookingSuccess}
+          onClose={() => setBookingSuccess(null)}
+          onGoToMessages={() => {
+            setBookingSuccess(null);
+            setWorkspaceSection('messages');
+            setView('workspace');
+          }}
+        />
+      )}
 
-      {view === 'home' && (
-        <main>
-          <Hero
-            selectedState={selectedState}
-            states={nigeriaStates}
-            onStateChange={async (state) => {
-              setSelectedState(state);
-              await withNotice(async () => {
-                await loadPublicData(state, searchTerm);
-                setView('marketplace');
-              }, state ? `Showing services in ${state}` : 'Showing all services');
-            }}
-            searchTerm={searchTerm}
-            onSearchTermChange={setSearchTerm}
-            onSearch={async (state, queryText) => {
-              setSelectedState(state);
-              setSearchTerm(queryText);
-              await withNotice(async () => {
-                await loadPublicData(state, queryText);
-                setView('marketplace');
-              }, queryText.trim() ? `Searching for ${queryText.trim()}` : 'Showing available services');
-            }}
-            onBrowse={() => setView('marketplace')}
-          />
-          <WhySection />
-          <ServicesSection categories={categories} onBrowse={() => setView('marketplace')} />
-          <MarketplacePreview offerings={publicOfferings} onBrowse={() => setView('marketplace')} />
-          <AppPromo />
-          <Footer
-            onOpenHelpTopic={(topicId) => {
-              setActiveHelpTopicId(topicId);
-              setView('help');
-            }}
-          />
+      {isRestoringAuthedRoute && (
+        <main className="page route-loading">
+          <EmptyState title="Loading your workspace" body="Restoring the right page for your account." />
         </main>
+      )}
+
+      {!isRestoringAuthedRoute && view === 'home' && (
+        isAuthed && me ? (
+          me.role === 'ARTISAN' ? (
+            <ArtisanLanding
+              token={token}
+              categories={categories}
+              offerings={myOfferings}
+              bookings={bookings}
+              firebaseUser={firebaseUser}
+              busy={busy}
+              runAction={withNotice}
+              refresh={async () => {
+                await loadPublicData();
+                await loadPrivateData();
+              }}
+              openBookings={() => {
+                setWorkspaceSection('bookings');
+                setView('workspace');
+              }}
+              openMessages={() => {
+                setWorkspaceSection('messages');
+                setView('workspace');
+              }}
+              openReviews={() => {
+                setWorkspaceSection('reviews');
+                setView('workspace');
+              }}
+              openProfile={() => {
+                setWorkspaceSection('profile');
+                setView('workspace');
+              }}
+            />
+          ) : (
+            <LoggedInHome
+              me={me}
+              firebaseUser={firebaseUser}
+              categories={categories}
+              offerings={publicOfferings}
+              artisans={artisans}
+              selectedState={selectedState}
+              searchTerm={searchTerm}
+              token={token}
+              busy={busy}
+              onSearchTermChange={setSearchTerm}
+              onSelectedStateChange={setSelectedState}
+              onBrowse={async (categoryId) => {
+                setSelectedCategoryId(categoryId || '');
+                await withNotice(async () => {
+                  await loadPublicData(selectedState, searchTerm, { categoryId: categoryId || '' });
+                  setView('marketplace');
+                }, categoryId ? 'Category selected' : 'Opening marketplace');
+              }}
+              onSearch={async () => {
+                await withNotice(async () => {
+                  await loadPublicData(selectedState, searchTerm);
+                  setView('marketplace');
+                }, searchTerm.trim() ? `Searching for ${searchTerm.trim()}` : 'Showing available services');
+              }}
+              onViewProfile={openArtisanProfile}
+              runAction={withNotice}
+              reloadPrivate={() => loadPrivateData()}
+              onBookingSuccess={setBookingSuccess}
+              openBookings={() => {
+                setWorkspaceSection('bookings');
+                setView('workspace');
+              }}
+            />
+          )
+        ) : (
+          <main>
+            <Hero
+              selectedState={selectedState}
+              states={nigeriaStates}
+              onStateChange={async (state) => {
+                setSelectedState(state);
+                await withNotice(async () => {
+                  await loadPublicData(state, searchTerm);
+                  setView('marketplace');
+                }, state ? `Showing services in ${state}` : 'Showing all services');
+              }}
+              searchTerm={searchTerm}
+              onSearchTermChange={setSearchTerm}
+              onSearch={async (state, queryText) => {
+                setSelectedState(state);
+                setSearchTerm(queryText);
+                await withNotice(async () => {
+                  await loadPublicData(state, queryText);
+                  setView('marketplace');
+                }, queryText.trim() ? `Searching for ${queryText.trim()}` : 'Showing available services');
+              }}
+              onBrowse={() => setView('marketplace')}
+            />
+            <WhySection />
+            <ServicesSection categories={categories} onBrowse={() => setView('marketplace')} />
+            <MarketplacePreview offerings={publicOfferings} onBrowse={() => setView('marketplace')} />
+            <AppPromo />
+            <Footer
+              onOpenHelpTopic={(topicId) => {
+                setActiveHelpTopicId(topicId);
+                setView('help');
+              }}
+            />
+          </main>
+        )
       )}
 
       {view === 'marketplace' && (
@@ -912,32 +1008,53 @@ function App() {
           )}
 
           {me && workspaceSection === 'overview' && (
-            <div className="dashboard-grid">
-              <RolePanel
+            me.role === 'ARTISAN' ? (
+              <ArtisanDashboard
                 token={token}
-                me={me}
+                bookings={bookings}
+                firebaseUser={firebaseUser}
                 busy={busy}
                 runAction={withNotice}
-                refresh={async () => {
-                  const user = await refreshMe();
-                  await loadPrivateData(token, user || me);
-                }}
+                refresh={() => loadPrivateData()}
+                openBookings={() => setWorkspaceSection('bookings')}
+                openMessages={() => setWorkspaceSection('messages')}
+                openReviews={() => setWorkspaceSection('reviews')}
+                openProfile={() => setWorkspaceSection('profile')}
+                openOffers={() => setWorkspaceSection('offers')}
               />
-              {me.role === 'ARTISAN' && (
-                <ArtisanPanel
-                  token={token}
-                  categories={categoryOptions}
-                  offerings={myOfferings}
-                  busy={busy}
-                  runAction={withNotice}
-                  refresh={async () => {
-                    await loadPublicData();
-                    await loadPrivateData();
-                  }}
-                />
-              )}
-              <BookingsSummary bookings={bookings} title={me.role === 'ARTISAN' ? 'Booking requests' : 'My bookings'} />
-            </div>
+            ) : (
+              <LoggedInHome
+                me={me}
+                firebaseUser={firebaseUser}
+                categories={categories}
+                offerings={publicOfferings}
+                artisans={artisans}
+                selectedState={selectedState}
+                searchTerm={searchTerm}
+                token={token}
+                busy={busy}
+                onSearchTermChange={setSearchTerm}
+                onSelectedStateChange={setSelectedState}
+                onBrowse={async (categoryId) => {
+                  setSelectedCategoryId(categoryId || '');
+                  await withNotice(async () => {
+                    await loadPublicData(selectedState, searchTerm, { categoryId: categoryId || '' });
+                    setView('marketplace');
+                  }, categoryId ? 'Category selected' : 'Opening marketplace');
+                }}
+                onSearch={async () => {
+                  await withNotice(async () => {
+                    await loadPublicData(selectedState, searchTerm);
+                    setView('marketplace');
+                  }, searchTerm.trim() ? `Searching for ${searchTerm.trim()}` : 'Showing available services');
+                }}
+                onViewProfile={openArtisanProfile}
+                runAction={withNotice}
+                reloadPrivate={() => loadPrivateData()}
+                onBookingSuccess={setBookingSuccess}
+                openBookings={() => setWorkspaceSection('bookings')}
+              />
+            )
           )}
         </main>
       )}
@@ -1073,6 +1190,144 @@ function AuthBox({
     }
   }
 
+  async function continueWithGoogle() {
+    if (!auth) return;
+
+    if (mode === 'signup' && !preferredRole) {
+      setAuthStep('role');
+      onNotice('Choose how you want to use Bundo first.');
+      return;
+    }
+
+    setSubmitting(true);
+    onNotice('');
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const credential = await signInWithPopup(auth, provider);
+      await finishAuth(credential.user);
+    } catch (error) {
+      onNotice(error instanceof Error ? error.message : 'Could not continue with Google');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function chooseRole(role: SignupRole) {
+    setPreferredRole(role);
+
+    if (pendingAuthUser) {
+      void finishAuth(pendingAuthUser, 'signup', role);
+      return;
+    }
+
+    setAuthStep('account');
+    onNotice('');
+  }
+
+  function openLogin() {
+    setPreferredRole(null);
+    setConfirmPassword('');
+    setPendingAuthUser(null);
+    setPendingEmailVerificationUser(null);
+    setMode('login');
+    setAuthStep('account');
+    setDrawerOpen(true);
+  }
+
+  function openSignup(role: SignupRole | null = null) {
+    setPreferredRole(role);
+    setConfirmPassword('');
+    setPendingAuthUser(null);
+    setPendingEmailVerificationUser(null);
+    setMode('signup');
+    setAuthStep(role ? 'account' : 'role');
+    setDrawerOpen(true);
+  }
+
+  function openResetPassword() {
+    setPassword('');
+    setConfirmPassword('');
+    setPendingAuthUser(null);
+    setPendingEmailVerificationUser(null);
+    setMode('reset');
+    setAuthStep('account');
+  }
+
+  function switchMode() {
+    if (mode === 'login' || mode === 'reset') {
+      openSignup();
+      return;
+    }
+
+    setMode('login');
+    setPreferredRole(null);
+    setConfirmPassword('');
+    setPendingAuthUser(null);
+    setPendingEmailVerificationUser(null);
+    setAuthStep('account');
+  }
+
+  if (firebaseUser && me && !me.role) {
+    return (
+      <div className="auth-entry role-completion-entry">
+        <button
+          type="button"
+          onClick={() => {
+            setMode('signup');
+            setAuthStep('role');
+            setDrawerOpen(true);
+            onNotice('Choose client or artisan to finish setting up your Bundo account.');
+          }}
+        >
+          Complete setup
+        </button>
+
+        {drawerOpen && (
+          <div className="auth-overlay" role="presentation" onClick={() => setDrawerOpen(false)}>
+            <aside
+              className="auth-drawer"
+              aria-label="Complete account setup"
+              aria-modal="true"
+              role="dialog"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="drawer-head">
+                <img className="drawer-logo" src={bundoLogo} alt="Bundo logo" />
+                <button type="button" onClick={() => setDrawerOpen(false)}>Close</button>
+              </div>
+              <p className="eyebrow">Finish setup</p>
+              <h2>How will you use Bundo?</h2>
+              <p className="drawer-copy">Choose your account type so we can unlock the right marketplace actions.</p>
+              <div className="role-choice-grid" aria-label="Choose account type">
+                <button type="button" className="role-choice-card" onClick={() => void finishAuth(firebaseUser, 'signup', 'CUSTOMER', true)}>
+                  <span>Client</span>
+                  <strong>Find and book trusted services</strong>
+                  <small>Browse professionals, message artisans, request bookings, and track jobs.</small>
+                </button>
+                <button type="button" className="role-choice-card artisan" onClick={() => void finishAuth(firebaseUser, 'signup', 'ARTISAN', true)}>
+                  <span>Artisan</span>
+                  <strong>Offer services on Bundo</strong>
+                  <small>Create a profile, add offerings, complete verification, and receive bookings.</small>
+                </button>
+              </div>
+              <button
+                type="button"
+                className="mode-switch"
+                onClick={() => {
+                  onNotice('Signed out');
+                  auth && signOut(auth);
+                }}
+              >
+                Use another account
+              </button>
+            </aside>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   if (firebaseUser && me) {
     const displayName = userDisplayName(firebaseUser, me);
     const initial = displayName.slice(0, 1).toUpperCase();
@@ -1133,7 +1388,7 @@ function AuthBox({
               </>
             ) : (
               <>
-                <button onClick={() => goToWorkspace('overview')}>Dashboard</button>
+                <button onClick={() => goTo('home')}>Dashboard</button>
                 <button onClick={() => goToWorkspace('bookings')}>My bookings</button>
                 <button onClick={() => goToWorkspace('messages')}>Messages</button>
                 <button onClick={() => goToWorkspace('notifications')}>Notifications</button>
@@ -1362,6 +1617,41 @@ function ServicesSection({ categories, onBrowse }: { categories: Category[]; onB
         ))}
       </div>
     </section>
+  );
+}
+
+function BookingSuccessDialog({
+  booking,
+  onClose,
+  onGoToMessages,
+}: {
+  booking: BookingSuccessState;
+  onClose: () => void;
+  onGoToMessages: () => void;
+}) {
+  return (
+    <div className="success-overlay" role="presentation" onClick={onClose}>
+      <section
+        className="booking-success-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="booking-success-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <span className="success-mark" aria-hidden="true">✓</span>
+        <p className="eyebrow">Booking request sent</p>
+        <h2 id="booking-success-title">Your request is with {booking.artisanName}</h2>
+        <p>
+          We created a booking for {booking.serviceTitle}. You can message the artisan now,
+          or continue browsing while the request stays active.
+        </p>
+        {booking.bookingId && <small>Booking #{booking.bookingId.slice(0, 8)}</small>}
+        <div className="booking-success-actions">
+          <button type="button" onClick={onGoToMessages}>Go to messages</button>
+          <button type="button" className="secondary-button" onClick={onClose}>Continue browsing</button>
+        </div>
+      </section>
+    </div>
   );
 }
 
