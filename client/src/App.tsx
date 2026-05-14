@@ -5,6 +5,8 @@ import {
   signOut,
   User,
 } from 'firebase/auth';
+import { AdminBookingsPanel } from './admin/AdminBookingsPanel';
+import { AdminKycPanel } from './admin/AdminKycPanel';
 import { AdminConsole } from './admin/AdminConsole';
 import type {
   ActionRunner,
@@ -41,6 +43,7 @@ import { resolveApiSession } from './lib/resolveApiSession';
 import { userDisplayName } from './lib/userDisplayName';
 import { readStoredRoute, routeStorageKey } from './lib/workspaceRoute';
 import { resetWorkspaceState } from './lib/workspaceState';
+import { AdminChatPanel } from './panels/AdminChatPanel';
 import { BookingsPage } from './panels/BookingsPanel';
 import { ChatPanel } from './panels/ChatPanel';
 import { NotificationsPanel } from './panels/NotificationsPanel';
@@ -103,6 +106,8 @@ function App() {
   const [priceMax, setPriceMax] = useState('');
   const [marketplaceSort, setMarketplaceSort] = useState<MarketplaceSort>('rating');
   const [authPromptSignal, setAuthPromptSignal] = useState(0);
+  const [routeHydrated, setRouteHydrated] = useState(true);
+  const [bookingSuccess, setBookingSuccess] = useState<BookingSuccessState | null>(null);
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [pushStatus, setPushStatus] = useState<PushStatus>(hasPushConfig() ? 'idle' : 'missing-config');
@@ -111,6 +116,8 @@ function App() {
   const currentUserRef = useRef<ApiUser | null>(null);
 
   const isAuthed = Boolean(firebaseUser && token);
+  const isRestoringAuthedRoute = isAuthed && !routeHydrated;
+  const usesArtisanSetupHeader = view === 'home' && me?.role === 'ARTISAN';
 
   useEffect(() => {
     currentTokenRef.current = token;
@@ -119,6 +126,30 @@ function App() {
   useEffect(() => {
     currentUserRef.current = me;
   }, [me]);
+
+  useEffect(() => {
+    if (!me?.role) {
+      clearStoredRoute();
+      return;
+    }
+
+    const persistedView =
+      view === 'artisan-profile'
+        ? 'marketplace'
+        : view === 'home' && me.role === 'ARTISAN'
+          ? 'workspace'
+          : view;
+    const persistedWorkspaceSection =
+      view === 'home' && me.role === 'ARTISAN' ? 'overview' : workspaceSection;
+
+    window.localStorage.setItem(
+      routeStorageKey,
+      JSON.stringify({
+        view: persistedView,
+        workspaceSection: persistedWorkspaceSection,
+      })
+    );
+  }, [me?.role, view, workspaceSection]);
 
   async function withNotice(action: () => Promise<void>, done = 'Done') {
     setBusy(true);
@@ -282,6 +313,7 @@ function App() {
     if (!auth) return;
     return onAuthStateChanged(auth, async (user) => {
       setFirebaseUser(user);
+      setRouteHydrated(false);
       if (!user) {
         if (currentTokenRef.current) {
           syncPushToken(currentTokenRef.current, null).catch(() => undefined);
@@ -305,6 +337,8 @@ function App() {
         setSelectedArtisan(null);
         setSelectedArtisanReviews([]);
         clearUrlSearch();
+        clearStoredRoute();
+        setRouteHydrated(true);
         return;
       }
 
@@ -323,6 +357,12 @@ function App() {
         }
 
         await loadPrivateData(session.token, session.user);
+
+        const storedRoute = readStoredRoute(session.user.role);
+        if (storedRoute) {
+          setView(storedRoute.view);
+          setWorkspaceSection(storedRoute.workspaceSection);
+        }
 
         const params = new URLSearchParams(window.location.search);
         const reference = params.get('reference') || params.get('trxref');
@@ -350,6 +390,7 @@ function App() {
             );
           } finally {
             clearUrlSearch();
+            setRouteHydrated(true);
           }
           return;
         }
@@ -371,6 +412,8 @@ function App() {
           }
           clearUrlSearch();
         }
+
+        setRouteHydrated(true);
       } catch {
         const resetState = resetWorkspaceState();
         setToken('');
@@ -386,6 +429,7 @@ function App() {
         setWorkspaceSection(resetState.workspaceSection);
         setView(resetState.view);
         setNotice('We could not finish account sync. Please make sure the backend is running, then sign in again.');
+        setRouteHydrated(true);
       }
     });
   }, []);
@@ -758,6 +802,7 @@ function App() {
             runAction={withNotice}
             reloadPrivate={() => loadPrivateData()}
             onViewProfile={openArtisanProfile}
+            onBookingSuccess={setBookingSuccess}
           />
 
           <section className="section-head compact">
@@ -793,6 +838,7 @@ function App() {
           runAction={withNotice}
           onBack={() => setView('marketplace')}
           reloadPrivate={() => loadPrivateData()}
+          onBookingSuccess={setBookingSuccess}
         />
       )}
 
@@ -2619,8 +2665,6 @@ function ArtisanPanel({
   runAction,
   refresh,
 }: {
-  bookings: Booking[];
-  mode: 'customer' | 'artisan';
   token: string;
   categories: ReactNode[];
   offerings: Offering[];
@@ -2752,11 +2796,6 @@ function ArtisanPanel({
         priceTo: form.get('priceTo') ? Number(form.get('priceTo')) : undefined,
       }),
     });
-
-    if (response.authorizationUrl) {
-      window.location.href = response.authorizationUrl;
-      return;
-    }
 
     await refresh();
     formElement.reset();

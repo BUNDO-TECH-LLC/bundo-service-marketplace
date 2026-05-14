@@ -27,6 +27,7 @@ import bundoLogo from '../assets/bundo-logo.png';
 export function AuthBox({
   firebaseUser,
   me,
+  authPromptSignal = 0,
   unreadCount,
   onReady,
   onNavigate,
@@ -35,6 +36,7 @@ export function AuthBox({
 }: {
   firebaseUser: User | null;
   me: ApiUser | null;
+  authPromptSignal?: number;
   unreadCount: number;
   onReady: (token: string, user: ApiUser) => void;
   onNavigate: (view: View) => void;
@@ -53,6 +55,22 @@ export function AuthBox({
   const [preferredRole, setPreferredRole] = useState<SignupRole | null>(null);
   const [pendingAuthUser, setPendingAuthUser] = useState<User | null>(null);
   const [pendingEmailVerificationUser, setPendingEmailVerificationUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    if (!authPromptSignal) return;
+
+    if (firebaseUser && me && !me.role) {
+      setMode('signup');
+      setAuthStep('role');
+      setDrawerOpen(true);
+      return;
+    }
+
+    setPreferredRole('ARTISAN');
+    setMode('signup');
+    setAuthStep('account');
+    setDrawerOpen(true);
+  }, [authPromptSignal]);
 
   async function finishAuth(
     firebaseAuthUser: User,
