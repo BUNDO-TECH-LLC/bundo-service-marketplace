@@ -178,7 +178,7 @@ router.post(
         message: 'Artisan profile created',
         profile,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
@@ -264,7 +264,7 @@ router.patch(
         message: 'Artisan profile updated',
         profile,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2025'

@@ -1,4 +1,4 @@
-import { BookingStatus, NotificationType, Role } from '@prisma/client';
+import { BookingStatus, NotificationType, Prisma, Role } from '@prisma/client';
 import db from '../../db/client';
 import { Pagination, paginationArgs } from '../../utils/pagination';
 import { getArtisanProfileByUserId } from '../artisans/artisans.service';
@@ -69,7 +69,7 @@ export const createBooking = async (input: {
     return null;
   }
 
-  const booking = await db.$transaction(async (tx) => {
+  const booking = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const createdBooking = await tx.booking.create({
       data: {
         customerId: input.customerId,

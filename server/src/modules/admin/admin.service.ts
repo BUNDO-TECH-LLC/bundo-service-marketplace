@@ -2,6 +2,7 @@ import {
   DisputeStatus,
   KycStatus,
   NotificationType,
+  Prisma,
   Role,
   UserStatus,
   VerifyStatus,
@@ -231,7 +232,7 @@ export const reviewKycSubmission = async (input: {
         ? VerifyStatus.REJECTED
         : VerifyStatus.PENDING;
 
-  const submission = await db.$transaction(async (tx) => {
+  const submission = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const reviewedSubmission = await tx.artisanKycSubmission.update({
       where: { id: input.id },
       data: {
@@ -475,7 +476,7 @@ export const deleteReviewAndRecalculateRating = async (id: string) => {
     return { status: 'missing_review' as const };
   }
 
-  const result = await db.$transaction(async (tx) => {
+  const result = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     await tx.review.delete({
       where: { id },
     });
@@ -664,7 +665,7 @@ export const createAdminConversationMessage = async (input: {
     return { status: 'missing_conversation' as const };
   }
 
-  const message = await db.$transaction(async (tx) => {
+  const message = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const createdMessage = await tx.message.create({
       data: {
         conversationId: input.conversationId,

@@ -5,6 +5,7 @@ import {
   NotificationType,
   PaymentStatus,
   PayoutStatus,
+  Prisma,
 } from '@prisma/client';
 import { env } from '../../config/env';
 import db from '../../db/client';
@@ -286,7 +287,7 @@ export const markPaymentReferencePaid = async (reference: string) => {
     }
   }
 
-  const updated = await db.$transaction(async (tx) => {
+  const updated = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const paid = await tx.payment.update({
       where: { id: payment.id },
       data: {
@@ -474,7 +475,7 @@ export const releaseBookingPayment = async (bookingId: string) => {
     reference,
   });
 
-  const result = await db.$transaction(async (tx) => {
+  const result = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const payout = await tx.payout.create({
       data: {
         bookingId: booking.id,
@@ -711,7 +712,7 @@ export const resolveBookingDispute = async (input: {
       ? DisputeStatus.RESOLVED_REFUND
       : DisputeStatus.RESOLVED_PARTIAL;
 
-  const result = await db.$transaction(async (tx) => {
+  const result = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const updatedPayment = await tx.payment.update({
       where: { id: payment.id },
       data: {

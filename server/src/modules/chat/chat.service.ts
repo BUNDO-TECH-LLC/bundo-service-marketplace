@@ -1,4 +1,4 @@
-import { NotificationType, Role } from '@prisma/client';
+import { NotificationType, Prisma, Role } from '@prisma/client';
 import db from '../../db/client';
 import { getArtisanProfileByUserId } from '../artisans/artisans.service';
 import { createNotification } from '../notifications/notifications.service';
@@ -104,7 +104,7 @@ export const createMessage = async (input: {
       return { status: 'forbidden' as const };
     }
 
-    const message = await db.$transaction(async (tx) => {
+    const message = await db.$transaction(async (tx: Prisma.TransactionClient) => {
       const createdMessage = await tx.message.create({
         data: {
           conversationId: conversation.id,
@@ -185,7 +185,7 @@ export const createMessage = async (input: {
     },
   });
 
-  const message = await db.$transaction(async (tx) => {
+  const message = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const createdMessage = await tx.message.create({
       data: {
         conversationId: conversation.id,

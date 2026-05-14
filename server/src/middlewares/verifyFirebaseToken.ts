@@ -20,7 +20,7 @@ export const verifyFirebaseToken = async (
 
   try {
     decoded = await admin.auth().verifyIdToken(token);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.warn({ error }, 'Firebase token verification failed');
     return res.status(401).json({ message: 'Invalid token' });
   }
@@ -35,7 +35,7 @@ export const verifyFirebaseToken = async (
     (req as any).user = user;
 
     next();
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ error, firebaseUid: decoded.uid }, 'Failed to sync authenticated user');
     return res.status(500).json({ message: 'Could not finish account sync' });
   }
