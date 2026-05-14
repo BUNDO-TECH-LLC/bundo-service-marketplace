@@ -83,7 +83,10 @@ export function createApp() {
       limit: isProduction ? 600 : 3000,
       standardHeaders: 'draft-8',
       legacyHeaders: false,
-      skip: (req) => ['/health', '/ready'].includes(req.url.split('?')[0]),
+      skip: (req) => {
+        const requestPath = req.url.split('?')[0] ?? req.url;
+        return ['/health', '/ready'].includes(requestPath);
+      },
     })
   );
 

@@ -26,3 +26,17 @@ export const paginationMeta = (pagination: Pagination) => ({
   page: pagination.page,
   limit: pagination.limit,
 });
+
+export const paginationArgs = (
+  pagination?: Pagination,
+  defaultLimit?: number
+): { take?: number; skip?: number } => {
+  if (!pagination) {
+    return defaultLimit === undefined ? {} : { take: defaultLimit };
+  }
+
+  return {
+    take: pagination.limit,
+    skip: pagination.skip,
+  };
+};

@@ -53,8 +53,8 @@ router.post(
     const booking = await createBooking({
       customerId: (req as any).user.firebaseUid,
       offeringId,
-      scheduledAt: scheduledDate,
-      note,
+      ...(scheduledDate !== undefined ? { scheduledAt: scheduledDate } : {}),
+      ...(typeof note === 'string' ? { note } : {}),
     });
 
     if (!booking) {

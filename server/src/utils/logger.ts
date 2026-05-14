@@ -22,7 +22,7 @@ try {
 const logger = pino({
   // Pretty print in development, raw JSON in production
   // Raw JSON is what Railway/log aggregators expect
-  transport,
+  ...(transport ? { transport } : {}),
   level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
 });
 

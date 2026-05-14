@@ -1,6 +1,6 @@
 import { Prisma, VerifyStatus } from '@prisma/client';
 import db from '../../db/client';
-import { Pagination } from '../../utils/pagination';
+import { Pagination, paginationArgs } from '../../utils/pagination';
 import {
   getArtisanProfileByUserId,
   getCategoryById,
@@ -55,8 +55,8 @@ function buildOfferingWhere(filters: OfferingFilters = {}): Prisma.OfferingWhere
 
   if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
     where.priceFrom = {
-      gte: filters.minPrice,
-      lte: filters.maxPrice,
+      ...(filters.minPrice !== undefined ? { gte: filters.minPrice } : {}),
+      ...(filters.maxPrice !== undefined ? { lte: filters.maxPrice } : {}),
     };
   }
 
@@ -123,9 +123,9 @@ export const createOfferingForArtisan = async (input: CreateOfferingInput) => {
       artisanId: artisan.id,
       categoryId: input.categoryId,
       title: input.title,
-      description: input.description,
+      ...(input.description !== undefined ? { description: input.description } : {}),
       priceFrom: input.priceFrom,
-      priceTo: input.priceTo,
+      ...(input.priceTo !== undefined ? { priceTo: input.priceTo } : {}),
     },
     include: {
       category: true,
@@ -155,8 +155,7 @@ export const getOfferings = async (
   return db.offering.findMany({
     where,
     orderBy: offeringOrderBy(filters.sort),
-    take: pagination?.limit,
-    skip: pagination?.skip,
+    ...paginationArgs(pagination),
     include: {
       category: true,
       artisan: {

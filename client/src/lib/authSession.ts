@@ -1,0 +1,20 @@
+import type { User } from 'firebase/auth';
+import type { ApiUser } from '../types';
+import { api, ApiError } from './api';
+
+export async function resolveApiSession(user: User) {
+  let idToken = await user.getIdToken();
+
+  try {
+    const response = await api<{ user: ApiUser }>('/me', { token: idToken });
+    return { token: idToken, user: response.user };
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 401) {
+      throw error;
+    }
+
+    idToken = await user.getIdToken(true);
+    const retryResponse = await api<{ user: ApiUser }>('/me', { token: idToken });
+    return { token: idToken, user: retryResponse.user };
+  }
+}

@@ -7,7 +7,7 @@ import {
   VerifyStatus,
 } from '@prisma/client';
 import db from '../../db/client';
-import { Pagination } from '../../utils/pagination';
+import { Pagination, paginationArgs } from '../../utils/pagination';
 import { createNotification } from '../notifications/notifications.service';
 
 export const getAdminStats = async () => {
@@ -70,8 +70,7 @@ export const getAdminStats = async () => {
 export const getUsers = async (pagination?: Pagination) => {
   return db.user.findMany({
     orderBy: { createdAt: 'desc' },
-    take: pagination?.limit,
-    skip: pagination?.skip,
+    ...paginationArgs(pagination),
     include: {
       artisanProfile: {
         select: {
@@ -125,8 +124,7 @@ export const updateUserRole = async (firebaseUid: string, role: Role) => {
 export const getAdminArtisans = async (pagination?: Pagination) => {
   return db.artisanProfile.findMany({
     orderBy: { createdAt: 'desc' },
-    take: pagination?.limit,
-    skip: pagination?.skip,
+    ...paginationArgs(pagination),
     include: {
       user: {
         select: {
@@ -174,8 +172,7 @@ export const getAdminArtisanById = async (id: string) => {
 export const getAdminKycSubmissions = async (pagination?: Pagination) => {
   return db.artisanKycSubmission.findMany({
     orderBy: [{ status: 'asc' }, { submittedAt: 'desc' }],
-    take: pagination?.limit ?? 50,
-    skip: pagination?.skip,
+    ...paginationArgs(pagination, 50),
     include: {
       artisan: {
         include: {
@@ -239,7 +236,7 @@ export const reviewKycSubmission = async (input: {
       where: { id: input.id },
       data: {
         status: input.status,
-        reviewNote: input.reviewNote,
+        reviewNote: input.reviewNote ?? null,
         reviewedAt: new Date(),
       },
       include: {
@@ -315,8 +312,7 @@ export const verifyArtisan = async (
 export const getAdminCategories = async (pagination?: Pagination) => {
   return db.category.findMany({
     orderBy: { name: 'asc' },
-    take: pagination?.limit,
-    skip: pagination?.skip,
+    ...paginationArgs(pagination),
     include: {
       _count: {
         select: { offerings: true },
@@ -377,8 +373,7 @@ export const deleteCategory = async (id: string) => {
 export const getAdminBookings = async (pagination?: Pagination) => {
   return db.booking.findMany({
     orderBy: { createdAt: 'desc' },
-    take: pagination?.limit ?? 50,
-    skip: pagination?.skip,
+    ...paginationArgs(pagination, 50),
     include: {
       customerUser: {
         select: {
@@ -438,8 +433,7 @@ export const getAdminBookingById = async (id: string) => {
 export const getAdminReviews = async (pagination?: Pagination) => {
   return db.review.findMany({
     orderBy: { createdAt: 'desc' },
-    take: pagination?.limit ?? 50,
-    skip: pagination?.skip,
+    ...paginationArgs(pagination, 50),
     include: {
       customer: {
         select: {
@@ -509,8 +503,7 @@ export const deleteReviewAndRecalculateRating = async (id: string) => {
 export const getAdminConversations = async (pagination?: Pagination) => {
   return db.conversation.findMany({
     orderBy: { updatedAt: 'desc' },
-    take: pagination?.limit ?? 50,
-    skip: pagination?.skip,
+    ...paginationArgs(pagination, 50),
     include: {
       customer: {
         select: {
@@ -677,8 +670,10 @@ export const createAdminConversationMessage = async (input: {
         conversationId: input.conversationId,
         senderId: input.adminId,
         body: input.body.trim(),
-        imageUrl: input.imageUrl,
-        imageCloudinaryId: input.imageCloudinaryId,
+        ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl } : {}),
+        ...(input.imageCloudinaryId !== undefined
+          ? { imageCloudinaryId: input.imageCloudinaryId }
+          : {}),
       },
       include: {
         sender: {

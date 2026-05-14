@@ -110,8 +110,10 @@ export const createMessage = async (input: {
           conversationId: conversation.id,
           senderId: input.senderId,
           body: input.body.trim(),
-          imageUrl: input.imageUrl,
-          imageCloudinaryId: input.imageCloudinaryId,
+          ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl } : {}),
+          ...(input.imageCloudinaryId !== undefined
+            ? { imageCloudinaryId: input.imageCloudinaryId }
+            : {}),
         },
         include: {
           sender: {
@@ -189,8 +191,10 @@ export const createMessage = async (input: {
         conversationId: conversation.id,
         senderId: input.senderId,
         body: input.body.trim(),
-        imageUrl: input.imageUrl,
-        imageCloudinaryId: input.imageCloudinaryId,
+        ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl } : {}),
+        ...(input.imageCloudinaryId !== undefined
+          ? { imageCloudinaryId: input.imageCloudinaryId }
+          : {}),
       },
       include: {
         sender: {

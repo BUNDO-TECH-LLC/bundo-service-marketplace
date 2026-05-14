@@ -1,0 +1,116 @@
+import { useState } from 'react';
+import { sendEmailVerification } from 'firebase/auth';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { AuthLayout } from '../../layouts/AuthLayout';
+import { auth } from '../../lib/firebase';
+
+type VerificationState = {
+  email?: string;
+  accountKind?: 'CUSTOMER' | 'ARTISAN';
+};
+
+export function EmailVerificationPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const state = (location.state || {}) as VerificationState;
+
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const email = state.email || auth?.currentUser?.email || 'your email';
+
+  function maskEmail(email: string) {
+    if (!email.includes('@')) return email;
+
+    const [name, domain] = email.split('@');
+    const visibleName = name.slice(0, 4);
+
+    return `${visibleName}•••••@${domain}`;
+  }
+
+  async function resendVerification() {
+    if (!auth?.currentUser) {
+      setMessage('Login again so we can resend your verification email.');
+      return;
+    }
+
+    setBusy(true);
+    setMessage('');
+
+    try {
+      await sendEmailVerification(auth.currentUser);
+      setMessage('Verification link sent again. Check your inbox.');
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : 'Could not resend the verification email.'
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function continueAfterVerification() {
+  if (!auth?.currentUser) {
+    navigate('/login');
+    return;
+  }
+
+  setBusy(true);
+  setMessage('');
+
+  try {
+    await auth.currentUser.reload();
+
+    if (!auth.currentUser.emailVerified) {
+      setMessage(
+        'Your email is not verified yet. Click the link in your inbox, then try again.'
+      );
+      return;
+    }
+
+    navigate('/loading', {
+      state: {
+        redirectTo: state.accountKind === 'ARTISAN' ? '/?view=workspace' : '/customer/dashboard',
+      },
+    });
+  } finally {
+    setBusy(false);
+  }
+}
+
+  return (
+     <AuthLayout
+    title="Verify your email"
+    subtitle={
+      <>
+        We sent a verification link to your email <br />
+        {email}
+      </>
+    }
+  > <div className="grid gap-[18px]">
+        <button
+          type="button"
+          onClick={continueAfterVerification}
+          className="mb-8 h-[57px] w-full rounded-[15px] bg-[var(--color-primary)] text-base font-medium text-white hover:opacity-90"
+        >
+          I have verified my email
+        </button>
+        <div className='grid justify-center'>
+        <p className="text-[15px] text-[var(--color-text-sub)]">
+          Didn’t receive the link?{' '}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={resendVerification}
+            className="font-medium text-[var(--color-primary)] disabled:opacity-50"
+          >
+            {busy ? 'Sending...' : 'Click to resend'}
+          </button>
+        </p>
+        </div>
+      </div>
+    </AuthLayout>
+  );
+}

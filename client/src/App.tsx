@@ -5,6 +5,8 @@ import {
   signOut,
   User,
 } from 'firebase/auth';
+import { AdminBookingsPanel } from './admin/AdminBookingsPanel';
+import { AdminKycPanel } from './admin/AdminKycPanel';
 import { AdminConsole } from './admin/AdminConsole';
 import type {
   ActionRunner,
@@ -41,6 +43,7 @@ import { resolveApiSession } from './lib/resolveApiSession';
 import { userDisplayName } from './lib/userDisplayName';
 import { readStoredRoute, routeStorageKey } from './lib/workspaceRoute';
 import { resetWorkspaceState } from './lib/workspaceState';
+import { AdminChatPanel } from './panels/AdminChatPanel';
 import { BookingsPage } from './panels/BookingsPanel';
 import { ChatPanel } from './panels/ChatPanel';
 import { NotificationsPanel } from './panels/NotificationsPanel';
@@ -79,8 +82,6 @@ function clearStoredRoute() {
 function App() {
   const [view, setView] = useState<View>('home');
   const [workspaceSection, setWorkspaceSection] = useState<WorkspaceSection>('overview');
-  const [adminSection, setAdminSection] = useState<AdminSection>('overview');
-  const [routeHydrated, setRouteHydrated] = useState(false);
   const [activeHelpTopicId, setActiveHelpTopicId] = useState<string | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [token, setToken] = useState('');
@@ -98,17 +99,16 @@ function App() {
   const [adminStats, setAdminStats] = useState<Record<string, number> | null>(null);
   const [adminBookings, setAdminBookings] = useState<Booking[]>([]);
   const [adminKycSubmissions, setAdminKycSubmissions] = useState<ArtisanKycSubmission[]>([]);
-  const [adminUsers, setAdminUsers] = useState<AdminUserRecord[]>([]);
-  const [adminArtisans, setAdminArtisans] = useState<AdminArtisanRecord[]>([]);
-  const [adminCategories, setAdminCategories] = useState<AdminCategoryRecord[]>([]);
   const [selectedState, setSelectedState] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [priceMin, setPriceMin] = useState('');
   const [priceMax, setPriceMax] = useState('');
   const [marketplaceSort, setMarketplaceSort] = useState<MarketplaceSort>('rating');
-  const [notice, setNotice] = useState('');
+  const [authPromptSignal, setAuthPromptSignal] = useState(0);
+  const [routeHydrated, setRouteHydrated] = useState(true);
   const [bookingSuccess, setBookingSuccess] = useState<BookingSuccessState | null>(null);
+  const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [pushStatus, setPushStatus] = useState<PushStatus>(hasPushConfig() ? 'idle' : 'missing-config');
   const [pushToken, setPushToken] = useState('');
@@ -116,6 +116,8 @@ function App() {
   const currentUserRef = useRef<ApiUser | null>(null);
 
   const isAuthed = Boolean(firebaseUser && token);
+  const isRestoringAuthedRoute = isAuthed && !routeHydrated;
+  const usesArtisanSetupHeader = view === 'home' && me?.role === 'ARTISAN';
 
   useEffect(() => {
     currentTokenRef.current = token;
@@ -124,6 +126,30 @@ function App() {
   useEffect(() => {
     currentUserRef.current = me;
   }, [me]);
+
+  useEffect(() => {
+    if (!me?.role) {
+      clearStoredRoute();
+      return;
+    }
+
+    const persistedView =
+      view === 'artisan-profile'
+        ? 'marketplace'
+        : view === 'home' && me.role === 'ARTISAN'
+          ? 'workspace'
+          : view;
+    const persistedWorkspaceSection =
+      view === 'home' && me.role === 'ARTISAN' ? 'overview' : workspaceSection;
+
+    window.localStorage.setItem(
+      routeStorageKey,
+      JSON.stringify({
+        view: persistedView,
+        workspaceSection: persistedWorkspaceSection,
+      })
+    );
+  }, [me?.role, view, workspaceSection]);
 
   async function withNotice(action: () => Promise<void>, done = 'Done') {
     setBusy(true);
@@ -239,8 +265,8 @@ function App() {
 
     if (user.role === 'ARTISAN') {
       const [bookingRes, offeringRes, conversationRes, notificationRes] = await Promise.all([
-        api<{ bookings: Booking[] }>('/bookings/artisan?page=1&limit=10', { token: authToken }).catch(() => ({ bookings: [] })),
-        api<{ offerings: Offering[] }>('/offerings/me', { token: authToken }).catch(() => ({ offerings: [] })),
+        api<{ bookings: Booking[] }>('/bookings/artisan?page=1&limit=10', { token: authToken }),
+        api<{ offerings: Offering[] }>('/offerings/me', { token: authToken }),
         api<{ conversations: Conversation[] }>('/conversations', { token: authToken }),
         api<{ notifications: Notification[] }>('/notifications', { token: authToken }),
       ]);
@@ -251,33 +277,18 @@ function App() {
     }
 
     if (user.role === 'ADMIN') {
-      const [
-        stats,
-        conversationRes,
-        bookingRes,
-        notificationRes,
-        kycRes,
-        userRes,
-        artisanRes,
-        categoryRes,
-      ] = await Promise.all([
+      const [stats, conversationRes, bookingRes, notificationRes, kycRes] = await Promise.all([
         api<{ stats: Record<string, number> }>('/admin/stats', { token: authToken }),
         api<{ conversations: Conversation[] }>('/admin/conversations?page=1&limit=20', { token: authToken }),
         api<{ bookings: Booking[] }>('/admin/bookings?page=1&limit=12', { token: authToken }),
         api<{ notifications: Notification[] }>('/notifications', { token: authToken }),
         api<{ submissions: ArtisanKycSubmission[] }>('/admin/kyc-submissions?page=1&limit=12', { token: authToken }),
-        api<{ users: AdminUserRecord[] }>('/admin/users?page=1&limit=24', { token: authToken }),
-        api<{ artisans: AdminArtisanRecord[] }>('/admin/artisans?page=1&limit=24', { token: authToken }),
-        api<{ categories: AdminCategoryRecord[] }>('/admin/categories?page=1&limit=24', { token: authToken }),
       ]);
       setAdminStats(stats.stats);
       setAdminConversations(conversationRes.conversations);
       setAdminBookings(bookingRes.bookings);
       setNotifications(notificationRes.notifications);
       setAdminKycSubmissions(kycRes.submissions);
-      setAdminUsers(userRes.users);
-      setAdminArtisans(artisanRes.artisans);
-      setAdminCategories(categoryRes.categories);
     }
   }
 
@@ -302,6 +313,7 @@ function App() {
     if (!auth) return;
     return onAuthStateChanged(auth, async (user) => {
       setFirebaseUser(user);
+      setRouteHydrated(false);
       if (!user) {
         if (currentTokenRef.current) {
           syncPushToken(currentTokenRef.current, null).catch(() => undefined);
@@ -314,49 +326,19 @@ function App() {
         setAdminConversations([]);
         setAdminBookings([]);
         setAdminKycSubmissions([]);
-        setAdminUsers([]);
-        setAdminArtisans([]);
-        setAdminCategories([]);
         setNotifications([]);
         setMyOfferings([]);
         setAdminStats(null);
         setPushToken('');
         setPushStatus(hasPushConfig() ? 'idle' : 'missing-config');
-        setRouteHydrated(false);
         setWorkspaceSection(resetState.workspaceSection);
         setView(resetState.view);
         setActiveHelpTopicId(null);
         setSelectedArtisan(null);
         setSelectedArtisanReviews([]);
-        clearStoredRoute();
         clearUrlSearch();
-        return;
-      }
-
-      if (needsEmailVerification(user)) {
-        const resetState = resetWorkspaceState();
-        setToken('');
-        setMe(null);
-        setBookings([]);
-        setConversations([]);
-        setAdminConversations([]);
-        setAdminBookings([]);
-        setAdminKycSubmissions([]);
-        setAdminUsers([]);
-        setAdminArtisans([]);
-        setAdminCategories([]);
-        setNotifications([]);
-        setMyOfferings([]);
-        setAdminStats(null);
-        setPushToken('');
-        setPushStatus(hasPushConfig() ? 'idle' : 'missing-config');
-        setRouteHydrated(false);
-        setWorkspaceSection(resetState.workspaceSection);
-        setView(resetState.view);
-        setActiveHelpTopicId(null);
-        setSelectedArtisan(null);
-        setSelectedArtisanReviews([]);
         clearStoredRoute();
+        setRouteHydrated(true);
         return;
       }
 
@@ -375,6 +357,12 @@ function App() {
         }
 
         await loadPrivateData(session.token, session.user);
+
+        const storedRoute = readStoredRoute(session.user.role);
+        if (storedRoute) {
+          setView(storedRoute.view);
+          setWorkspaceSection(storedRoute.workspaceSection);
+        }
 
         const params = new URLSearchParams(window.location.search);
         const reference = params.get('reference') || params.get('trxref');
@@ -402,15 +390,8 @@ function App() {
             );
           } finally {
             clearUrlSearch();
+            setRouteHydrated(true);
           }
-          return;
-        }
-
-        if (session.user.role === 'ADMIN') {
-          setAdminSection('overview');
-          setView('admin');
-          setRouteHydrated(true);
-          clearUrlSearch();
           return;
         }
 
@@ -423,26 +404,15 @@ function App() {
           setView(requestedView as View);
           if (
             requestedSection &&
-            ['overview', 'bookings', 'messages', 'offers', 'notifications', 'reviews', 'profile'].includes(
+            ['overview', 'bookings', 'messages', 'offers', 'notifications'].includes(
               requestedSection
             )
           ) {
             setWorkspaceSection(requestedSection as WorkspaceSection);
           }
-          setRouteHydrated(true);
           clearUrlSearch();
-          return;
         }
 
-        const storedRoute = readStoredRoute(session.user.role);
-        if (storedRoute) {
-          setWorkspaceSection(storedRoute.workspaceSection);
-          setAdminSection(storedRoute.adminSection);
-          setView(storedRoute.view);
-        } else if (session.user.role === 'ARTISAN') {
-          setWorkspaceSection('overview');
-          setView('workspace');
-        }
         setRouteHydrated(true);
       } catch {
         const resetState = resetWorkspaceState();
@@ -453,16 +423,13 @@ function App() {
         setAdminConversations([]);
         setAdminBookings([]);
         setAdminKycSubmissions([]);
-        setAdminUsers([]);
-        setAdminArtisans([]);
-        setAdminCategories([]);
         setNotifications([]);
         setMyOfferings([]);
         setAdminStats(null);
-        setRouteHydrated(false);
         setWorkspaceSection(resetState.workspaceSection);
         setView(resetState.view);
         setNotice('We could not finish account sync. Please make sure the backend is running, then sign in again.');
+        setRouteHydrated(true);
       }
     });
   }, []);
@@ -505,28 +472,6 @@ function App() {
     };
   }, [isAuthed, pushToken, token]);
 
-  useEffect(() => {
-    if (!isAuthed || !me?.role || !routeHydrated) return;
-
-    const routeToStore =
-      me.role === 'ARTISAN' && view === 'home'
-        ? {
-            view: 'workspace' as View,
-            workspaceSection: 'overview' as WorkspaceSection,
-            adminSection,
-          }
-        : {
-            view,
-            workspaceSection,
-            adminSection,
-          };
-
-    window.localStorage.setItem(
-      routeStorageKey,
-      JSON.stringify(routeToStore)
-    );
-  }, [adminSection, isAuthed, me?.role, routeHydrated, view, workspaceSection]);
-
   async function enablePushAlerts() {
     if (!token) {
       setNotice('Sign in first to enable alerts');
@@ -563,23 +508,10 @@ function App() {
     () => categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>),
     [categories]
   );
-  const isRestoringAuthedRoute = isAuthed && Boolean(me?.role) && !routeHydrated;
-  const usesArtisanSetupHeader = isAuthed && me?.role === 'ARTISAN' && view === 'home';
-  const usesArtisanWorkspaceHeader = isAuthed && me?.role === 'ARTISAN' && view === 'workspace';
-  const hideGlobalHeader = isAuthed && (me?.role === 'ADMIN' || usesArtisanSetupHeader || usesArtisanWorkspaceHeader);
-  const artisanHeaderActive =
-    workspaceSection === 'bookings'
-      ? 'Jobs'
-      : workspaceSection === 'messages'
-        ? 'Messages'
-        : workspaceSection === 'reviews'
-          ? 'Reviews'
-          : 'Dashboard';
 
   return (
     <div className="app-shell">
-      {!hideGlobalHeader && (
-      <header className={`topbar ${isAuthed ? 'signed-in-topbar' : ''}`}>
+      <header className="topbar">
         <button className="brand" onClick={() => setView('home')}>
           <img className="brand-logo" src={bundoLogo} alt="Bundo logo" />
           <span>Bundo</span>
@@ -587,37 +519,16 @@ function App() {
         <nav aria-label="Main navigation">
           {isAuthed && (
             <>
-              <button className={view === 'home' ? 'active' : ''} onClick={() => setView('home')}>Dashboard</button>
-              <button className={view === 'marketplace' ? 'active' : ''} onClick={() => setView('marketplace')}>Categories</button>
+              <button className={view === 'marketplace' ? 'active' : ''} onClick={() => setView('marketplace')}>Services</button>
               <button
-                className={view === 'workspace' && workspaceSection === 'bookings' ? 'active' : ''}
+                className={view === 'workspace' ? 'active' : ''}
                 onClick={() => {
-                  setWorkspaceSection('bookings');
+                  setWorkspaceSection('overview');
                   setView('workspace');
                 }}
               >
-                {me?.role === 'ARTISAN' ? 'Jobs' : 'Bookings'}
+                Dashboard
               </button>
-              <button
-                className={view === 'workspace' && workspaceSection === 'messages' ? 'active' : ''}
-                onClick={() => {
-                  setWorkspaceSection('messages');
-                  setView('workspace');
-                }}
-              >
-                Messages
-              </button>
-              {me?.role === 'ARTISAN' && (
-                <button
-                  className={view === 'workspace' && workspaceSection === 'reviews' ? 'active' : ''}
-                  onClick={() => {
-                    setWorkspaceSection('reviews');
-                    setView('workspace');
-                  }}
-                >
-                  Reviews
-                </button>
-              )}
             </>
           )}
           {me?.role === 'ADMIN' && <button className={view === 'admin' ? 'active' : ''} onClick={() => setView('admin')}>Admin</button>}
@@ -630,66 +541,63 @@ function App() {
           >
             Help
           </button>
-        </nav>
-        {isAuthed && (
-          <form
-            className="topbar-search"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void withNotice(async () => {
-                await loadPublicData(selectedState, searchTerm);
-                setView('marketplace');
-              }, searchTerm.trim() ? `Searching for ${searchTerm.trim()}` : 'Showing available services');
+          <button
+            className="professional-link"
+            onClick={() => {
+              if (!me) {
+                setAuthPromptSignal((value) => value + 1);
+                setNotice('Create or sign in to an artisan account to start professional onboarding.');
+                setView('home');
+                return;
+              }
+
+              if (me.role === 'ADMIN') {
+                setNotice('Admin accounts already have marketplace control access.');
+                setView('admin');
+                return;
+              }
+
+              if (me.role === 'ARTISAN') {
+                setWorkspaceSection('offers');
+                setView('workspace');
+                setNotice('Welcome back to your artisan workspace.');
+                return;
+              }
+
+              withNotice(async () => {
+                await api('/users/role', {
+                  method: 'PATCH',
+                  token,
+                  body: JSON.stringify({ role: 'ARTISAN' }),
+                });
+                const nextUser = await refreshMe();
+                await loadPrivateData(token, nextUser || me);
+                setWorkspaceSection('overview');
+                setView('workspace');
+              }, 'Your account is now set up for artisan onboarding');
             }}
           >
-            <label>
-              <span aria-hidden="true">⌕</span>
-              <input
-                type="search"
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Search for artisan"
-              />
-            </label>
-            <label>
-              <span aria-hidden="true">⌖</span>
-              <select
-                value={selectedState}
-                onChange={(event) => {
-                  setSelectedState(event.target.value);
-                }}
-              >
-                <option value="">Nigeria</option>
-                {nigeriaStates.map((state) => (
-                  <option key={state} value={state}>
-                    {state}, Nigeria
-                  </option>
-                ))}
-              </select>
-            </label>
-          </form>
-        )}
+            Register as a professional
+          </button>
+        </nav>
         <AuthBox
           firebaseUser={firebaseUser}
           me={me}
+          authPromptSignal={authPromptSignal}
           unreadCount={notifications.filter((notification) => !notification.readAt).length}
           onReady={(nextToken, nextUser) => {
             setToken(nextToken);
             setMe(nextUser);
             loadPrivateData(nextToken, nextUser).catch(() => undefined);
-            if (nextUser.role === 'ADMIN') {
-              setView('admin');
-            } else if (nextUser.role === 'CUSTOMER') {
+            if (nextUser.role === 'CUSTOMER') {
               setView('home');
             }
-            setRouteHydrated(true);
           }}
           onNavigate={setView}
           onWorkspaceSection={setWorkspaceSection}
           onNotice={setNotice}
         />
       </header>
-      )}
 
       {notice && <div className={`notice ${usesArtisanSetupHeader ? 'setup-notice' : ''}`}>{notice}</div>}
       {bookingSuccess && (
@@ -945,36 +853,9 @@ function App() {
         />
       )}
 
-      {usesArtisanWorkspaceHeader && (
-        <ArtisanAppHeader
-          displayName={userDisplayName(firebaseUser, me)}
-          active={artisanHeaderActive}
-          onDashboard={() => {
-            setWorkspaceSection('overview');
-            setView('workspace');
-          }}
-          onJobs={() => {
-            setWorkspaceSection('bookings');
-            setView('workspace');
-          }}
-          onMessages={() => {
-            setWorkspaceSection('messages');
-            setView('workspace');
-          }}
-          onReviews={() => {
-            setWorkspaceSection('reviews');
-            setView('workspace');
-          }}
-          onProfile={() => {
-            setWorkspaceSection('profile');
-            setView('workspace');
-          }}
-        />
-      )}
-
       {view === 'workspace' && (
-        <main className={`page workspace-page ${workspaceSection === 'messages' ? 'messages-workspace' : ''} ${me?.role === 'ARTISAN' ? 'artisan-workspace-page' : ''}`}>
-          {workspaceSection !== 'messages' && me?.role !== 'ARTISAN' && (
+        <main className={`page workspace-page ${workspaceSection === 'messages' ? 'messages-workspace' : ''}`}>
+          {workspaceSection !== 'messages' && (
             <section className="section-head">
               <p className="eyebrow">Workspace</p>
               <h1>
@@ -991,7 +872,7 @@ function App() {
                     ? 'Update your artisan profile and service listings.'
                     : firebaseUser
                       ? firebaseUser.email
-                      : 'Sign in to manage profile settings, bookings, messages, and account updates.'}
+                      : 'Sign in to test roles, artisan setup, bookings, and chat from the web client.'}
               </p>
             </section>
           )}
@@ -1034,7 +915,7 @@ function App() {
 
           {me && workspaceSection === 'offers' && me.role === 'ARTISAN' && (
             <div className="dashboard-grid">
-              <ArtisanOffersPanel
+              <ArtisanPanel
                 token={token}
                 categories={categoryOptions}
                 offerings={myOfferings}
@@ -1049,10 +930,7 @@ function App() {
           )}
 
           {me && workspaceSection === 'offers' && me.role !== 'ARTISAN' && (
-            <EmptyState
-              title="Artisan tools"
-              body="Apply as an artisan from profile settings, then complete KYC and wait for admin approval before listing offers."
-            />
+            <EmptyState title="Artisan tools" body="Choose the artisan role first to manage offers." />
           )}
 
           {me && workspaceSection === 'notifications' && (
@@ -1065,20 +943,6 @@ function App() {
               pushStatus={pushStatus}
               pushEnabled={Boolean(pushToken)}
               enablePushAlerts={enablePushAlerts}
-            />
-          )}
-
-          {me && workspaceSection === 'reviews' && me.role === 'ARTISAN' && (
-            <ArtisanReviewsPanel token={token} />
-          )}
-
-          {me && workspaceSection === 'profile' && me.role === 'ARTISAN' && (
-            <ArtisanProfileSettings
-              token={token}
-              firebaseUser={firebaseUser}
-              busy={busy}
-              runAction={withNotice}
-              refresh={() => loadPrivateData()}
             />
           )}
 
@@ -1135,28 +999,42 @@ function App() {
       )}
 
       {view === 'admin' && (
-        <main className="admin-page">
-          <AdminConsole
-            section={adminSection}
-            setSection={setAdminSection}
-            stats={adminStats}
-            users={adminUsers}
-            artisans={adminArtisans}
-            bookings={adminBookings}
-            conversations={adminConversations}
-            submissions={adminKycSubmissions}
-            categories={adminCategories}
+        <main className="page">
+          <section className="section-head">
+            <p className="eyebrow">Admin</p>
+            <h1>Marketplace control center</h1>
+            <p>Track growth, moderation, trust signals, and operations health.</p>
+          </section>
+          <div className="grid stats">
+            {!adminStats && <EmptyState title="Admin stats unavailable" body="Sign in as an admin, then open this page again." />}
+            {adminStats &&
+              Object.entries(adminStats).map(([key, value]) => (
+                <article className="stat-card" key={key}>
+                  <strong>{value}</strong>
+                  <span>{key}</span>
+                </article>
+              ))}
+          </div>
+          <AdminChatPanel
             token={token}
-            adminLabel={firebaseUser?.email || me?.email || 'Admin'}
+            conversations={adminConversations}
             busy={busy}
             runAction={withNotice}
             refresh={() => loadPrivateData()}
-            onSignOut={() => {
-              setAdminSection('overview');
-              setView('home');
-              setNotice('Signed out');
-              auth && signOut(auth);
-            }}
+          />
+          <AdminBookingsPanel
+            token={token}
+            bookings={adminBookings}
+            busy={busy}
+            runAction={withNotice}
+            refresh={() => loadPrivateData()}
+          />
+          <AdminKycPanel
+            token={token}
+            submissions={adminKycSubmissions}
+            busy={busy}
+            runAction={withNotice}
+            refresh={() => loadPrivateData()}
           />
         </main>
       )}
@@ -2918,6 +2796,7 @@ function ArtisanPanel({
         priceTo: form.get('priceTo') ? Number(form.get('priceTo')) : undefined,
       }),
     });
+
     await refresh();
     formElement.reset();
   }

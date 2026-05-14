@@ -84,9 +84,11 @@ router.post('/', verifyFirebaseToken, requireRole(Role.ARTISAN), async (req, res
     artisanUserId: (req as any).user.firebaseUid,
     categoryId: validation.data.categoryId!,
     title: validation.data.title!,
-    description: validation.data.description ?? undefined,
+    ...(validation.data.description != null
+      ? { description: validation.data.description }
+      : {}),
     priceFrom: validation.data.priceFrom!,
-    priceTo: validation.data.priceTo ?? undefined,
+    ...(validation.data.priceTo != null ? { priceTo: validation.data.priceTo } : {}),
   });
 
   if (result.status === 'missing_artisan') {
@@ -133,17 +135,16 @@ router.get('/', async (req, res) => {
         ? city
         : undefined;
   const filters = {
-    artisanId: typeof artisanId === 'string' ? artisanId : undefined,
-    categoryId: typeof categoryId === 'string' ? categoryId : undefined,
-    city: location,
-    q: typeof q === 'string' ? q : undefined,
-    minPrice: typeof minPrice === 'string' ? Number(minPrice) : undefined,
-    maxPrice: typeof maxPrice === 'string' ? Number(maxPrice) : undefined,
-    sort:
-      typeof sort === 'string' &&
-      ['newest', 'price_low', 'price_high', 'rating'].includes(sort)
-        ? (sort as 'newest' | 'price_low' | 'price_high' | 'rating')
-        : undefined,
+    ...(typeof artisanId === 'string' ? { artisanId } : {}),
+    ...(typeof categoryId === 'string' ? { categoryId } : {}),
+    ...(location !== undefined ? { city: location } : {}),
+    ...(typeof q === 'string' ? { q } : {}),
+    ...(typeof minPrice === 'string' ? { minPrice: Number(minPrice) } : {}),
+    ...(typeof maxPrice === 'string' ? { maxPrice: Number(maxPrice) } : {}),
+    ...(typeof sort === 'string' &&
+    ['newest', 'price_low', 'price_high', 'rating'].includes(sort)
+      ? { sort: sort as 'newest' | 'price_low' | 'price_high' | 'rating' }
+      : {}),
   };
 
   if (
