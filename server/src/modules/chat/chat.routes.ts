@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import crypto from 'node:crypto';
 import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
 import { env } from '../../config/env';
+import { buildCloudinaryUploadSignature } from '../../utils/cloudinarySignature';
 import {
   createMessage,
   getConversationMessages,
@@ -36,11 +36,10 @@ function validateMessagePayload(body: unknown, imageUrl: unknown, imageCloudinar
 router.post('/messages/sign-upload', verifyFirebaseToken, async (_req, res) => {
   const timestamp = Math.floor(Date.now() / 1000);
   const folder = 'bundo/chat-images';
-  const paramsToSign = `folder=${folder}&timestamp=${timestamp}`;
-  const signature = crypto
-    .createHash('sha1')
-    .update(`${paramsToSign}${env.CLOUDINARY_API_SECRET}`)
-    .digest('hex');
+  const signature = buildCloudinaryUploadSignature(
+    { folder, timestamp },
+    env.CLOUDINARY_API_SECRET
+  );
 
   return res.json({
     message: 'Upload signature created',

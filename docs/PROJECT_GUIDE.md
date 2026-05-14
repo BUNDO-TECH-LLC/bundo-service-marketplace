@@ -28,6 +28,7 @@ Current launch-oriented structure:
 - `server/` for the Express API, Prisma schema, migrations, and backend environment files
 - `docs/` for operational and product documentation
 - root `package.json` as the shared entrypoint for running both sides cleanly
+- root [README.md](/Users/macbook/bundo/README.md) for quick start commands and a pointer into this guide
 
 ---
 
@@ -112,6 +113,8 @@ Mounted route groups:
   [src/config/firebase.ts](/Users/macbook/bundo/server/src/config/firebase.ts)
 - Prisma client:
   [src/db/client.ts](/Users/macbook/bundo/server/src/db/client.ts)
+- Payment confirmation gate (Paystack vs simulation policy):
+  [src/modules/payments/paymentConfirmPolicy.ts](/Users/macbook/bundo/server/src/modules/payments/paymentConfirmPolicy.ts)
 
 ---
 
@@ -168,16 +171,69 @@ Supporting client files:
 
 - API helper:
   [client/src/lib/api.ts](/Users/macbook/bundo/client/src/lib/api.ts)
+- Signup role and email-verification handoff in `localStorage`:
+  [client/src/lib/authSignupStorage.ts](/Users/macbook/bundo/client/src/lib/authSignupStorage.ts)
+- Shared formatting helpers (currency, message time, day labels):
+  [client/src/lib/formatting.ts](/Users/macbook/bundo/client/src/lib/formatting.ts)
+- Nigeria state list for forms:
+  [client/src/lib/geo.ts](/Users/macbook/bundo/client/src/lib/geo.ts)
+- Category icons for marketplace cards:
+  [client/src/lib/categoryIcon.ts](/Users/macbook/bundo/client/src/lib/categoryIcon.ts)
+- Marketing hero/device image URLs:
+  [client/src/lib/marketingAssets.ts](/Users/macbook/bundo/client/src/lib/marketingAssets.ts)
+- Display name helper for Firebase and API user objects:
+  [client/src/lib/userDisplayName.ts](/Users/macbook/bundo/client/src/lib/userDisplayName.ts)
+- `/me` fetch with token refresh retry:
+  [client/src/lib/resolveApiSession.ts](/Users/macbook/bundo/client/src/lib/resolveApiSession.ts)
+- Workspace local state reset (logout and similar):
+  [client/src/lib/workspaceState.ts](/Users/macbook/bundo/client/src/lib/workspaceState.ts)
+- Chat image upload to Cloudinary (signed upload then browser POST):
+  [client/src/lib/chatUpload.ts](/Users/macbook/bundo/client/src/lib/chatUpload.ts)
+- Booking and payment labels for UI (shared by bookings panel and admin):
+  [client/src/lib/bookingDisplay.ts](/Users/macbook/bundo/client/src/lib/bookingDisplay.ts)
+- Notification label and relative time helpers:
+  [client/src/lib/notificationDisplay.ts](/Users/macbook/bundo/client/src/lib/notificationDisplay.ts)
+- Last-route persistence for workspace/admin restore:
+  [client/src/lib/workspaceRoute.ts](/Users/macbook/bundo/client/src/lib/workspaceRoute.ts)
 - Firebase web config:
   [client/src/lib/firebase.ts](/Users/macbook/bundo/client/src/lib/firebase.ts)
 - Firebase web push helper:
   [client/src/lib/messaging.ts](/Users/macbook/bundo/client/src/lib/messaging.ts)
 - Shared frontend types:
   [client/src/types.ts](/Users/macbook/bundo/client/src/types.ts)
+- App navigation and admin record types used across screens and auth:
+  [client/src/appTypes.ts](/Users/macbook/bundo/client/src/appTypes.ts)
+- Small reusable UI:
+  [client/src/components/EmptyState.tsx](/Users/macbook/bundo/client/src/components/EmptyState.tsx),
+  [client/src/components/StatCard.tsx](/Users/macbook/bundo/client/src/components/StatCard.tsx)
+- Auth surface (Firebase email/Google, verification, role completion), imported by `App.tsx`:
+  [client/src/auth/AuthBox.tsx](/Users/macbook/bundo/client/src/auth/AuthBox.tsx)
+- Logged-in customer home, artisan profile view, artisan dashboard:
+  [client/src/views/LoggedInHome.tsx](/Users/macbook/bundo/client/src/views/LoggedInHome.tsx),
+  [client/src/views/ArtisanProfilePage.tsx](/Users/macbook/bundo/client/src/views/ArtisanProfilePage.tsx),
+  [client/src/views/ArtisanDashboard.tsx](/Users/macbook/bundo/client/src/views/ArtisanDashboard.tsx)
+- Help center content and topic data:
+  [client/src/help/HelpCenter.tsx](/Users/macbook/bundo/client/src/help/HelpCenter.tsx),
+  [client/src/help/helpTopics.ts](/Users/macbook/bundo/client/src/help/helpTopics.ts)
+- Admin console and section panels (overview, bookings, KYC, profiles, catalog):
+  [client/src/admin/AdminConsole.tsx](/Users/macbook/bundo/client/src/admin/AdminConsole.tsx),
+  [client/src/admin/AdminOverviewPanel.tsx](/Users/macbook/bundo/client/src/admin/AdminOverviewPanel.tsx),
+  [client/src/admin/AdminBookingsPanel.tsx](/Users/macbook/bundo/client/src/admin/AdminBookingsPanel.tsx),
+  [client/src/admin/AdminKycPanel.tsx](/Users/macbook/bundo/client/src/admin/AdminKycPanel.tsx),
+  [client/src/admin/AdminProfilesPanel.tsx](/Users/macbook/bundo/client/src/admin/AdminProfilesPanel.tsx),
+  [client/src/admin/AdminCatalogPanel.tsx](/Users/macbook/bundo/client/src/admin/AdminCatalogPanel.tsx),
+  [client/src/admin/adminMetricLabel.ts](/Users/macbook/bundo/client/src/admin/adminMetricLabel.ts)
+- Workspace-oriented panels (imported into `App.tsx`):
+  [client/src/panels/BookingsPanel.tsx](/Users/macbook/bundo/client/src/panels/BookingsPanel.tsx),
+  [client/src/panels/ChatPanel.tsx](/Users/macbook/bundo/client/src/panels/ChatPanel.tsx),
+  [client/src/panels/AdminChatPanel.tsx](/Users/macbook/bundo/client/src/panels/AdminChatPanel.tsx),
+  [client/src/panels/NotificationsPanel.tsx](/Users/macbook/bundo/client/src/panels/NotificationsPanel.tsx)
 - Global styling:
   [client/src/styles.css](/Users/macbook/bundo/client/src/styles.css)
 - Firebase messaging service worker:
   [client/public/firebase-messaging-sw.js](/Users/macbook/bundo/client/public/firebase-messaging-sw.js)
+- Historical one-off extractors (do not run against current tree without updating markers):
+  [client/scripts/README.md](/Users/macbook/bundo/client/scripts/README.md)
 
 The current frontend is a single-page React app that manages:
 
@@ -195,6 +251,8 @@ The current frontend is a single-page React app that manages:
 - a dedicated admin operations console with its own navigation for overview, profiles, jobs, messages, verification, and catalog; admin sessions do not show the customer/artisan marketplace navbar
 - payment actions in the booking flow
 - help-center and trust-policy content for payments, disputes, cancellations, KYC, privacy, and support
+
+`App.tsx` still owns routing, data loading, marketplace, onboarding, and many feature-specific components; **auth**, **views** (customer home, artisan profile, artisan dashboard), **help**, **admin** console stack, and the largest **panels** live in their own modules under `client/src/`, with shared display and session helpers in `client/src/lib/`.
 
 ---
 
@@ -331,8 +389,9 @@ Result:
 6. After payment, one of two things confirms the transaction:
    - Paystack webhook calls `/webhooks/paystack`
    - local callback flow calls `POST /payments/verify-reference`
-7. Backend verifies the Paystack transaction and marks payment as `PAID_HELD`.
-8. Ledger entries are created for:
+7. Backend applies the **payment confirmation policy** (see below): with `PAYSTACK_SECRET_KEY` set, Paystack is queried to verify the charge before any move to `PAID_HELD`. In **production**, if Paystack is not configured, confirmation is rejected and no ledger rows are written. In **non-production**, optional `ALLOW_PAYMENT_SIMULATION=true` allows marking `PAID_HELD` without Paystack for local UI demos only.
+8. When verification succeeds (or simulation is explicitly allowed), the payment is marked `PAID_HELD`.
+9. Ledger entries are created for:
    - customer payment
    - platform fee
    - provider earning
@@ -341,6 +400,20 @@ Result:
 
 - funds are treated as held by the marketplace
 - payout is not auto-sent to artisan
+- production cannot silently confirm held payments without Paystack verification
+
+### Payment confirmation policy (technical)
+
+Rules are implemented in [paymentConfirmPolicy.ts](/Users/macbook/bundo/server/src/modules/payments/paymentConfirmPolicy.ts) and enforced in [payments.service.ts](/Users/macbook/bundo/server/src/modules/payments/payments.service.ts) inside `markPaymentReferencePaid`:
+
+| Environment | `PAYSTACK_SECRET_KEY` | `ALLOW_PAYMENT_SIMULATION` | Behavior |
+|-------------|------------------------|----------------------------|----------|
+| any | set | ignored | Paystack API verification required before `PAID_HELD` + ledger |
+| **production** | unset | any | **Reject** — returns `paystack_not_configured`, no DB promotion |
+| non-production | unset | `true` | **Simulate** — logs a warning, promotes to `PAID_HELD` without Paystack (local demos only) |
+| non-production | unset | unset / `false` | **Reject** — same as production fail-closed for money |
+
+Environment templates: [server/.env.example](/Users/macbook/bundo/server/.env.example). Root [README.md](/Users/macbook/bundo/README.md) summarizes how to run the stack and where the guide lives.
 
 ## 5. Completion and payout release
 
@@ -606,7 +679,7 @@ Mounted at root.
 - `GET /payments/:bookingId`
   Fetch booking payment for owner.
 - `POST /payments/verify-reference`
-  Verify and sync a Paystack payment reference for the current user.
+  Verify and sync a Paystack payment reference for the current user. Returns **503** when Paystack is not configured and payment simulation is not allowed (see payment confirmation policy).
 - `POST /webhooks/paystack`
   Paystack webhook endpoint.
 
@@ -708,7 +781,11 @@ Stats:
 
 ## Smart Local Paystack Testing
 
-For local development, Bundo now supports two useful paths:
+For local development, Bundo supports **Paystack-backed** confirmation (webhook or verify-reference), plus an optional **non-production simulation** path when Paystack keys are absent (see above).
+
+### Local simulation without Paystack keys
+
+If you only need the workspace to show **`PAID_HELD`** after a fake checkout (no real money), in **non-production** you can set `ALLOW_PAYMENT_SIMULATION=true` in `server/.env`. The server logs a warning whenever it confirms a payment without calling Paystack. **Never** enable this in production.
 
 ### Webhook path
 
@@ -770,6 +847,7 @@ Reference environment template:
 - approved artisans have dedicated dashboard, jobs, reviews, and profile settings surfaces
 - artisan refresh restore now lands in the workspace instead of reopening onboarding from a stale saved route
 - marketplace payment structure already modeled correctly
+- production fail-closed payment confirmation when Paystack is not configured; optional `ALLOW_PAYMENT_SIMULATION` for non-production demos only
 - admin visibility into operations
 - conversation moderation support
 - rating system tied to real bookings
@@ -781,6 +859,15 @@ Reference environment template:
 - richer marketplace filtering and sorting for discovery
 - direct browser portfolio uploads through signed Cloudinary uploads
 - request-id aware health and readiness endpoints for observability
+- Vitest unit tests for payment confirmation policy and Paystack signing helpers; GitHub Actions CI builds client and server (see [.github/workflows/ci.yml](/Users/macbook/bundo/.github/workflows/ci.yml))
+
+---
+
+## Automated tests and CI
+
+- **Vitest** runs from `server/` with `npm test` (see [vitest.config.ts](/Users/macbook/bundo/server/vitest.config.ts)). Test files live next to modules as `*.test.ts` and are excluded from the production TypeScript build output.
+- **Policy tests** cover [paymentConfirmPolicy.ts](/Users/macbook/bundo/server/src/modules/payments/paymentConfirmPolicy.ts) so production vs simulation rules cannot regress silently.
+- **CI** (`.github/workflows/ci.yml`) runs `npm ci`, `npm test`, and `npm run build` in `server/`, and `npm ci` + `npm run build` in `client/`, on pushes and pull requests to `main` / `master`.
 
 ---
 
@@ -820,6 +907,7 @@ Reference environment template:
 - [x] Direct browser media upload flow for artisan portfolio
 - [x] Artisan profile/settings surface
 - [x] Basic production observability with health, readiness, request IDs, and structured request logging
+- [x] Server unit tests for payment confirmation policy and CI build pipeline
 
 ### Still needed before a stronger public MVP launch
 
@@ -863,11 +951,17 @@ The smartest order from here is:
 
 If someone new joins the project, these are the best first reads:
 
+- [README.md](/Users/macbook/bundo/README.md) (how to run the repo)
 - [src/server.ts](/Users/macbook/bundo/server/src/server.ts)
 - [prisma/schema.prisma](/Users/macbook/bundo/server/prisma/schema.prisma)
+- [src/modules/payments/paymentConfirmPolicy.ts](/Users/macbook/bundo/server/src/modules/payments/paymentConfirmPolicy.ts)
 - [src/modules/payments/payments.service.ts](/Users/macbook/bundo/server/src/modules/payments/payments.service.ts)
 - [src/modules/admin/admin.routes.ts](/Users/macbook/bundo/server/src/modules/admin/admin.routes.ts)
 - [src/modules/bookings/bookings.routes.ts](/Users/macbook/bundo/server/src/modules/bookings/bookings.routes.ts)
 - [src/modules/artisans/artisans.routes.ts](/Users/macbook/bundo/server/src/modules/artisans/artisans.routes.ts)
 - [client/src/App.tsx](/Users/macbook/bundo/client/src/App.tsx)
+- [client/src/lib/api.ts](/Users/macbook/bundo/client/src/lib/api.ts)
+- [client/src/lib/formatting.ts](/Users/macbook/bundo/client/src/lib/formatting.ts)
+- [client/src/appTypes.ts](/Users/macbook/bundo/client/src/appTypes.ts)
+- [client/src/panels/BookingsPanel.tsx](/Users/macbook/bundo/client/src/panels/BookingsPanel.tsx)
 - [client/src/types.ts](/Users/macbook/bundo/client/src/types.ts)
