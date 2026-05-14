@@ -627,7 +627,7 @@ function LandingPage() {
             setMe(nextUser);
             loadPrivateData(nextToken, nextUser).catch(() => undefined);
             if (nextUser.role === 'CUSTOMER') {
-              setView('home');
+              navigate('/customer/dashboard');
             }
           }}
           onNavigate={setView}

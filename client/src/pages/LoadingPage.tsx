@@ -46,7 +46,7 @@ export default function LoadingPage() {
   return (
     <main className="min-h-screen w-full bg-[var(--color-page)] flex items-center justify-center">
       <section className="flex flex-col items-center gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-0">
           <div className="h-[50px] w-[50px] rounded-[8px] flex items-center justify-center">
             <img
               src={bundoLogo}

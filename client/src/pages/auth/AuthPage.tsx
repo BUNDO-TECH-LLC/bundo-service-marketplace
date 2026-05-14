@@ -114,7 +114,7 @@ export function AuthPage({ mode }: AuthPageProps) {
         const destination =
           session.user.role === 'ARTISAN' || session.user.role === 'ADMIN'
             ? '/?view=workspace'
-            : '/';
+            : '/customer/dashboard';
 
         showLoadingThenNavigate(destination);
         return;
