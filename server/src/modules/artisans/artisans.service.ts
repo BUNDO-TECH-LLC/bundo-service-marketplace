@@ -1,6 +1,6 @@
 import { KycStatus, Prisma, VerifyStatus } from '@prisma/client';
 import db from '../../db/client';
-import { Pagination } from '../../utils/pagination';
+import { Pagination, paginationArgs } from '../../utils/pagination';
 import { createNotification } from '../notifications/notifications.service';
 
 type CreateArtisanProfileInput = {
@@ -128,8 +128,7 @@ export const getArtisans = async (
   return db.artisanProfile.findMany({
     where,
     orderBy: artisanOrderBy(filters.sort),
-    take: pagination?.limit,
-    skip: pagination?.skip,
+    ...paginationArgs(pagination),
     select: {
       id: true,
       displayName: true,
@@ -237,9 +236,9 @@ export const createOffering = async (input: CreateOfferingInput) => {
       artisanId: artisan.id,
       categoryId: input.categoryId,
       title: input.title,
-      description: input.description,
+      ...(input.description !== undefined ? { description: input.description } : {}),
       priceFrom: input.priceFrom,
-      priceTo: input.priceTo,
+      ...(input.priceTo !== undefined ? { priceTo: input.priceTo } : {}),
     },
     include: {
       category: true,

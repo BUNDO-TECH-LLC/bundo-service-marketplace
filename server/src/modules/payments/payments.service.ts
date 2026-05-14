@@ -376,25 +376,23 @@ export const createOrUpdatePayoutAccount = async (input: {
     accountNumber: input.accountNumber,
     bankCode: input.bankCode,
   });
+  const bankName = input.bankName || recipient.data.details?.bank_name;
+  const accountName = input.accountName || recipient.data.details?.account_name;
+  const payoutAccountData = {
+    bankCode: input.bankCode,
+    accountNumber: input.accountNumber,
+    paystackRecipientCode: recipient.data.recipient_code,
+    isVerified: true,
+    ...(bankName !== undefined ? { bankName } : {}),
+    ...(accountName !== undefined ? { accountName } : {}),
+  };
 
   const account = await db.providerPayoutAccount.upsert({
     where: { artisanId: artisan.id },
-    update: {
-      bankCode: input.bankCode,
-      bankName: input.bankName || recipient.data.details?.bank_name,
-      accountNumber: input.accountNumber,
-      accountName: input.accountName || recipient.data.details?.account_name,
-      paystackRecipientCode: recipient.data.recipient_code,
-      isVerified: true,
-    },
+    update: payoutAccountData,
     create: {
       artisanId: artisan.id,
-      bankCode: input.bankCode,
-      bankName: input.bankName || recipient.data.details?.bank_name,
-      accountNumber: input.accountNumber,
-      accountName: input.accountName || recipient.data.details?.account_name,
-      paystackRecipientCode: recipient.data.recipient_code,
-      isVerified: true,
+      ...payoutAccountData,
     },
   });
 
@@ -691,9 +689,11 @@ export const resolveBookingDispute = async (input: {
 
   const refund = await createPaystackRefund({
     transactionReference: payment.paystackReference,
-    amountKobo: refundAmount === payment.amount ? undefined : toKobo(refundAmount),
     customerNote:
       input.resolution?.trim() || 'Bundo marketplace dispute resolution refund',
+    ...(refundAmount !== payment.amount
+      ? { amountKobo: toKobo(refundAmount) }
+      : {}),
   });
 
   const remainingGross = payment.amount - refundAmount;

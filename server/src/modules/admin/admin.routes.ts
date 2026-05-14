@@ -469,13 +469,14 @@ router.post('/disputes/:id/resolve', async (req, res) => {
 
   const parsedRefundAmount =
     refundAmount === undefined ? undefined : Number(refundAmount);
+  const disputeAction = action as 'RELEASE' | 'REFUND_FULL' | 'REFUND_PARTIAL';
 
   const result = await resolveBookingDispute({
     disputeId: String(req.params.id),
-    action,
+    action: disputeAction,
     adminId: (req as any).user.firebaseUid,
-    resolution,
-    refundAmount: parsedRefundAmount,
+    ...(typeof resolution === 'string' ? { resolution } : {}),
+    ...(parsedRefundAmount !== undefined ? { refundAmount: parsedRefundAmount } : {}),
   });
 
   if (result.status === 'paystack_not_configured') {
@@ -656,8 +657,10 @@ router.post('/conversations/:id/messages', async (req, res) => {
     conversationId: String(req.params.id),
     adminId: (req as any).user.firebaseUid,
     body: hasBody ? body : '',
-    imageUrl: hasImageUrl ? imageUrl : undefined,
-    imageCloudinaryId: imageCloudinaryId || undefined,
+    ...(hasImageUrl ? { imageUrl } : {}),
+    ...(typeof imageCloudinaryId === 'string' && imageCloudinaryId
+      ? { imageCloudinaryId }
+      : {}),
   });
 
   if (result.status === 'missing_conversation') {

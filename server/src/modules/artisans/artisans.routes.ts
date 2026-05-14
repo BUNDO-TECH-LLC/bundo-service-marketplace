@@ -699,14 +699,13 @@ router.get('/', async (req, res) => {
         ? city
         : undefined;
   const filters = {
-    city: location,
-    area: typeof area === 'string' ? area : undefined,
-    categoryId: typeof categoryId === 'string' ? categoryId : undefined,
-    q: typeof q === 'string' ? q : undefined,
-    sort:
-      typeof sort === 'string' && ['newest', 'rating', 'reviews'].includes(sort)
-        ? (sort as 'newest' | 'rating' | 'reviews')
-        : undefined,
+    ...(location !== undefined ? { city: location } : {}),
+    ...(typeof area === 'string' ? { area } : {}),
+    ...(typeof categoryId === 'string' ? { categoryId } : {}),
+    ...(typeof q === 'string' ? { q } : {}),
+    ...(typeof sort === 'string' && ['newest', 'rating', 'reviews'].includes(sort)
+      ? { sort: sort as 'newest' | 'rating' | 'reviews' }
+      : {}),
   };
   const [artisans, total] = await Promise.all([
     getArtisans(filters, pagination),

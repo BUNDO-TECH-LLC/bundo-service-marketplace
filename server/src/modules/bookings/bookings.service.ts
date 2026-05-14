@@ -1,11 +1,11 @@
 import { BookingStatus, NotificationType, Role } from '@prisma/client';
 import db from '../../db/client';
-import { Pagination } from '../../utils/pagination';
+import { Pagination, paginationArgs } from '../../utils/pagination';
 import { getArtisanProfileByUserId } from '../artisans/artisans.service';
 import { createNotifications } from '../notifications/notifications.service';
 
 function toMinutes(value: string) {
-  const [hours, minutes] = value.split(':').map(Number);
+  const [hours = 0, minutes = 0] = value.split(':').map(Number);
   return hours * 60 + minutes;
 }
 
@@ -75,8 +75,8 @@ export const createBooking = async (input: {
         customerId: input.customerId,
         artisanId: offering.artisanId,
         offeringId: offering.id,
-        scheduledAt: input.scheduledAt,
-        note: input.note,
+        ...(input.scheduledAt !== undefined ? { scheduledAt: input.scheduledAt } : {}),
+        ...(input.note !== undefined ? { note: input.note } : {}),
       },
       include: {
         artisan: true,
@@ -195,8 +195,7 @@ export const getCustomerBookings = async (
   return db.booking.findMany({
     where: { customerId },
     orderBy: { createdAt: 'desc' },
-    take: pagination?.limit,
-    skip: pagination?.skip,
+    ...paginationArgs(pagination),
     include: {
       artisan: true,
       payment: true,
@@ -225,8 +224,7 @@ export const getArtisanBookings = async (
   return db.booking.findMany({
     where: { artisanId: artisan.id },
     orderBy: { createdAt: 'desc' },
-    take: pagination?.limit,
-    skip: pagination?.skip,
+    ...paginationArgs(pagination),
     include: {
       customerUser: {
         select: {

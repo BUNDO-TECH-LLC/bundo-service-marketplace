@@ -43,7 +43,7 @@ export const createReview = async (input: {
         customerId: input.customerId,
         artisanId: booking.artisanId,
         rating: input.rating,
-        comment: input.comment,
+        ...(input.comment !== undefined ? { comment: input.comment } : {}),
       },
       include: {
         customer: {
