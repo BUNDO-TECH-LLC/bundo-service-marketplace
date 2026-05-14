@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
+import { env } from '../../config/env';
 import {
   createNotification,
   getNotificationsForUser,
@@ -54,6 +55,10 @@ router.patch('/read-all', verifyFirebaseToken, async (req, res) => {
 });
 
 router.post('/test', verifyFirebaseToken, async (req, res) => {
+  if (env.NODE_ENV === 'production') {
+    return res.status(404).json({ message: 'Not found' });
+  }
+
   const userId = (req as any).user.firebaseUid;
 
   const notification = await createNotification({

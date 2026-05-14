@@ -227,16 +227,35 @@ export const reviewKycSubmission = async (input: {
   status: KycStatus;
   reviewNote?: string | null;
 }) => {
-  const submission = await db.artisanKycSubmission.update({
-    where: { id: input.id },
-    data: {
-      status: input.status,
-      reviewNote: input.reviewNote,
-      reviewedAt: new Date(),
-    },
-    include: {
-      artisan: true,
-    },
+  const verifyStatus =
+    input.status === KycStatus.APPROVED
+      ? VerifyStatus.APPROVED
+      : input.status === KycStatus.REJECTED
+        ? VerifyStatus.REJECTED
+        : VerifyStatus.PENDING;
+
+  const submission = await db.$transaction(async (tx) => {
+    const reviewedSubmission = await tx.artisanKycSubmission.update({
+      where: { id: input.id },
+      data: {
+        status: input.status,
+        reviewNote: input.reviewNote,
+        reviewedAt: new Date(),
+      },
+      include: {
+        artisan: true,
+      },
+    });
+
+    const artisan = await tx.artisanProfile.update({
+      where: { id: reviewedSubmission.artisanId },
+      data: {
+        verifyStatus,
+        verifiedAt: verifyStatus === VerifyStatus.APPROVED ? new Date() : null,
+      },
+    });
+
+    return { ...reviewedSubmission, artisan };
   });
 
   await createNotification({
@@ -628,4 +647,74 @@ export const createAdminConversationNote = async (input: {
   });
 
   return { status: 'created' as const, note };
+};
+
+export const createAdminConversationMessage = async (input: {
+  conversationId: string;
+  adminId: string;
+  body: string;
+  imageUrl?: string;
+  imageCloudinaryId?: string;
+}) => {
+  const conversation = await db.conversation.findUnique({
+    where: { id: input.conversationId },
+    include: {
+      artisan: {
+        select: {
+          userId: true,
+        },
+      },
+    },
+  });
+
+  if (!conversation) {
+    return { status: 'missing_conversation' as const };
+  }
+
+  const message = await db.$transaction(async (tx) => {
+    const createdMessage = await tx.message.create({
+      data: {
+        conversationId: input.conversationId,
+        senderId: input.adminId,
+        body: input.body.trim(),
+        imageUrl: input.imageUrl,
+        imageCloudinaryId: input.imageCloudinaryId,
+      },
+      include: {
+        sender: {
+          select: {
+            firebaseUid: true,
+            email: true,
+            phone: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    await tx.conversation.update({
+      where: { id: input.conversationId },
+      data: { updatedAt: new Date() },
+    });
+
+    return createdMessage;
+  });
+
+  const recipients = [conversation.customerId, conversation.artisan?.userId].filter(
+    (userId): userId is string => Boolean(userId)
+  );
+
+  await Promise.all(
+    recipients.map((userId) =>
+      createNotification({
+        userId,
+        type: NotificationType.ADMIN,
+        title: 'Admin joined your conversation',
+        body: 'Bundo support replied in your service chat.',
+        link: '/?view=workspace&section=messages',
+      })
+    )
+  );
+
+  return { status: 'created' as const, message };
 };

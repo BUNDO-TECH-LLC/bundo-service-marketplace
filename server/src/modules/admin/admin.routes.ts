@@ -16,6 +16,7 @@ import {
   countAdminReviews,
   countUsers,
   createCategory,
+  createAdminConversationMessage,
   createAdminConversationNote,
   deleteCategory,
   deleteReviewAndRecalculateRating,
@@ -627,6 +628,45 @@ router.post('/conversations/:id/notes', async (req, res) => {
   return res.status(201).json({
     message: 'Admin note created',
     note: result.note,
+  });
+});
+
+router.post('/conversations/:id/messages', async (req, res) => {
+  const { body, imageUrl, imageCloudinaryId } = req.body;
+  const hasBody = typeof body === 'string' && body.trim().length > 0;
+  const hasImageUrl = typeof imageUrl === 'string' && imageUrl.trim().length > 0;
+
+  if (body !== undefined && typeof body !== 'string') {
+    return res.status(400).json({ message: 'body must be a string' });
+  }
+
+  if (imageUrl !== undefined && !hasImageUrl) {
+    return res.status(400).json({ message: 'imageUrl must be a non-empty string' });
+  }
+
+  if (imageCloudinaryId !== undefined && typeof imageCloudinaryId !== 'string') {
+    return res.status(400).json({ message: 'imageCloudinaryId must be a string' });
+  }
+
+  if (!hasBody && !hasImageUrl) {
+    return res.status(400).json({ message: 'body or imageUrl is required' });
+  }
+
+  const result = await createAdminConversationMessage({
+    conversationId: String(req.params.id),
+    adminId: (req as any).user.firebaseUid,
+    body: hasBody ? body : '',
+    imageUrl: hasImageUrl ? imageUrl : undefined,
+    imageCloudinaryId: imageCloudinaryId || undefined,
+  });
+
+  if (result.status === 'missing_conversation') {
+    return res.status(404).json({ message: 'Conversation not found' });
+  }
+
+  return res.status(201).json({
+    message: 'Admin message sent',
+    chatMessage: result.message,
   });
 });
 

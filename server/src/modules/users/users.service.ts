@@ -22,10 +22,32 @@ export const findOrCreateUser = async (firebaseUser: any) => {
 };
 
 export const updateUserRole = async (firebaseUid: string, role: Role) => {
-  return db.user.update({
+  const user = await db.user.findUnique({
+    where: { firebaseUid },
+  });
+
+  if (!user) {
+    return { status: 'missing_user' as const };
+  }
+
+  if (user.role === role) {
+    return { status: 'updated' as const, user };
+  }
+
+  if (user.role === Role.ARTISAN && role === Role.CUSTOMER) {
+    return { status: 'locked_role' as const };
+  }
+
+  if (user.role === Role.ADMIN) {
+    return { status: 'locked_role' as const };
+  }
+
+  const updated = await db.user.update({
     where: { firebaseUid },
     data: { role },
   });
+
+  return { status: 'updated' as const, user: updated };
 };
 
 export const updateUserFcmToken = async (

@@ -33,6 +33,28 @@ function bookingFitsAvailability(
   });
 }
 
+function bookingThreadMessage(input: {
+  serviceTitle?: string | null;
+  scheduledAt?: Date | null;
+  note?: string | null;
+}) {
+  const parts = [`Booking request opened for ${input.serviceTitle || 'a service'}.`];
+
+  if (input.scheduledAt) {
+    parts.push(`Scheduled for ${input.scheduledAt.toLocaleString('en-NG', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'Africa/Lagos',
+    })}.`);
+  }
+
+  if (input.note?.trim()) {
+    parts.push(`Customer note: ${input.note.trim()}`);
+  }
+
+  return parts.join(' ');
+}
+
 export const createBooking = async (input: {
   customerId: string;
   offeringId: string;
@@ -47,22 +69,52 @@ export const createBooking = async (input: {
     return null;
   }
 
-  const booking = await db.booking.create({
-    data: {
-      customerId: input.customerId,
-      artisanId: offering.artisanId,
-      offeringId: offering.id,
-      scheduledAt: input.scheduledAt,
-      note: input.note,
-    },
-    include: {
-      artisan: true,
-      payment: true,
-      disputes: true,
-      offering: {
-        include: { category: true },
+  const booking = await db.$transaction(async (tx) => {
+    const createdBooking = await tx.booking.create({
+      data: {
+        customerId: input.customerId,
+        artisanId: offering.artisanId,
+        offeringId: offering.id,
+        scheduledAt: input.scheduledAt,
+        note: input.note,
       },
-    },
+      include: {
+        artisan: true,
+        payment: true,
+        disputes: true,
+        offering: {
+          include: { category: true },
+        },
+      },
+    });
+
+    const conversation = await tx.conversation.upsert({
+      where: {
+        customerId_artisanId: {
+          customerId: input.customerId,
+          artisanId: offering.artisanId,
+        },
+      },
+      update: { updatedAt: new Date() },
+      create: {
+        customerId: input.customerId,
+        artisanId: offering.artisanId,
+      },
+    });
+
+    await tx.message.create({
+      data: {
+        conversationId: conversation.id,
+        senderId: input.customerId,
+        body: bookingThreadMessage({
+          serviceTitle: createdBooking.offering?.title,
+          scheduledAt: createdBooking.scheduledAt,
+          note: createdBooking.note,
+        }),
+      },
+    });
+
+    return createdBooking;
   });
 
   const artisan = await db.artisanProfile.findUnique({

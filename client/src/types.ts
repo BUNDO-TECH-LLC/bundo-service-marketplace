@@ -191,6 +191,8 @@ export type Message = {
   conversationId: string;
   senderId: string;
   body: string;
+  imageUrl?: string | null;
+  imageCloudinaryId?: string | null;
   createdAt: string;
   sender?: Pick<ApiUser, 'firebaseUid' | 'email' | 'phone' | 'role'>;
 };

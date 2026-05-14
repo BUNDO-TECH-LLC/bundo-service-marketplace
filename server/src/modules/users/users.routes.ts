@@ -14,11 +14,24 @@ router.patch('/role', verifyFirebaseToken, async (req, res) => {
     });
   }
 
-  const user = await updateUserRole((req as any).user.firebaseUid, role);
+  const result = await updateUserRole((req as any).user.firebaseUid, role);
+
+  if (result.status === 'missing_user') {
+    return res.status(404).json({
+      message: 'User not found',
+    });
+  }
+
+  if (result.status === 'locked_role') {
+    return res.status(409).json({
+      message:
+        'This role change requires admin support. Artisan accounts remain under verification control.',
+    });
+  }
 
   return res.json({
     message: 'Role updated',
-    user,
+    user: result.user,
   });
 });
 

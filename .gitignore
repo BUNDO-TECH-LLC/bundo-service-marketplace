@@ -2,3 +2,5 @@ node_modules/
 dist/
 .env
 *.json.key
+.DS_Store
+.vercel/

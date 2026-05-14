@@ -3,12 +3,85 @@ import db from '../../db/client';
 import { getArtisanProfileByUserId } from '../artisans/artisans.service';
 import { createNotification } from '../notifications/notifications.service';
 
+async function ensureBookingConversationsForUser(input: {
+  firebaseUid: string;
+  role: Role | null;
+}) {
+  if (input.role === Role.ARTISAN) {
+    const artisan = await getArtisanProfileByUserId(input.firebaseUid);
+
+    if (!artisan) {
+      return null;
+    }
+
+    const bookingPairs = await db.booking.findMany({
+      where: { artisanId: artisan.id },
+      distinct: ['customerId', 'artisanId'],
+      select: {
+        customerId: true,
+        artisanId: true,
+      },
+    });
+
+    await Promise.all(
+      bookingPairs.map((pair) =>
+        db.conversation.upsert({
+          where: {
+            customerId_artisanId: {
+              customerId: pair.customerId,
+              artisanId: pair.artisanId,
+            },
+          },
+          update: {},
+          create: {
+            customerId: pair.customerId,
+            artisanId: pair.artisanId,
+          },
+        })
+      )
+    );
+
+    return artisan;
+  }
+
+  const bookingPairs = await db.booking.findMany({
+    where: { customerId: input.firebaseUid },
+    distinct: ['customerId', 'artisanId'],
+    select: {
+      customerId: true,
+      artisanId: true,
+    },
+  });
+
+  await Promise.all(
+    bookingPairs.map((pair) =>
+      db.conversation.upsert({
+        where: {
+          customerId_artisanId: {
+            customerId: pair.customerId,
+            artisanId: pair.artisanId,
+          },
+        },
+        update: {},
+        create: {
+          customerId: pair.customerId,
+          artisanId: pair.artisanId,
+        },
+      })
+    )
+  );
+
+  return null;
+}
+
 export const createMessage = async (input: {
   senderId: string;
   senderRole: Role | null;
   artisanId?: string;
   conversationId?: string;
   body: string;
+  imageUrl?: string;
+  imageCloudinaryId?: string;
 }) => {
   if (input.conversationId) {
     const conversation = await db.conversation.findUnique({
@@ -37,6 +110,8 @@ export const createMessage = async (input: {
           conversationId: conversation.id,
           senderId: input.senderId,
           body: input.body.trim(),
+          imageUrl: input.imageUrl,
+          imageCloudinaryId: input.imageCloudinaryId,
         },
         include: {
           sender: {
@@ -114,6 +189,8 @@ export const createMessage = async (input: {
         conversationId: conversation.id,
         senderId: input.senderId,
         body: input.body.trim(),
+        imageUrl: input.imageUrl,
+        imageCloudinaryId: input.imageCloudinaryId,
       },
       include: {
         sender: {
@@ -151,7 +228,7 @@ export const getConversationsForUser = async (input: {
   role: Role | null;
 }) => {
   if (input.role === Role.ARTISAN) {
-    const artisan = await getArtisanProfileByUserId(input.firebaseUid);
+    const artisan = await ensureBookingConversationsForUser(input);
 
     if (!artisan) {
       return [];
@@ -176,6 +253,8 @@ export const getConversationsForUser = async (input: {
       },
     });
   }
+
+  await ensureBookingConversationsForUser(input);
 
   return db.conversation.findMany({
     where: { customerId: input.firebaseUid },
