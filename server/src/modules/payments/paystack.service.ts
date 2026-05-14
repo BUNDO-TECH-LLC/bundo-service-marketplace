@@ -33,15 +33,15 @@ const paystackRequest = async <T>(
   return data as T;
 };
 
+export const computePaystackSignatureHex = (rawBody: string, secret: string) =>
+  crypto.createHmac('sha512', secret).update(rawBody).digest('hex');
+
 export const verifyPaystackSignature = (rawBody: string, signature?: string) => {
   if (!env.PAYSTACK_SECRET_KEY || !signature) {
     return false;
   }
 
-  const hash = crypto
-    .createHmac('sha512', env.PAYSTACK_SECRET_KEY)
-    .update(rawBody)
-    .digest('hex');
+  const hash = computePaystackSignatureHex(rawBody, env.PAYSTACK_SECRET_KEY);
 
   const expected = Buffer.from(hash, 'hex');
   const received = Buffer.from(signature, 'hex');

@@ -37,44 +37,52 @@ router.post(
       return res.status(400).json({ message: 'bookingId is required' });
     }
 
-    const result = await initializeBookingPayment({
-      bookingId,
-      customerId: (req as any).user.firebaseUid,
-    });
+    try {
+      const result = await initializeBookingPayment({
+        bookingId,
+        customerId: (req as any).user.firebaseUid,
+      });
 
-    if (result.status === 'paystack_not_configured') {
-      return res.status(503).json({ message: 'Paystack is not configured' });
-    }
+      if (result.status === 'paystack_not_configured') {
+        return res.status(503).json({ message: 'Paystack is not configured' });
+      }
 
-    if (result.status === 'missing_booking') {
-      return res.status(404).json({ message: 'Booking not found' });
-    }
+      if (result.status === 'missing_booking') {
+        return res.status(404).json({ message: 'Booking not found' });
+      }
 
-    if (result.status === 'forbidden') {
-      return res.status(403).json({ message: 'You can only pay for your own booking' });
-    }
+      if (result.status === 'forbidden') {
+        return res.status(403).json({ message: 'You can only pay for your own booking' });
+      }
 
-    if (result.status === 'not_payable') {
-      return res.status(409).json({ message: 'Cancelled or declined bookings cannot be paid for' });
-    }
+      if (result.status === 'not_payable') {
+        return res.status(409).json({ message: 'Cancelled or declined bookings cannot be paid for' });
+      }
 
-    if (result.status === 'missing_email') {
-      return res.status(400).json({ message: 'Your account needs an email before payment can start' });
-    }
+      if (result.status === 'missing_email') {
+        return res.status(400).json({ message: 'Your account needs an email before payment can start' });
+      }
 
-    if (result.status === 'already_paid') {
-      return res.json({
-        message: 'Payment already received',
+      if (result.status === 'already_paid') {
+        return res.json({
+          message: 'Payment already received',
+          payment: result.payment,
+          authorizationUrl: result.payment.authorizationUrl,
+        });
+      }
+
+      return res.status(201).json({
+        message: 'Payment initialized',
         payment: result.payment,
         authorizationUrl: result.payment.authorizationUrl,
       });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Paystack initialization failed';
+      return res.status(502).json({
+        message: `Could not start payment with Paystack: ${message}`,
+      });
     }
-
-    return res.status(201).json({
-      message: 'Payment initialized',
-      payment: result.payment,
-      authorizationUrl: result.payment.authorizationUrl,
-    });
   }
 );
 
@@ -120,6 +128,13 @@ router.post('/payments/verify-reference', verifyFirebaseToken, async (req, res) 
 
   if (result.status === 'verification_failed') {
     return res.status(409).json({ message: 'Payment has not been confirmed by Paystack' });
+  }
+
+  if (result.status === 'paystack_not_configured') {
+    return res.status(503).json({
+      message:
+        'Payment confirmation is unavailable: Paystack is not configured, or simulation is disabled. Set PAYSTACK_SECRET_KEY for real payments, or ALLOW_PAYMENT_SIMULATION=true in non-production only for local demos.',
+    });
   }
 
   return res.json({

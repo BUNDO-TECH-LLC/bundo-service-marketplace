@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { Prisma, Role } from '@prisma/client';
-import crypto from 'node:crypto';
 import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
 import { requireRole } from '../../middlewares/requireRole';
 import { getReviewsForArtisan } from '../reviews/reviews.service';
@@ -34,6 +33,7 @@ import {
   updatePortfolioImageForArtisan,
 } from './artisans.service';
 import { env } from '../../config/env';
+import { buildCloudinaryUploadSignature } from '../../utils/cloudinarySignature';
 
 const router = Router();
 
@@ -124,11 +124,10 @@ router.post(
   async (_req, res) => {
     const timestamp = Math.floor(Date.now() / 1000);
     const folder = 'bundo/artisan-portfolio';
-    const paramsToSign = `folder=${folder}&timestamp=${timestamp}`;
-    const signature = crypto
-      .createHash('sha1')
-      .update(`${paramsToSign}${env.CLOUDINARY_API_SECRET}`)
-      .digest('hex');
+    const signature = buildCloudinaryUploadSignature(
+      { folder, timestamp },
+      env.CLOUDINARY_API_SECRET
+    );
 
     return res.json({
       message: 'Upload signature created',

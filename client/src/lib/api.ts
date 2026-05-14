@@ -10,6 +10,19 @@ export class ApiError extends Error {
   }
 }
 
+function parseJsonResponse(text: string): unknown | null {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return null;
+  }
+}
+
 export async function api<T>(
   path: string,
   options: RequestInit & { token?: string } = {}
@@ -40,10 +53,22 @@ export async function api<T>(
   }
 
   const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
+  const data = parseJsonResponse(text);
+
+  if (data === null && text.trim()) {
+    throw new ApiError(
+      `Invalid response from API (${response.status}). The server may be down or returning non-JSON.`,
+      response.status,
+      { rawPreview: text.slice(0, 500) }
+    );
+  }
 
   if (!response.ok) {
-    throw new ApiError(data?.message || 'Request failed', response.status, data);
+    const message =
+      typeof data === 'object' && data !== null && 'message' in data && typeof (data as { message: unknown }).message === 'string'
+        ? (data as { message: string }).message
+        : 'Request failed';
+    throw new ApiError(message, response.status, data);
   }
 
   return data as T;

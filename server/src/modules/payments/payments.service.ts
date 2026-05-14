@@ -8,6 +8,8 @@ import {
 } from '@prisma/client';
 import { env } from '../../config/env';
 import db from '../../db/client';
+import logger from '../../utils/logger';
+import { resolvePaymentConfirmationGate } from './paymentConfirmPolicy';
 import { getArtisanProfileByUserId } from '../artisans/artisans.service';
 import { createNotifications } from '../notifications/notifications.service';
 import {
@@ -215,6 +217,10 @@ export const verifyPaymentReferenceForUser = async (input: {
     return result;
   }
 
+  if (result.status === 'paystack_not_configured') {
+    return result;
+  }
+
   if (result.status === 'already_processed' || result.status === 'processed') {
     return { status: 'verified' as const, payment: result.payment };
   }
@@ -243,7 +249,28 @@ export const markPaymentReferencePaid = async (reference: string) => {
     return { status: 'already_processed' as const, payment };
   }
 
-  if (isPaystackConfigured()) {
+  const gate = resolvePaymentConfirmationGate({
+    paystackConfigured: isPaystackConfigured(),
+    nodeEnv: env.NODE_ENV,
+    allowPaymentSimulation: env.ALLOW_PAYMENT_SIMULATION === 'true',
+  });
+
+  if (gate.action === 'reject') {
+    logger.warn(
+      { reference, bookingId: payment.bookingId },
+      'Payment confirmation blocked: Paystack not configured and simulation disabled'
+    );
+    return { status: 'paystack_not_configured' as const };
+  }
+
+  if (gate.action === 'accept_without_paystack_verify') {
+    logger.warn(
+      { reference, bookingId: payment.bookingId, mode: gate.mode },
+      'Confirming payment without Paystack verification (ALLOW_PAYMENT_SIMULATION)'
+    );
+  }
+
+  if (gate.action === 'verify_with_paystack_api') {
     const verified = await verifyPaystackTransaction(reference);
 
     if (
