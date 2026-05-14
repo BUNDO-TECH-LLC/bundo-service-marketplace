@@ -1,4 +1,4 @@
-import { BookingStatus, NotificationType } from '@prisma/client';
+import { BookingStatus, NotificationType, Prisma } from '@prisma/client';
 import db from '../../db/client';
 import { createNotification } from '../notifications/notifications.service';
 
@@ -36,7 +36,7 @@ export const createReview = async (input: {
     return { status: 'duplicate_review' as const };
   }
 
-  const result = await db.$transaction(async (tx) => {
+  const result = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const review = await tx.review.create({
       data: {
         bookingId: booking.id,

@@ -99,7 +99,7 @@ router.patch('/users/:id/status', async (req, res) => {
       message: 'User status updated',
       user,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2025'
@@ -127,7 +127,7 @@ router.patch('/users/:id/role', async (req, res) => {
       message: 'User role updated',
       user,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2025'
@@ -231,7 +231,7 @@ router.patch('/kyc-submissions/:id/review', async (req, res) => {
       message: 'KYC submission reviewed',
       submission,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2025'
@@ -265,7 +265,7 @@ router.patch('/artisans/:id/verify', async (req, res) => {
       message: 'Artisan verification updated',
       artisan,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2025'
@@ -316,7 +316,7 @@ router.post('/categories', async (req, res) => {
       message: 'Category created',
       category,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2002'
@@ -366,7 +366,7 @@ router.patch('/categories/:id', async (req, res) => {
       message: 'Category updated',
       category,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2025'

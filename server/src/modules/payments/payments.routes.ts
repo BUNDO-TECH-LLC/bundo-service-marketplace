@@ -76,7 +76,7 @@ router.post(
         payment: result.payment,
         authorizationUrl: result.payment.authorizationUrl,
       });
-    } catch (error) {
+    } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : 'Paystack initialization failed';
       return res.status(502).json({
