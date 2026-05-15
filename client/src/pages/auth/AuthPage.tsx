@@ -8,9 +8,11 @@ import {
 } from 'firebase/auth';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthLayout } from '../../layouts/AuthLayout';
+import { SignupRolePicker } from '../../components/auth/SignupRolePicker';
 import { api } from '../../lib/api';
 import { resolveApiSession } from '../../lib/authSession';
 import { auth, firebaseReady } from '../../lib/firebase';
+import { appRoutes } from '../../routes/paths';
 import type { Role } from '../../types';
 import googleLogo from '../../assets/icons/material-icon-theme_google.svg';
 import appleLogo from '../../assets/icons/Vector.svg';
@@ -34,10 +36,10 @@ const errorClassName =
 export function AuthPage({ mode }: AuthPageProps) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-
-  const initialRole = searchParams.get('role') === 'artisan' ? 'ARTISAN' : 'CUSTOMER';
-
-  const [accountKind] = useState<AccountKind>(initialRole);
+  const roleParam = searchParams.get('role');
+  const hasSignupRole = roleParam === 'customer' || roleParam === 'artisan';
+  const accountKind: AccountKind = roleParam === 'artisan' ? 'ARTISAN' : 'CUSTOMER';
+  const [selectedSignupRole, setSelectedSignupRole] = useState<AccountKind | null>(null);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -48,8 +50,37 @@ export function AuthPage({ mode }: AuthPageProps) {
   const [showLoading, setShowLoading] = useState(false);
   const [nextRoute, setNextRoute] = useState('/');
 
-  const title = mode === 'login' ? 'Welcome back!' : 'Create an account';
+  const title =
+    mode === 'login'
+      ? 'Welcome back!'
+      : accountKind === 'ARTISAN'
+        ? 'Create your artisan account'
+        : 'Create an account';
   const action = mode === 'login' ? 'Log in' : 'Get Started';
+
+  const subtitle =
+    mode === 'login' ? (
+      <>
+        Do not have an account?{' '}
+        <Link className="font-medium text-[var(--color-accent-link)] no-underline" to="/create-account">
+          Create account
+        </Link>
+      </>
+    ) : accountKind === 'ARTISAN' ? (
+      <>
+        Signing up as an artisan.{' '}
+        <Link className="font-medium text-[var(--color-accent-link)] no-underline" to={appRoutes.login}>
+          Log in
+        </Link>
+      </>
+    ) : (
+      <>
+        Signing up as a customer.{' '}
+        <Link className="font-medium text-[var(--color-accent-link)] no-underline" to={appRoutes.login}>
+          Log in
+        </Link>
+      </>
+    );
 
   function showLoadingThenNavigate(route: string) {
     setNextRoute(route);
@@ -82,8 +113,6 @@ export function AuthPage({ mode }: AuthPageProps) {
   }
 
   async function ensureRole(token: string, role: AccountKind) {
-    if (role === 'CUSTOMER') return;
-
     await api('/users/role', {
       method: 'PATCH',
       token,
@@ -112,9 +141,11 @@ export function AuthPage({ mode }: AuthPageProps) {
         const session = await resolveApiSession(credential.user);
 
         const destination =
-          session.user.role === 'ARTISAN' || session.user.role === 'ADMIN'
-            ? '/?view=workspace'
-            : '/customer/dashboard';
+          session.user.role === 'ADMIN'
+            ? appRoutes.admin
+            : session.user.role === 'ARTISAN'
+              ? appRoutes.artisanDashboard
+              : appRoutes.customerDashboard;
 
         showLoadingThenNavigate(destination);
         return;
@@ -148,26 +179,35 @@ export function AuthPage({ mode }: AuthPageProps) {
     return <LoadingPage />;
   }
 
+  if (mode === 'signup' && !hasSignupRole) {
+    return (
+      <AuthLayout hideHeader>
+        <SignupRolePicker
+          selectedRole={selectedSignupRole}
+          onSelectRole={(role) => {
+            setSelectedSignupRole(role);
+            setError('');
+          }}
+          onContinue={() => {
+            if (!selectedSignupRole) {
+              setError('Choose whether you want to join as a customer or artisan.');
+              return;
+            }
+
+            navigate(
+              `${appRoutes.signup}?role=${selectedSignupRole === 'ARTISAN' ? 'artisan' : 'customer'}`
+            );
+          }}
+          error={error}
+        />
+      </AuthLayout>
+    );
+  }
+
   return (
     <AuthLayout
       title={title}
-      subtitle={
-        mode === 'login' ? (
-          <>
-            Do not have an account?{' '}
-            <Link className="font-medium text-[var(--color-accent-link)] no-underline" to="/create-account">
-              Create account
-            </Link>
-          </>
-        ) : (
-          <>
-            Already have an account?{' '}
-            <Link className="font-medium text-[var(--color-accent-link)] no-underline" to="/login">
-              Log in
-            </Link>
-          </>
-        )
-      }
+      subtitle={subtitle}
     >
       <div className="grid gap-4">
         <button

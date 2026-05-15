@@ -1,0 +1,324 @@
+.success-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--overlay-dim);
+  backdrop-filter: blur(2px);
+}
+
+.booking-success-dialog {
+  display: grid;
+  width: min(460px, 100%);
+  justify-items: center;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 32px;
+  background: var(--color-white);
+  box-shadow: 0 28px 70px var(--shadow-drawer);
+  text-align: center;
+}
+
+.success-mark {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  border: 3px solid var(--accent);
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 34px;
+  font-weight: 900;
+}
+
+.booking-success-dialog h2,
+.booking-success-dialog p {
+  margin: 0;
+}
+
+.booking-success-dialog h2 {
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+.booking-success-dialog p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.booking-success-dialog small {
+  color: var(--accent-dark);
+  font-weight: 900;
+}
+
+.booking-success-actions {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.booking-success-actions button {
+  padding: 14px 16px;
+  color: var(--color-white);
+  background: var(--accent);
+}
+
+.booking-success-actions .secondary-button {
+  color: var(--color-white);
+  background: var(--ink);
+}
+
+.bookings-page {
+  display: grid;
+  gap: 24px;
+}
+
+.booking-tabs {
+  display: flex;
+  gap: clamp(24px, 7vw, 88px);
+  border-bottom: 2px solid var(--ink);
+  overflow-x: auto;
+}
+
+.booking-tabs button {
+  border-radius: 0;
+  padding: 0 0 18px;
+  color: var(--ink);
+  background: transparent;
+  white-space: nowrap;
+}
+
+.booking-tabs button.active {
+  border-bottom: 3px solid var(--accent);
+}
+
+.booking-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+}
+
+.booking-detail-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 20px;
+  background: var(--color-white);
+  box-shadow: 0 8px 26px var(--shadow-light);
+}
+
+.booking-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 20px;
+}
+
+.bookings-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.admin-status-stack {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+
+.booking-person {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.booking-person > span,
+.booking-person > img {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--color-neutral-soft);
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.booking-person > img {
+  object-fit: cover;
+}
+
+.booking-person h3,
+.booking-person p {
+  margin: 0;
+}
+
+.booking-person p {
+  margin-top: 5px;
+  color: var(--muted);
+}
+
+.booking-status {
+  border-radius: 999px;
+  padding: 8px 10px;
+  color: var(--ink);
+  background: var(--soft);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.booking-status.requested {
+  color: var(--accent-dark);
+  background: var(--accent-soft);
+}
+
+.booking-status.accepted,
+.booking-status.completed {
+  color: var(--color-success);
+  background: var(--success-soft);
+}
+
+.booking-status.cancelled,
+.booking-status.declined {
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+.payment-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 7px 10px;
+  color: var(--accent-dark);
+  background: var(--accent-soft);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.payment-chip.paid_held,
+.payment-chip.released {
+  color: var(--color-success);
+  background: var(--success-soft);
+}
+
+.payment-chip.failed,
+.payment-chip.refunded,
+.payment-chip.partially_refunded {
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+}
+
+.booking-detail-list {
+  display: grid;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  margin: 18px 0 0;
+  padding: 0 0 20px;
+}
+
+.booking-detail-list div {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 16px;
+}
+
+.booking-detail-list dt,
+.booking-detail-list dd {
+  margin: 0;
+}
+
+.booking-detail-list dt {
+  color: var(--ink);
+}
+
+.booking-detail-list dd {
+  color: var(--ink);
+  text-align: right;
+}
+
+.booking-total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid var(--line);
+  padding: 18px 0;
+}
+
+.booking-total-row span,
+.booking-total-row strong {
+  color: var(--ink);
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.booking-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 18px;
+}
+
+.booking-card-actions button {
+  flex: 1;
+  border: 1px solid var(--line);
+  padding: 13px 16px;
+  color: var(--ink);
+  background: var(--color-white);
+}
+
+.booking-card-actions button.primary-action {
+  border-color: var(--ink);
+  color: var(--color-white);
+  background: var(--ink);
+}
+
+.booking-card-actions button:not(.secondary-button):hover {
+  color: var(--color-white);
+  background: var(--ink);
+}
+
+@media (max-width: 900px) {
+  .booking-list {
+    grid-template-columns: 1fr;
+  }
+
+  .bookings-toolbar,
+  .booking-detail-head {
+    align-items: start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 620px) {
+  .booking-detail-list div {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .booking-detail-list dd {
+    text-align: left;
+  }
+
+  .booking-card-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .booking-card-actions button {
+    width: 100%;
+  }
+}

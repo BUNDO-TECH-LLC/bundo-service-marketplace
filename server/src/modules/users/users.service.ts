@@ -14,6 +14,7 @@ export const findOrCreateUser = async (firebaseUser: any) => {
         firebaseUid: uid,
         email: email || null,
         phone: phone_number || null,
+        role: Role.CUSTOMER,
       },
     });
   }

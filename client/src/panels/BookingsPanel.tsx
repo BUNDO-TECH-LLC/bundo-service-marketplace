@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { api } from '../lib/api';
 import { formatMessageTime, money } from '../lib/formatting';
+import { artisanProfileImageUrl } from '../lib/profileImage';
+import { capitalizeLeadingCharacter } from '../lib/userDisplayName';
 import {
   bookingContactName,
   bookingDate,
@@ -13,6 +15,7 @@ import {
 import type { ActionRunner } from '../appTypes';
 import type { Booking } from '../types';
 import { EmptyState } from '../components/EmptyState';
+import { ProfileAvatar } from '../components/ui/ProfileAvatar';
 
 export function BookingsSummary({ bookings, title = 'My bookings' }: { bookings: Booking[]; title?: string }) {
   return (
@@ -327,14 +330,10 @@ export function BookingsPage({
 
       <div className="booking-list">
         {visibleBookings.map((booking) => {
-          const contactName =
-            booking.artisan?.displayName || booking.offering?.artisan?.displayName || 'Bundo professional';
-          const contactInitials = contactName
-            .split(' ')
-            .map((part) => part[0])
-            .join('')
-            .slice(0, 2)
-            .toUpperCase();
+          const contactName = capitalizeLeadingCharacter(
+            booking.artisan?.displayName || booking.offering?.artisan?.displayName || 'Bundo professional'
+          );
+          const contactImageUrl = artisanProfileImageUrl(booking.artisan || booking.offering?.artisan);
           const serviceName = booking.offering?.title || 'Service booking';
           const price = booking.offering?.priceFrom ? money(booking.offering.priceFrom) : 'To be confirmed';
           const paymentStatus = booking.payment?.status;
@@ -352,7 +351,7 @@ export function BookingsPage({
             <article className="booking-detail-card" key={booking.id}>
               <header className="booking-detail-head">
                 <div className="booking-person">
-                  <span>{contactInitials}</span>
+                  <ProfileAvatar name={contactName} imageUrl={contactImageUrl} className="h-[58px] w-[58px]" textClassName="text-lg" />
                   <div>
                     <h3>{contactName}</h3>
                     <p>{booking.offering?.category?.name || serviceName}</p>

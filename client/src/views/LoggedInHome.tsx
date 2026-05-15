@@ -9,6 +9,7 @@ import { userDisplayName } from '../lib/userDisplayName';
 import type { ActionRunner, BookingSuccessState } from '../appTypes';
 import type { ApiUser, Artisan, Booking, Category, Offering } from '../types';
 import { EmptyState } from '../components/EmptyState';
+import { AppIcon } from '../components/ui/AppIcon';
 
 export function LoggedInHome({
   me,
@@ -119,7 +120,7 @@ export function LoggedInHome({
           <div className="quick-service-grid" aria-label="Quick service picks">
             {categories.slice(0, 6).map((category) => (
               <button key={category.id} type="button" onClick={() => void onBrowse(category.id)}>
-                <span>{categoryIcon(category.iconKey)}</span>
+                <span><AppIcon icon={categoryIcon(category.iconKey)} /></span>
                 {category.name}
               </button>
             ))}
@@ -154,7 +155,7 @@ export function LoggedInHome({
           {categories.length === 0 && <span className="muted">Categories will appear here after seeding.</span>}
           {categories.slice(0, 7).map((category) => (
             <button key={category.id} type="button" onClick={() => void onBrowse(category.id)}>
-              <span>{categoryIcon(category.iconKey)}</span>
+              <span><AppIcon icon={categoryIcon(category.iconKey)} /></span>
               {category.name}
             </button>
           ))}

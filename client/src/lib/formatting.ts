@@ -1,3 +1,5 @@
+export { dayLabels } from '../constants/data';
+
 export function money(value: number) {
   return new Intl.NumberFormat('en-NG', {
     style: 'currency',
@@ -5,8 +7,6 @@ export function money(value: number) {
     maximumFractionDigits: 0,
   }).format(value);
 }
-
-export const dayLabels = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export function formatMessageTime(value: string) {
   return new Intl.DateTimeFormat('en', {

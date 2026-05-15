@@ -8,15 +8,15 @@ import {
   signOut,
   User,
 } from 'firebase/auth';
-import { api, ApiError } from '../lib/api';
-import { resolveApiSession } from '../lib/authSession';
-import { auth, firebaseReady } from '../lib/firebase';
+import { api, ApiError } from '../../../lib/api';
+import { resolveApiSession } from '../../../lib/authSession';
+import { auth, firebaseReady } from '../../../lib/firebase';
 import {
   enableBrowserPush,
   ensureBrowserPushToken,
   hasPushConfig,
   subscribeToForegroundMessages,
-} from '../lib/messaging';
+} from '../../../lib/messaging';
 import {
   ApiUser,
   Artisan,
@@ -35,8 +35,11 @@ import {
   Review,
   Role,
   AvailabilitySlot,
-} from '../types';
-import bundoLogo from '../assets/BundoLogo.png';
+} from '../../../types';
+import bundoLogo from '../../../assets/BundoLogo.png';
+import { AppIcon } from '../../../components/ui/AppIcon';
+import { dayLabels, helpTopics, nigeriaStates } from '../../../constants/data';
+import { categoryIcon } from '../../../lib/categoryIcon';
 
 type View = 'home' | 'marketplace' | 'workspace' | 'admin' | 'help' | 'artisan-profile';
 type WorkspaceSection = 'overview' | 'bookings' | 'messages' | 'offers' | 'notifications';
@@ -49,46 +52,6 @@ const heroImage =
 const phoneImage =
   'https://images.unsplash.com/photo-1551650975-87deedd944c3?auto=format&fit=crop&w=1000&q=80';
 
-const nigeriaStates = [
-  'Abia',
-  'Adamawa',
-  'Akwa Ibom',
-  'Anambra',
-  'Bauchi',
-  'Bayelsa',
-  'Benue',
-  'Borno',
-  'Cross River',
-  'Delta',
-  'Ebonyi',
-  'Edo',
-  'Ekiti',
-  'Enugu',
-  'Gombe',
-  'Imo',
-  'Jigawa',
-  'Kaduna',
-  'Kano',
-  'Katsina',
-  'Kebbi',
-  'Kogi',
-  'Kwara',
-  'Lagos',
-  'Nasarawa',
-  'Niger',
-  'Ogun',
-  'Ondo',
-  'Osun',
-  'Oyo',
-  'Plateau',
-  'Rivers',
-  'Sokoto',
-  'Taraba',
-  'Yobe',
-  'Zamfara',
-  'FCT',
-];
-
 function money(value: number) {
   return new Intl.NumberFormat('en-NG', {
     style: 'currency',
@@ -96,8 +59,6 @@ function money(value: number) {
     maximumFractionDigits: 0,
   }).format(value);
 }
-
-const dayLabels = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 function formatMessageTime(value: string) {
   return new Intl.DateTimeFormat('en', {
@@ -549,10 +510,10 @@ function LandingPage() {
   );
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <button className="brand" onClick={() => setView('home')}>
-          <img className="brand-logo" src={bundoLogo} alt="Bundo logo" />
+    <div className="landing-shell">
+      <header className="landing-topbar">
+        <button className="landing-brand" onClick={() => setView('home')}>
+          <img className="landing-brand-logo" src={bundoLogo} alt="Bundo logo" />
           <span>Bundo</span>
         </button>
         <nav aria-label="Main navigation">
@@ -579,42 +540,6 @@ function LandingPage() {
             }}
           >
             Help
-          </button>
-          <button
-            className="professional-link"
-            onClick={() => {
-              if (!me) {
-                navigate('/create-account?role=artisan');
-                return;
-              }
-
-              if (me.role === 'ADMIN') {
-                setNotice('Admin accounts already have marketplace control access.');
-                setView('admin');
-                return;
-              }
-
-              if (me.role === 'ARTISAN') {
-                setWorkspaceSection('offers');
-                setView('workspace');
-                setNotice('Welcome back to your artisan workspace.');
-                return;
-              }
-
-              withNotice(async () => {
-                await api('/users/role', {
-                  method: 'PATCH',
-                  token,
-                  body: JSON.stringify({ role: 'ARTISAN' }),
-                });
-                const nextUser = await refreshMe();
-                await loadPrivateData(token, nextUser || me);
-                setWorkspaceSection('overview');
-                setView('workspace');
-              }, 'Your account is now set up for artisan onboarding');
-            }}
-          >
-            Register as a professional
           </button>
         </nav>
         <AuthBox
@@ -676,7 +601,7 @@ function LandingPage() {
       )}
 
       {view === 'marketplace' && (
-        <main className="page">
+        <main className="landing-page">
           <section className="section-head">
             <p className="eyebrow">Book trusted help</p>
             <h1>Find skilled professionals near you</h1>
@@ -687,7 +612,7 @@ function LandingPage() {
             </p>
           </section>
 
-          <section className="toolbar" aria-label="Marketplace summary">
+          <section className="landing-toolbar" aria-label="Marketplace summary">
             {selectedState && <span>Location: {selectedState}</span>}
             {searchTerm && <span>Search: {searchTerm}</span>}
             {selectedCategoryId && (
@@ -768,7 +693,7 @@ function LandingPage() {
                   <h3>{artisan.displayName}</h3>
                   <p>{artisan.bio || 'Trusted professional'}</p>
                   <p className="muted">{artisan.city}{artisan.area ? `, ${artisan.area}` : ''}</p>
-                  <p className="rating">Rating {artisan.avgRating || 0} · {artisan.ratingCount} reviews</p>
+                  <p className="rating">Rating {artisan.avgRating || 0} -+ {artisan.ratingCount} reviews</p>
                   <button className="text-button" onClick={() => openArtisanProfile(artisan.id)}>View profile</button>
                 </div>
               </article>
@@ -803,7 +728,7 @@ function LandingPage() {
       )}
 
       {view === 'workspace' && (
-        <main className={`page workspace-page ${workspaceSection === 'messages' ? 'messages-workspace' : ''}`}>
+        <main className={`landing-page workspace-page ${workspaceSection === 'messages' ? 'messages-workspace' : ''}`}>
           {workspaceSection !== 'messages' && (
             <section className="section-head">
               <p className="eyebrow">Workspace</p>
@@ -927,7 +852,7 @@ function LandingPage() {
       )}
 
       {view === 'admin' && (
-        <main className="page">
+        <main className="landing-page">
           <section className="section-head">
             <p className="eyebrow">Admin</p>
             <h1>Marketplace control center</h1>
@@ -1221,7 +1146,7 @@ function Hero({
   onBrowse,
 }: {
   selectedState: string;
-  states: string[];
+  states: readonly string[];
   onStateChange: (state: string) => Promise<void>;
   searchTerm: string;
   onSearchTermChange: (value: string) => void;
@@ -1234,15 +1159,15 @@ function Hero({
   }
 
   return (
-    <section className="hero">
-      <div className="hero-media">
+      <section className="hero">
+      <div className="landing-hero-media">
         <img src={heroImage} alt="Professional cleaning a bright home" />
       </div>
-      <div className="hero-copy">
+      <div className="landing-hero-copy">
         <p className="eyebrow">BUNDO MARKETPLACE</p>
         <h1>Quality home services, on demand</h1>
         <p>Experienced professionals for the work that keeps daily life moving.</p>
-        <form className="hero-search" onSubmit={submitSearch}>
+        <form className="landing-hero-search" onSubmit={submitSearch}>
           <div className="search-heading">
             <label htmlFor="service-state">Where do you need a service?</label>
             <span>Find trusted help near you</span>
@@ -1314,18 +1239,20 @@ function WhySection() {
 function ServicesSection({ categories, onBrowse }: { categories: Category[]; onBrowse: () => void }) {
   return (
     <section className="services">
-      <div className="section-title-row">
+      <div className="landing-section-title-row">
         <div>
           <p className="eyebrow">Explore</p>
           <h2>Services offered</h2>
         </div>
         <button onClick={onBrowse}>View all</button>
       </div>
-      <div className="chips">
+      <div className="landing-chips">
         {categories.length === 0 && <span className="muted">Categories will appear here after seeding.</span>}
         {categories.map((category) => (
           <button key={category.id} onClick={onBrowse}>
-            <span>{category.iconKey || '•'}</span>
+            <span>
+              <AppIcon icon={categoryIcon(category.iconKey)} size={20} />
+            </span>
             {category.name}
           </button>
         ))}
@@ -1354,7 +1281,7 @@ function MarketplaceFilters({
 }: {
   categories: Category[];
   selectedState: string;
-  states: string[];
+  states: readonly string[];
   searchTerm: string;
   selectedCategoryId: string;
   priceMin: string;
@@ -1371,7 +1298,7 @@ function MarketplaceFilters({
 }) {
   return (
     <section className="marketplace-filters">
-      <div className="section-title-row">
+      <div className="landing-section-title-row">
         <div>
           <p className="eyebrow">Refine results</p>
           <h2>Search with more control</h2>
@@ -1440,7 +1367,7 @@ function MarketplaceFilters({
 function MarketplacePreview({ offerings, onBrowse }: { offerings: Offering[]; onBrowse: () => void }) {
   return (
     <section className="preview-band">
-      <div className="section-title-row">
+      <div className="landing-section-title-row">
         <div>
           <p className="eyebrow">Marketplace</p>
           <h2>Ready to book</h2>
@@ -1495,7 +1422,7 @@ function OfferingGrid({
             {money(offering.priceFrom)}
             {offering.priceTo ? ` - ${money(offering.priceTo)}` : ''}
           </p>
-          <p className="muted">{offering.artisan?.displayName || 'Approved artisan'} · {offering.artisan?.area || 'Bundo'}</p>
+          <p className="muted">{offering.artisan?.displayName || 'Approved artisan'} -+ {offering.artisan?.area || 'Bundo'}</p>
           <div className="actions">
             <button
               className="secondary-button"
@@ -1813,220 +1740,13 @@ function Footer({
       <h4>Currently live in</h4>
       <div className="city-list">{cities.map((city) => <span key={city}>{city}</span>)}</div>
       <div className="footer-bottom">
-        <img className="brand-logo" src={bundoLogo} alt="Bundo logo" />
+        <img className="landing-brand-logo" src={bundoLogo} alt="Bundo logo" />
         <span>Bundo</span>
-        <small>© 2026 Bundo Marketplace</small>
+        <small>-� 2026 Bundo Marketplace</small>
       </div>
     </footer>
   );
 }
-
-const helpTopics = [
-  {
-    id: 'getting-started',
-    icon: '01',
-    title: 'Getting started with Bundo',
-    sections: [
-      {
-        heading: 'About Bundo',
-        questions: [
-          ['What is Bundo?', 'Bundo connects customers with approved local artisans for home and lifestyle services. Customers discover services, message artisans, request bookings, and leave reviews after completed jobs.'],
-          ['Where does Bundo work?', 'Bundo is built for Nigeria. Start by selecting your state, then browse available offerings from approved artisans in that location.'],
-        ],
-      },
-      {
-        heading: 'Account setup',
-        questions: [
-          ['How do I create an account?', 'Use Login or Sign up in the top navigation. After signing in, choose whether you want to continue as a customer or artisan from your dashboard.'],
-          ['Can one account become an artisan?', 'Yes. Choose the artisan role, create a public artisan profile, then add offerings customers can book.'],
-        ],
-      },
-    ],
-  },
-  {
-    id: 'customers',
-    icon: '02',
-    title: 'Booking services as a customer',
-    sections: [
-      {
-        heading: 'Finding professionals',
-        questions: [
-          ['How do I find a service?', 'Select your state from the homepage dropdown, open the marketplace, then compare available offerings and approved artisan profiles.'],
-          ['What should I check before booking?', 'Check the service price, artisan location, rating count, profile details, and send a message if you need more information.'],
-        ],
-      },
-      {
-        heading: 'Bookings',
-        questions: [
-          ['How do I place a booking?', 'Sign in as a customer, open a service card, and select Book. Your booking request appears in your customer dashboard.'],
-          ['Can I chat before booking?', 'Yes. Use Message on a service card to start a conversation with the artisan before requesting the service.'],
-        ],
-      },
-    ],
-  },
-  {
-    id: 'artisans',
-    icon: '03',
-    title: 'Working as an artisan',
-    sections: [
-      {
-        heading: 'Profile setup',
-        questions: [
-          ['How do I become an artisan?', 'Sign in, choose the artisan role, then create your artisan profile with display name, bio, state or city, area, latitude, and longitude.'],
-          ['When will customers see my profile?', 'Your profile becomes publicly discoverable after admin approval. This helps keep the marketplace trustworthy.'],
-        ],
-      },
-      {
-        heading: 'Offerings',
-        questions: [
-          ['How do I list a service?', 'From the artisan dashboard, choose a category, add the service title, description, and price range, then create the offering.'],
-          ['Can customers message me?', 'Yes. Customer messages appear in your conversations, and you can reply back inside the thread.'],
-        ],
-      },
-    ],
-  },
-  {
-    id: 'trust',
-    icon: '04',
-    title: 'Trust, reviews, and safety',
-    sections: [
-      {
-        heading: 'Reviews',
-        questions: [
-          ['Who can leave a review?', 'Only customers can review an artisan, and reviews are tied to completed bookings.'],
-          ['Why do ratings matter?', 'Ratings help customers choose reliable artisans and help strong professionals build credibility.'],
-        ],
-      },
-      {
-        heading: 'Marketplace safety',
-        questions: [
-          ['How does Bundo protect users?', 'Bundo uses role-based access, verified artisan profiles, admin moderation, booking history, and conversation records.'],
-          ['Can admin review chats?', 'Admins can inspect conversations and add private operational notes when support or moderation is needed.'],
-        ],
-      },
-    ],
-  },
-  {
-    id: 'payments',
-    icon: '05',
-    title: 'Payments, held funds, and payouts',
-    sections: [
-      {
-        heading: 'Customer payments',
-        questions: [
-          ['How does Bundo handle payment?', 'Customers pay through Paystack. Once the transaction is confirmed, Bundo marks the payment as held while the booking is still in progress.'],
-          ['When does the artisan get paid?', 'Bundo releases payout after the service is completed and the booking is reviewed on the operations side. This helps reduce fraud and incomplete-service risk.'],
-          ['Does Bundo store card details?', 'No. Card and payment authorization are handled by Paystack. Bundo stores payment references and booking-linked status updates.'],
-        ],
-      },
-      {
-        heading: 'Payouts',
-        questions: [
-          ['How does an artisan receive payout?', 'An artisan adds a verified Nigerian payout account in their workspace. Once a held payment is approved for release, Bundo sends the payout to that account.'],
-          ['Why might payout be delayed?', 'Payout may be delayed if the booking is not completed, a dispute is open, the payout account is missing, or internal review is still ongoing.'],
-        ],
-      },
-    ],
-  },
-  {
-    id: 'disputes',
-    icon: '06',
-    title: 'Disputes and refunds',
-    sections: [
-      {
-        heading: 'Dispute flow',
-        questions: [
-          ['When should I raise a dispute?', 'Raise a dispute when payment has been secured but the service outcome is contested, incomplete, or materially different from what was agreed.'],
-          ['Who can raise a dispute?', 'The booking owner and the assigned artisan can open a dispute on the booking while payment is still held.'],
-        ],
-      },
-      {
-        heading: 'Refund decisions',
-        questions: [
-          ['What outcomes are possible?', 'Bundo can release payout to the artisan, issue a full refund to the customer, or issue a partial refund depending on the review outcome.'],
-          ['How are decisions recorded?', 'Dispute outcomes are logged in the booking, payment history, and admin tooling so there is a clear internal audit trail.'],
-        ],
-      },
-    ],
-  },
-  {
-    id: 'cancellations',
-    icon: '07',
-    title: 'Cancellations and rescheduling',
-    sections: [
-      {
-        heading: 'Before service starts',
-        questions: [
-          ['Can I cancel a booking?', 'Yes. Customers can cancel a booking while it is still requested or accepted.'],
-          ['Can I reschedule a booking?', 'Yes. Customers and artisans can reschedule a requested or accepted booking. If the artisan has active availability slots, the new time must fit those availability windows.'],
-        ],
-      },
-      {
-        heading: 'Operational rules',
-        questions: [
-          ['What happens after completion?', 'Completed bookings are not meant to be casually rewritten. Changes after completion should go through support and dispute handling instead.'],
-          ['Why are time windows checked?', 'Availability checks reduce missed appointments and help keep booking promises aligned with the artisan’s declared working hours.'],
-        ],
-      },
-    ],
-  },
-  {
-    id: 'artisan-standards',
-    icon: '08',
-    title: 'Artisan standards and KYC',
-    sections: [
-      {
-        heading: 'Verification and trust',
-        questions: [
-          ['Why does Bundo ask for KYC?', 'KYC helps Bundo confirm artisan identity before scaling profile visibility, payments, and payouts. It strengthens trust for customers and reduces fraud risk.'],
-          ['What does an artisan submit?', 'The current flow supports legal name, document type, document number, identity document image, optional selfie image, and address details for review.'],
-        ],
-      },
-      {
-        heading: 'Review outcomes',
-        questions: [
-          ['What KYC outcomes can happen?', 'A submission can be approved, rejected, or returned with changes requested. Artisans are notified in their workspace when the review result changes.'],
-          ['Does KYC replace profile approval?', 'No. KYC supports the broader trust workflow. Admin verification and marketplace approval still matter for public discovery and payout readiness.'],
-        ],
-      },
-    ],
-  },
-  {
-    id: 'privacy',
-    icon: '09',
-    title: 'Privacy and platform rules',
-    sections: [
-      {
-        heading: 'Data handling',
-        questions: [
-          ['What account data does Bundo keep?', 'Bundo stores the minimum account, booking, review, payout, and notification data needed to operate the marketplace and support users.'],
-          ['Who can see private conversation details?', 'Customers and the assigned artisan can see their thread. Admins can inspect conversations for moderation, support, fraud prevention, and dispute handling.'],
-        ],
-      },
-      {
-        heading: 'Marketplace rules',
-        questions: [
-          ['Can Bundo restrict accounts?', 'Yes. Bundo may restrict accounts involved in abuse, fraud, repeated cancellations, impersonation, or policy violations.'],
-          ['Why do platform rules matter?', 'A service marketplace depends on trust. Clear platform rules help protect customers, reliable artisans, and payment operations.'],
-        ],
-      },
-    ],
-  },
-  {
-    id: 'support',
-    icon: '10',
-    title: 'Support and account issues',
-    sections: [
-      {
-        heading: 'Getting help',
-        questions: [
-          ['What if something goes wrong?', 'Use the conversation thread first so there is a clear record. Admin support can review chats and booking context when needed.'],
-          ['What if my account is restricted?', 'An admin may restrict accounts that violate marketplace rules. Contact support with your account email and a short explanation.'],
-        ],
-      },
-    ],
-  },
-];
 
 function HelpCenter({
   activeTopicId,
@@ -2057,9 +1777,9 @@ function HelpCenter({
             <div className="help-topic-list">
               {helpTopics.map((topic) => (
                 <button key={topic.id} className="help-topic-row" onClick={() => onOpenTopic(topic.id)}>
-                  <span>{topic.icon}</span>
+                  <span><AppIcon icon={topic.icon} size={18} /></span>
                   <strong>{topic.title}</strong>
-                  <em>&gt;</em>
+                  <em><AppIcon icon="mdi:chevron-right" size={20} /></em>
                 </button>
               ))}
             </div>
@@ -2489,7 +2209,7 @@ function ArtisanPanel({
           <div className="payment-note success">
             <strong>{payoutAccount.accountName || 'Verified account'}</strong>
             <span>
-              {payoutAccount.bankName || payoutAccount.bankCode} · {payoutAccount.accountNumber}
+              {payoutAccount.bankName || payoutAccount.bankCode} -+ {payoutAccount.accountNumber}
             </span>
           </div>
         )}
@@ -2514,7 +2234,7 @@ function ArtisanPanel({
             <strong>{offering.title}</strong>
             <span>
               {money(offering.priceFrom)}
-              {offering.category?.name ? ` · ${offering.category.name}` : ''}
+              {offering.category?.name ? ` -+ ${offering.category.name}` : ''}
             </span>
           </div>
         ))}
@@ -2582,7 +2302,7 @@ function ArtisanPanel({
         {availabilitySlots.map((slot) => (
           <div className="list-item" key={slot.id}>
             <strong>
-              {dayLabels[slot.dayOfWeek]} · {slot.startTime} - {slot.endTime}
+              {dayLabels[slot.dayOfWeek]} -+ {slot.startTime} - {slot.endTime}
             </strong>
             <span>{slot.isActive ? 'Active' : 'Paused'}</span>
             <div className="actions">
@@ -3603,7 +3323,9 @@ function ChatPanel({
         <section className="chatbox">
           {!activeConversation && (
             <div className="chat-empty">
-              <span className="conversation-avatar large">B</span>
+              <span className="conversation-avatar large">
+                <AppIcon icon="mdi:chat-processing-outline" size={28} />
+              </span>
               <h3>Select a conversation</h3>
               <p>Choose a thread from the left to read messages and send replies.</p>
             </div>

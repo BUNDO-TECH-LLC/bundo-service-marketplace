@@ -1,5 +1,7 @@
 import { api } from '../lib/api';
 import type { ActionRunner, AdminCategoryRecord } from '../appTypes';
+import { AppIcon } from '../components/ui/AppIcon';
+import { categoryIcon } from '../lib/categoryIcon';
 
 export function AdminCatalogPanel({
   token,
@@ -19,7 +21,7 @@ export function AdminCatalogPanel({
     if (!name) return;
     const slug = window.prompt('Category slug', name.toLowerCase().trim().replace(/\s+/g, '-'));
     if (!slug) return;
-    const iconKey = window.prompt('Icon key', 'service');
+    const iconKey = window.prompt('Iconify icon name', 'solar:widget-5-bold');
     if (!iconKey) return;
 
     await api('/admin/categories', {
@@ -35,7 +37,7 @@ export function AdminCatalogPanel({
     if (!name) return;
     const slug = window.prompt('Update category slug', category.slug);
     if (!slug) return;
-    const iconKey = window.prompt('Update icon key', category.iconKey);
+    const iconKey = window.prompt('Update Iconify icon name', category.iconKey);
     if (!iconKey) return;
 
     await api(`/admin/categories/${category.id}`, {
@@ -76,11 +78,14 @@ export function AdminCatalogPanel({
                 <h4>{category.name}</h4>
                 <p>{category.slug}</p>
               </div>
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[var(--color-accent-wash)] text-[var(--color-accent-bright)]">
+                <AppIcon icon={categoryIcon(category.iconKey)} size={20} />
+              </span>
               <span className="booking-status">{category._count?.offerings || 0} offerings</span>
             </div>
             <dl className="admin-inline-list">
               <div>
-                <dt>Icon key</dt>
+                <dt>Iconify icon</dt>
                 <dd>{category.iconKey}</dd>
               </div>
               <div>

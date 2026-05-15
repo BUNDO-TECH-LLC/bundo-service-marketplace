@@ -1,0 +1,881 @@
+.artisan-setup-page {
+  min-height: calc(100vh - 66px);
+  padding: 140px clamp(20px, 8vw, 120px) 72px;
+  background: var(--color-white);
+}
+
+.artisan-dashboard-page {
+  min-height: calc(100vh - 66px);
+  padding: 48px clamp(20px, 8vw, 120px) 72px;
+  background: var(--color-white);
+}
+
+.artisan-setup-topline {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  min-height: 92px;
+  margin: 0;
+  padding: 18px clamp(20px, 8vw, 120px);
+  background: var(--color-white);
+}
+
+.setup-brand {
+  color: var(--ink);
+}
+
+.artisan-setup-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 52px;
+}
+
+.artisan-setup-head h1,
+.artisan-dashboard-hero h1 {
+  margin: 0;
+  font-size: 42px;
+  font-weight: 500;
+  line-height: 1.15;
+}
+
+.artisan-setup-head strong {
+  color: var(--accent);
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.artisan-stepper {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 56px;
+}
+
+.artisan-stepper button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--ink);
+  background: transparent;
+  font-size: 22px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.artisan-stepper button::after {
+  display: block;
+  flex: 1;
+  height: 1px;
+  content: "";
+  background: var(--color-text-faint);
+}
+
+.artisan-stepper button:last-child::after {
+  display: none;
+}
+
+.artisan-stepper span {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--ink);
+  background: var(--color-neutral-soft);
+}
+
+.artisan-stepper .active {
+  color: var(--accent);
+}
+
+.artisan-stepper .active span {
+  color: var(--color-white);
+  background: var(--color-accent-button);
+}
+
+.artisan-review-note {
+  max-width: 820px;
+  margin: -24px auto 28px;
+}
+
+.artisan-setup-card {
+  display: grid;
+  width: min(100%, 820px);
+  gap: 12px;
+  border: 1px solid var(--color-input-border);
+  border-radius: 14px;
+  margin: 0 auto;
+  padding: 34px 42px;
+  background: var(--color-white);
+}
+
+.artisan-setup-card.wide,
+.artisan-setup-card.media-step,
+.artisan-setup-card.availability-step {
+  width: min(100%, 860px);
+  border: 0;
+  padding-top: 0;
+}
+
+.artisan-setup-card h2 {
+  margin: 0 0 6px;
+  font-size: 30px;
+  font-weight: 500;
+}
+
+.artisan-setup-card h3 {
+  margin: 20px 0 2px;
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.artisan-setup-card p,
+.artisan-setup-card small {
+  color: var(--muted);
+}
+
+.artisan-setup-card label {
+  display: grid;
+  gap: 8px;
+  color: var(--color-text-faint);
+}
+
+.artisan-setup-card label > span {
+  color: var(--accent);
+}
+
+.artisan-setup-card input,
+.artisan-setup-card select,
+.artisan-setup-card textarea {
+  min-width: 0;
+  border: 1px solid var(--color-input-border);
+  border-radius: 8px;
+  padding: 13px 16px;
+  color: var(--ink);
+  background: var(--color-white);
+}
+
+.artisan-setup-card textarea {
+  min-height: 150px;
+  resize: vertical;
+}
+
+.location-link {
+  justify-self: start;
+  padding: 0;
+  color: var(--accent);
+  background: transparent;
+}
+
+.terms-row {
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 12px !important;
+  margin-top: 26px;
+}
+
+.terms-row input {
+  width: 20px;
+  margin-top: 2px;
+}
+
+.terms-row span {
+  color: var(--muted) !important;
+}
+
+.setup-two-col {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.setup-package-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.setup-package-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  padding: 18px;
+  background: var(--color-white);
+}
+
+.setup-package-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.setup-package-head h3 {
+  margin: 0;
+}
+
+.setup-package-head button {
+  padding: 0;
+  color: var(--color-danger);
+  background: transparent;
+}
+
+.orange-note {
+  color: var(--accent) !important;
+}
+
+.full-orange {
+  width: 100%;
+  margin-top: 18px;
+  padding: 18px;
+  color: var(--color-white);
+  background: var(--color-accent-button);
+}
+
+.profile-upload {
+  position: relative;
+  display: grid !important;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  border: 1px dashed var(--color-input-border);
+  border-radius: 14px;
+  padding: 18px;
+}
+
+.profile-upload strong {
+  border-radius: 8px;
+  padding: 12px 18px;
+  color: var(--color-white);
+  background: var(--color-ink);
+}
+
+.profile-upload input,
+.portfolio-upload-tile input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.setup-portfolio-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 22px;
+  margin-top: 14px;
+}
+
+.portfolio-upload-tile,
+.portfolio-placeholder,
+.setup-portfolio-grid img {
+  position: relative;
+  display: grid;
+  aspect-ratio: 1.1 / 1;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 8px;
+  color: var(--accent);
+  background: var(--color-neutral-soft);
+  object-fit: cover;
+}
+
+.portfolio-upload-tile {
+  border: 1px dashed var(--accent);
+  background: var(--color-accent-wash);
+  font-weight: 800;
+}
+
+.portfolio-placeholder {
+  color: var(--color-text-faint);
+}
+
+.day-picker,
+.availability-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+}
+
+.day-picker button,
+.availability-dots span {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--ink);
+  background: var(--color-neutral-soft);
+  font-size: 24px;
+  font-weight: 500;
+}
+
+.day-picker button.active,
+.availability-dots span.active {
+  color: var(--color-white);
+  background: var(--color-accent-button);
+}
+
+.artisan-setup-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 46px;
+}
+
+.artisan-setup-actions button {
+  width: auto;
+  min-width: 92px;
+  padding: 14px 28px;
+  color: var(--color-white);
+  background: var(--color-accent-button);
+}
+
+.artisan-setup-actions .secondary-button {
+  background: var(--color-ink);
+}
+
+.artisan-dashboard-hero {
+  display: grid;
+  gap: 36px;
+}
+
+.artisan-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 28px;
+}
+
+.artisan-stat-card,
+.artisan-soft-card {
+  display: grid;
+  gap: 18px;
+  border-radius: 8px;
+  padding: 22px;
+  background: var(--color-soft);
+}
+
+.artisan-stat-card span,
+.artisan-stat-card small {
+  color: var(--color-text-faint);
+}
+
+.artisan-stat-card strong {
+  font-size: 40px;
+  font-weight: 500;
+}
+
+.artisan-stat-card small,
+.summary-list dd {
+  color: var(--accent);
+}
+
+.artisan-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 0.9fr);
+  gap: 24px;
+  margin-top: 28px;
+}
+
+.artisan-request-stack,
+.artisan-side-stack {
+  display: grid;
+  align-content: start;
+  gap: 24px;
+}
+
+.artisan-request-card {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 18px;
+  border: 1px solid var(--color-input-border);
+  border-radius: 8px;
+  padding: 22px;
+  background: var(--color-white);
+}
+
+.artisan-request-card h3,
+.artisan-request-card p {
+  margin: 0;
+}
+
+.artisan-request-card small {
+  color: var(--accent);
+}
+
+.summary-list {
+  display: grid;
+  gap: 20px;
+}
+
+.summary-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.summary-list dt {
+  color: var(--color-text-faint);
+}
+
+.quick-links button {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--color-input-border);
+  border-radius: 0;
+  padding: 12px 0;
+  color: var(--color-muted);
+  background: transparent;
+}
+
+.artisan-jobs-page,
+.artisan-job-detail-page,
+.artisan-reviews-page,
+.artisan-profile-settings-page {
+  display: grid;
+  gap: 28px;
+}
+
+.artisan-jobs-head h2,
+.artisan-job-detail-head h2,
+.artisan-reviews-page > h2 {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 500;
+}
+
+.artisan-jobs-head p,
+.artisan-job-detail-head p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.artisan-tabs {
+  border-bottom: 0;
+}
+
+.artisan-job-list {
+  display: grid;
+  gap: 24px;
+}
+
+.artisan-job-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.1fr) minmax(220px, 1.4fr) auto auto auto;
+  align-items: center;
+  gap: 20px;
+  border: 1px solid var(--color-input-border);
+  border-radius: 8px;
+  padding: 18px;
+  background: var(--color-white);
+}
+
+.artisan-job-row > p {
+  color: var(--ink);
+}
+
+.artisan-job-row button,
+.artisan-job-actions button {
+  width: auto;
+  padding: 15px 22px;
+  color: var(--color-white);
+  background: var(--color-accent-button);
+}
+
+.artisan-job-row .secondary-button,
+.artisan-job-actions .secondary-button {
+  background: var(--color-ink);
+}
+
+.artisan-job-detail-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.artisan-job-customer,
+.artisan-job-detail-card {
+  width: min(100%, 760px);
+  margin: 0 auto;
+}
+
+.artisan-job-customer {
+  display: grid;
+  gap: 16px;
+}
+
+.artisan-job-detail-card {
+  border: 1px solid var(--color-input-border);
+  border-radius: 8px;
+  padding: 28px;
+  background: var(--color-white);
+}
+
+.artisan-job-detail-card h3 {
+  margin-top: 0;
+  font-size: 26px;
+  font-weight: 500;
+}
+
+.artisan-job-detail-card dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+}
+
+.artisan-job-detail-card .full {
+  grid-column: 1 / -1;
+}
+
+.artisan-job-detail-card dt {
+  color: var(--color-text-faint);
+}
+
+.artisan-job-detail-card dd {
+  margin: 8px 0 0;
+}
+
+.artisan-job-detail-card .full dd {
+  min-height: 120px;
+  border: 1px solid var(--color-input-border);
+  border-radius: 8px;
+  padding: 14px;
+  color: var(--muted);
+}
+
+.artisan-job-actions {
+  display: grid;
+  width: min(100%, 820px);
+  grid-template-columns: 1fr 1fr auto;
+  gap: 16px;
+  margin: 0 auto;
+}
+
+.reviews-summary {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.6fr) minmax(320px, 1fr);
+  align-items: center;
+  gap: 42px;
+  width: min(100%, 820px);
+  margin: 0 auto 42px;
+}
+
+.reviews-score {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  border-right: 1px solid var(--line);
+  padding-right: 36px;
+}
+
+.reviews-score strong {
+  font-size: 58px;
+  font-weight: 500;
+}
+
+.reviews-score span {
+  color: var(--accent);
+  font-size: 24px;
+}
+
+.reviews-bars {
+  display: grid;
+  gap: 14px;
+}
+
+.reviews-bars div {
+  display: grid;
+  grid-template-columns: 70px 1fr 32px;
+  align-items: center;
+  gap: 12px;
+}
+
+.reviews-bars i {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-divider);
+}
+
+.reviews-bars b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-accent-button);
+}
+
+.reviews-list {
+  display: grid;
+  gap: 18px;
+  width: min(100%, 920px);
+  margin: 0 auto;
+}
+
+.artisan-review-card {
+  border: 1px solid var(--color-input-border);
+  border-radius: 14px;
+  padding: 18px;
+  background: var(--color-white);
+}
+
+.verified-hire {
+  border: 1px solid var(--color-success);
+  border-radius: 6px;
+  margin-left: 8px;
+  padding: 2px 8px;
+  color: var(--color-success);
+  background: var(--color-success-wash);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.artisan-profile-settings-page {
+  grid-template-columns: minmax(250px, 0.48fr) minmax(0, 1fr);
+  align-items: start;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.artisan-workspace-page {
+  padding-top: 140px;
+}
+
+.artisan-settings-sidebar {
+  display: grid;
+  justify-items: center;
+  gap: 22px;
+}
+
+.recommended-avatar.large {
+  width: 116px;
+  height: 116px;
+  font-size: 42px;
+}
+
+.artisan-settings-sidebar h2,
+.artisan-settings-sidebar p {
+  margin: 0;
+}
+
+.artisan-settings-sidebar > button:first-of-type {
+  width: 100%;
+  padding: 18px;
+  color: var(--color-white);
+  background: var(--color-ink);
+}
+
+.artisan-settings-sidebar > span {
+  width: 100%;
+  padding: 18px 24px;
+  color: var(--color-muted);
+  font-size: 20px;
+}
+
+.artisan-settings-sidebar > span.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.danger-outline {
+  align-self: end;
+  width: 100%;
+  border: 1px solid var(--color-danger);
+  margin-top: 80px;
+  padding: 18px;
+  color: var(--color-danger);
+  background: var(--color-white);
+}
+
+.artisan-settings-card {
+  display: grid;
+  gap: 22px;
+  border: 1px solid var(--color-input-border);
+  border-radius: 8px;
+  padding: 58px;
+  background: var(--color-white);
+}
+
+.artisan-settings-stack {
+  display: grid;
+  gap: 24px;
+}
+
+.artisan-settings-card h2 {
+  margin: 0;
+  font-size: 38px;
+  font-weight: 500;
+}
+
+.profile-picture-row {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  margin: 28px 0;
+}
+
+.artisan-settings-card label {
+  display: grid;
+  gap: 8px;
+}
+
+.artisan-settings-card input,
+.artisan-settings-card select {
+  border: 1px solid var(--color-input-border);
+  border-radius: 8px;
+  padding: 15px;
+  background: var(--color-white);
+}
+
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 18px;
+  border-top: 1px solid var(--line);
+  margin-top: 18px;
+  padding-top: 28px;
+}
+
+.settings-actions button {
+  width: auto;
+  min-width: 170px;
+  padding: 18px;
+}
+
+@media (max-width: 900px) {
+  .artisan-setup-head,
+  .artisan-dashboard-grid,
+  .setup-two-col {
+    grid-template-columns: 1fr;
+  }
+
+  .artisan-setup-head {
+    display: grid;
+  }
+
+  .artisan-stepper {
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+
+  .artisan-stepper button::after {
+    display: none;
+  }
+
+  .artisan-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .setup-portfolio-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .artisan-job-row,
+  .artisan-profile-settings-page,
+  .reviews-summary,
+  .artisan-job-detail-card dl,
+  .artisan-job-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .reviews-score {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding-right: 0;
+    padding-bottom: 24px;
+  }
+}
+
+@media (max-width: 620px) {
+  .artisan-setup-page,
+  .artisan-dashboard-page {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .artisan-setup-head h1,
+  .artisan-dashboard-hero h1 {
+    font-size: 32px;
+  }
+
+  .artisan-stepper,
+  .artisan-stat-grid,
+  .setup-portfolio-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .artisan-stepper button {
+    font-size: 18px;
+  }
+
+  .artisan-stepper span {
+    width: 42px;
+    height: 42px;
+  }
+
+  .artisan-setup-card {
+    padding: 24px 18px;
+  }
+
+  .profile-upload,
+  .artisan-request-card {
+    grid-template-columns: 1fr;
+  }
+
+  .artisan-job-row {
+    align-items: stretch;
+  }
+
+  .artisan-job-row button,
+  .artisan-job-actions button,
+  .settings-actions button {
+    width: 100%;
+  }
+
+  .artisan-job-detail-head,
+  .profile-picture-row,
+  .settings-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .artisan-settings-card {
+    padding: 24px 18px;
+  }
+
+  .artisan-settings-card h2 {
+    font-size: 30px;
+  }
+
+  .reviews-bars div {
+    grid-template-columns: 56px 1fr 24px;
+  }
+
+  .day-picker,
+  .availability-dots {
+    gap: 10px;
+  }
+
+  .day-picker button,
+  .availability-dots span {
+    width: 46px;
+    height: 46px;
+    font-size: 18px;
+  }
+
+  .artisan-setup-actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+    gap: 12px;
+  }
+
+  .artisan-setup-actions button {
+    width: 100%;
+  }
+}

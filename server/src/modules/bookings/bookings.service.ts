@@ -79,7 +79,14 @@ export const createBooking = async (input: {
         ...(input.note !== undefined ? { note: input.note } : {}),
       },
       include: {
-        artisan: true,
+        artisan: {
+          include: {
+            portfolioImages: {
+              orderBy: { displayOrder: 'asc' },
+              take: 1,
+            },
+          },
+        },
         payment: true,
         disputes: true,
         offering: {
@@ -178,7 +185,14 @@ export const getBookingsForUser = async (input: {
     where: { customerId: input.firebaseUid },
     orderBy: { createdAt: 'desc' },
     include: {
-      artisan: true,
+      artisan: {
+        include: {
+          portfolioImages: {
+            orderBy: { displayOrder: 'asc' },
+            take: 1,
+          },
+        },
+      },
       payment: true,
       disputes: true,
       offering: {
@@ -197,7 +211,14 @@ export const getCustomerBookings = async (
     orderBy: { createdAt: 'desc' },
     ...paginationArgs(pagination),
     include: {
-      artisan: true,
+      artisan: {
+        include: {
+          portfolioImages: {
+            orderBy: { displayOrder: 'asc' },
+            take: 1,
+          },
+        },
+      },
       payment: true,
       disputes: true,
       offering: {
