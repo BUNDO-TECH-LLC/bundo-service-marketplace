@@ -10,6 +10,7 @@ import { browseLocationAreaOptions, customerDashboardFallbackCategories } from '
 import { api, ApiError } from '../lib/api';
 import { resolveApiSession } from '../lib/authSession';
 import { categoryIcon } from '../lib/categoryIcon';
+import { formatDistanceFromBrowseArea } from '../lib/geo';
 import { auth } from '../lib/firebase';
 import { artisanProfileImageUrl } from '../lib/profileImage';
 import { capitalizeLeadingCharacter } from '../lib/userDisplayName';
@@ -49,11 +50,17 @@ function fallbackCategoriesAsCategories(): Category[] {
   }));
 }
 
-function ResultStars() {
+function ResultStars({ rating }: { rating: number }) {
+  const filled = Math.min(5, Math.max(0, Math.round(rating)));
   return (
-    <span className="categories-stars" aria-label="Rating">
+    <span className="categories-stars" aria-label={`Rating ${rating} out of 5`}>
       {Array.from({ length: 5 }).map((_, index) => (
-        <AppIcon key={index} icon="mdi:star" size={16} />
+        <AppIcon
+          key={index}
+          icon={index < filled ? 'mdi:star' : 'mdi:star-outline'}
+          size={16}
+          className={index < filled ? undefined : 'categories-star-empty'}
+        />
       ))}
     </span>
   );
@@ -361,9 +368,22 @@ export default function CategoriesPage() {
     });
   }
 
+  function expandSearchRadius() {
+    patchSearchParams(
+      (next) => {
+        next.delete('state');
+        const current = Number(next.get('limit') || String(DEFAULT_RESULT_LIMIT));
+        next.set('limit', String(Math.min(120, current + 24)));
+      },
+      { preserveLimit: true }
+    );
+  }
+
   const showCustomerChrome = me?.role === 'CUSTOMER' && Boolean(firebaseUser);
 
-  const resultsTitle = selectedCategory?.name || (q.trim() ? q.trim() : 'Search results');
+  const resultsMoreCopy = selectedCategory?.name
+    ? `Try adjusting your search filter or changing your location to find more ${selectedCategory.name} professionals.`
+    : 'Try adjusting your search filter or changing your location to find more artisans.';
 
   return (
     <div className="categories-page">
@@ -586,6 +606,7 @@ export default function CategoriesPage() {
                     onClick={() => {
                       patchSearchParams((next) => {
                         next.set('categoryId', category.id);
+                        next.set('q', category.name);
                       });
                     }}
                   >
@@ -614,9 +635,8 @@ export default function CategoriesPage() {
           </>
         ) : (
           <>
-            <div className="categories-page-head">
-              <h1 className="categories-page-title">{resultsTitle}</h1>
-              <form className="categories-search-wide categories-search-wrap" onSubmit={applyMainSearch}>
+            <div className="categories-results-search-block">
+              <form className="categories-search-full categories-search-wrap" onSubmit={applyMainSearch}>
                 <span className="categories-search-icon">
                   <AppIcon icon="mingcute:search-line" size={22} />
                 </span>
@@ -630,67 +650,82 @@ export default function CategoriesPage() {
               </form>
             </div>
 
-            <div className="categories-toolbar categories-toolbar--results">
-              <select
-                className="categories-pill-select categories-pill-select--dark"
-                value={categoryId}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  patchSearchParams((next) => {
-                    if (value) {
-                      next.set('categoryId', value);
-                    } else {
-                      next.delete('categoryId');
-                    }
-                  });
-                }}
-                aria-label="Category"
-              >
-                <option value="">All Categories</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-
+            <div className="categories-toolbar categories-toolbar--catalog categories-toolbar--results">
               <span className="categories-toolbar-label">Filter by:</span>
-              <select
-                className="categories-pill-select"
-                value={state}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  patchSearchParams((next) => {
-                    if (value) {
-                      next.set('state', value);
-                    } else {
-                      next.delete('state');
-                    }
-                  });
-                }}
-                aria-label="Location"
-              >
-                {browseLocationAreaOptions.map((opt) => (
-                  <option key={opt.value || 'all'} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
 
-              <select
-                className="categories-pill-select"
-                value={ratingOrder}
-                onChange={(event) => {
-                  patchSearchParams((next) => {
-                    next.set('ratingOrder', event.target.value);
-                  });
-                }}
-                aria-label="Rating"
-              >
-                <option value="any">Any rating</option>
-                <option value="best">Best rated to lowest</option>
-                <option value="low">Lowest to best rated</option>
-              </select>
+              <div className="categories-filter-select categories-filter-select--location">
+                <AppIcon icon="mingcute:location-line" className="categories-filter-select__icon" size={20} aria-hidden />
+                <select
+                  className="categories-filter-select__native"
+                  value={state}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    patchSearchParams((next) => {
+                      if (value) {
+                        next.set('state', value);
+                      } else {
+                        next.delete('state');
+                      }
+                    });
+                  }}
+                  aria-label="Location"
+                >
+                  {browseLocationAreaOptions.map((opt) => (
+                    <option key={opt.value || 'all'} value={opt.value}>
+                      {opt.label === 'All areas' ? 'Lagos, Nigeria' : opt.label}
+                    </option>
+                  ))}
+                </select>
+                <AppIcon icon="mdi:chevron-down" className="categories-filter-select__chevron" size={18} aria-hidden />
+              </div>
+
+              <div className="categories-filter-select">
+                <select
+                  className="categories-filter-select__native categories-filter-select__native--wide"
+                  value={categoryId}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    patchSearchParams((next) => {
+                      if (value) {
+                        next.set('categoryId', value);
+                        const picked = categories.find((c) => c.id === value);
+                        if (picked) {
+                          next.set('q', picked.name);
+                        }
+                      } else {
+                        next.delete('categoryId');
+                      }
+                    });
+                  }}
+                  aria-label="Categories"
+                >
+                  <option value="">Categories</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <AppIcon icon="mdi:chevron-down" className="categories-filter-select__chevron" size={18} aria-hidden />
+              </div>
+
+              <div className="categories-filter-select">
+                <select
+                  className="categories-filter-select__native categories-filter-select__native--rating"
+                  value={ratingOrder}
+                  onChange={(event) => {
+                    patchSearchParams((next) => {
+                      next.set('ratingOrder', event.target.value);
+                    });
+                  }}
+                  aria-label="Rating"
+                >
+                  <option value="any">Any rating</option>
+                  <option value="best">Best rated to lowest</option>
+                  <option value="low">Lowest to best rated</option>
+                </select>
+                <AppIcon icon="mdi:chevron-down" className="categories-filter-select__chevron" size={18} aria-hidden />
+              </div>
 
               <div className="categories-toolbar-spacer" aria-hidden />
 
@@ -727,11 +762,20 @@ export default function CategoriesPage() {
                   const artisanName = capitalizeLeadingCharacter(
                     offering.artisan?.displayName || 'Approved artisan'
                   );
-                  const subtitle = offering.title || offering.category?.name || 'Service';
+                  const categoryName = offering.category?.name || 'Service';
+                  const subtitle = offering.category?.name
+                    ? `${offering.category.name} expert`
+                    : offering.title || 'Service';
                   const rating = offering.artisan?.avgRating ?? 0;
                   const ratingCount = offering.artisan?.ratingCount ?? 0;
-                  const locationLabel =
-                    [offering.artisan?.area, offering.artisan?.city].filter(Boolean).join(', ') || 'Nearby';
+                  const distanceLabel =
+                    formatDistanceFromBrowseArea(
+                      offering.artisan?.lat,
+                      offering.artisan?.lng,
+                      state
+                    ) ||
+                    [offering.artisan?.area, offering.artisan?.city].filter(Boolean).join(', ') ||
+                    'Nearby';
 
                   return (
                     <article key={offering.id} className="categories-result-row">
@@ -742,25 +786,31 @@ export default function CategoriesPage() {
                         textClassName="text-xl"
                       />
                       <div className="categories-result-meta">
+                        <div className="categories-result-meta-content">
+                        <div className="categories-result-meta-content-left">
+                          <div className="categories-result-meta-content-left-name">
                         <h2 className="categories-result-name">{artisanName}</h2>
                         <p className="categories-result-sub">{subtitle}</p>
-                        <div className="categories-result-tags">
-                          <span className="categories-tag">Category</span>
-                          <span className="categories-tag">{offering.category?.name || 'Service'}</span>
                         </div>
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-                          <ResultStars />
-                          <span>
+                        <div className="categories-result-category-line">
+                          <span className="categories-result-category-label">Category</span>
+                          <span className="categories-result-category-value">{categoryName}</span>
+                        </div>
+                        </div>
+                        <div className="categories-result-meta-content-mid">
+                        <div className="categories-result-rating-row">
+                          <ResultStars rating={rating} />
+                          <span className="categories-result-rating-text">
                             {rating.toFixed(1)}({ratingCount})
                           </span>
                         </div>
-                        <p className="categories-result-sub mt-1">
-                          <span className="font-semibold text-[var(--color-ink)]">Distance</span>
-                          <br />
-                          {locationLabel}
-                        </p>
+                        <div className="categories-result-distance">
+                          <span className="categories-result-distance-label">Distance</span>
+                          <span className="categories-result-distance-value">{distanceLabel}</span>
+                        </div>
+                        </div>
+                        </div>
                       </div>
-                      <div className="categories-result-side">
                         <div className="categories-result-actions">
                           {offering.artisan?.id ? (
                             <>
@@ -780,7 +830,7 @@ export default function CategoriesPage() {
                               </button>
                             </>
                           ) : null}
-                        </div>
+                        
                       </div>
                     </article>
                   );
@@ -801,15 +851,13 @@ export default function CategoriesPage() {
                       <AppIcon icon="mdi:emoticon-happy-outline" size={28} />
                     </div>
                     <h2 className="m-0 text-lg font-semibold">No more results in this area</h2>
-                    <p className="mx-auto mt-2 max-w-lg text-sm text-[var(--color-text-sub)]">
-                      Try adjusting your search filter or changing your location to find more professionals.
-                    </p>
+                    <p className="mx-auto mt-2 max-w-lg text-sm text-[var(--color-text-sub)]">{resultsMoreCopy}</p>
                     <div className="categories-end-actions">
                       <button type="button" className="categories-btn-dark" onClick={clearLocationFilter}>
                         Change your location
                       </button>
-                      <button type="button" className="categories-btn-outline" onClick={browseAllCategories}>
-                        Browse all categories
+                      <button type="button" className="categories-btn-outline" onClick={expandSearchRadius}>
+                        Expand radius
                       </button>
                     </div>
                   </div>
