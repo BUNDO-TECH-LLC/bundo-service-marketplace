@@ -7,8 +7,10 @@ import { AuthPage } from '../pages/auth/AuthPage';
 import { EmailVerificationPage } from '../pages/auth/EmailVerificationPage';
 import CustomerDashboard from '../pages/customer/Dashboard';
 import CustomerWorkspacePage from '../pages/customer/Workspace';
+import MessagesPage from '../pages/customer/MessagesPage';
+import BookJobPage from '../pages/customer/BookJobPage';
 import ArtisanDashboardPage from '../pages/artisan/Dashboard';
-import ProfilePage from '../pages/artisan/ProfilePage';
+import ProfilePage from '../pages/customer/artisan-profile/ProfilePage';
 import AdminPage from '../pages/admin/AdminPage';
 import LoadingPage from '../pages/LoadingPage';
 
@@ -33,10 +35,12 @@ export default function AppRouter() {
         <Route path="/login" element={<AuthPage mode="login" />} />
         <Route path="/create-account" element={<AuthPage mode="signup" />} />
         <Route path="/verify-email" element={<EmailVerificationPage />} />
+        <Route path="/customer/messages" element={<MessagesPage />} />
         <Route path="/customer/workspace" element={<CustomerWorkspacePage />} />
+        <Route path="/customer/book" element={<BookJobPage />} />
         <Route path="/customer/dashboard" element={<CustomerDashboard />} />
         <Route path="/artisan/dashboard" element={<ArtisanDashboardPage />} />
-        <Route path="/artisans/:artisanId" element={<ProfilePage />} />
+        <Route path="/artisans/:artisanId" element={<ProfilePage/>} />
         <Route path="/admin" element={<AdminPage />} />
         <Route path="/loading" element={<LoadingPage />} />
       </Route>

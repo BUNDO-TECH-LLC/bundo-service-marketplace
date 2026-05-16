@@ -17,6 +17,7 @@ import { artisanProfileImageUrl } from '../../lib/profileImage';
 import { capitalizeLeadingCharacter } from '../../lib/userDisplayName';
 import {
   appRoutes,
+  buildBookJobPath,
   buildCategoriesPath,
   buildCustomerWorkspacePath,
 } from '../../routes/paths';
@@ -280,6 +281,7 @@ export default function CustomerDashboard({ requireAuth = true }: CustomerDashbo
         onOpenMarketplace={openCategories}
         onOpenNotifications={() => navigate(buildCustomerWorkspacePath('notifications'))}
         onOpenWorkspace={openWorkspace}
+        onUserUpdated={setMe}
         onLogout={logout}
       />
 
@@ -388,7 +390,23 @@ export default function CustomerDashboard({ requireAuth = true }: CustomerDashbo
                           From {money(offering.priceFrom)}
                         </strong>
                       </div>
-                      <button className="min-h-14 rounded-[14px] bg-[var(--color-ink)] font-semibold text-[var(--color-paper)] hover:bg-[var(--color-ink-panel)]" type="button" onClick={() => openCategories()}>
+                      <button
+                        className="min-h-14 rounded-[14px] bg-[var(--color-ink)] font-semibold text-[var(--color-paper)] hover:bg-[var(--color-ink-panel)]"
+                        type="button"
+                        onClick={() => {
+                          if (offering.artisan?.id) {
+                            navigate(
+                              buildBookJobPath({
+                                artisanId: offering.artisan.id,
+                                offeringId: offering.id,
+                              })
+                            );
+                            return;
+                          }
+
+                          openCategories();
+                        }}
+                      >
                         Book
                       </button>
                     </article>

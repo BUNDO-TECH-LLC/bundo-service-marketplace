@@ -11,6 +11,8 @@ export const appRoutes = {
   verifyEmail: '/verify-email',
   loading: '/loading',
   customerDashboard: '/customer/dashboard',
+  customerBook: '/customer/book',
+  customerMessages: '/customer/messages',
   customerWorkspace: '/customer/workspace',
   artisanDashboard: '/artisan/dashboard',
   admin: '/admin',
@@ -75,6 +77,10 @@ export function buildCategoriesPath(input?: CategoriesPathInput) {
 export const buildMarketplacePath = buildCategoriesPath;
 
 export function buildCustomerWorkspacePath(section?: WorkspaceSection) {
+  if (section === 'messages') {
+    return appRoutes.customerMessages;
+  }
+
   if (!section) {
     return appRoutes.customerWorkspace;
   }
@@ -92,4 +98,14 @@ export function buildArtisanDashboardPath(section?: WorkspaceSection) {
 
 export function buildArtisanProfilePath(artisanId: string) {
   return `/artisans/${artisanId}`;
+}
+
+export function buildBookJobPath(input: { artisanId: string; offeringId?: string }) {
+  const params = new URLSearchParams({ artisanId: input.artisanId });
+
+  if (input.offeringId?.trim()) {
+    params.set('offeringId', input.offeringId.trim());
+  }
+
+  return `${appRoutes.customerBook}?${params}`;
 }

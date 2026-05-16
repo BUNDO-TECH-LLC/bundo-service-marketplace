@@ -26,3 +26,39 @@ export function userDisplayName(firebaseUser: User | null, me: ApiUser | null) {
 
   return capitalizeLeadingCharacter(email.split('@')[0].split(/[._-]/)[0] || 'Account');
 }
+
+export function userFullDisplayName(firebaseUser: User | null, me: ApiUser | null) {
+  const name = firebaseUser?.displayName?.trim();
+
+  if (name) {
+    return name
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((part) => capitalizeLeadingCharacter(part))
+      .join(' ');
+  }
+
+  const email = firebaseUser?.email || me?.email;
+
+  if (!email) {
+    return 'Account';
+  }
+
+  const local = email.split('@')[0];
+  return capitalizeLeadingCharacter(local.replace(/[._-]+/g, ' ').trim() || 'Account');
+}
+
+export function userHandle(firebaseUser: User | null, me: ApiUser | null) {
+  const email = firebaseUser?.email || me?.email;
+
+  if (!email) {
+    return '@account';
+  }
+
+  const handle = email
+    .split('@')[0]
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '');
+
+  return `@${handle || 'account'}`;
+}

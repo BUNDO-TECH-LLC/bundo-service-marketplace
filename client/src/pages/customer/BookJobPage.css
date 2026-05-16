@@ -1,0 +1,527 @@
+.book-job-page {
+  --book-job-summary-bg: #f3f3f3;
+}
+
+.book-job-header-search {
+  display: grid;
+  width: min(100%, 402px);
+  justify-self: end;
+  grid-template-columns: minmax(170px, 1fr) minmax(150px, 0.92fr);
+  align-items: center;
+  border: 1px solid var(--color-input-border);
+  border-radius: 0.65rem;
+  background: var(--color-paper);
+}
+
+.book-job-header-search__field {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 0.85rem;
+}
+
+.book-job-header-search__field:first-child {
+  border-right: 1px solid var(--color-line);
+}
+
+.book-job-header-search__icon {
+  flex-shrink: 0;
+  color: var(--color-ink);
+}
+
+.book-job-header-search__input,
+.book-job-header-search__select {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-ink);
+  outline: none;
+}
+
+.book-job-main {
+  margin-top: 2rem;
+}
+
+.book-job-title {
+  margin: 0 0 1.75rem;
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+  font-weight: 800;
+  color: var(--color-ink);
+}
+
+.book-job-notice {
+  margin-bottom: 1.25rem;
+}
+
+.book-job-loading,
+.book-job-empty {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+}
+
+.book-job-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.85fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.book-job-card {
+  border: 1px solid var(--color-line);
+  border-radius: 0.85rem;
+  background: var(--color-paper);
+}
+
+.book-job-card--details {
+  padding: 1.35rem 1.5rem 1.5rem;
+}
+
+.book-job-card--summary {
+  padding: 1.35rem 1.25rem;
+  background: var(--book-job-summary-bg);
+}
+
+.book-job-artisan {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+  padding-bottom: 1.25rem;
+}
+
+.book-job-artisan__avatar {
+  width: 4.5rem;
+  height: 4.5rem;
+}
+
+.book-job-artisan__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.book-job-artisan__name {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--color-ink);
+}
+
+.book-job-artisan__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.5rem;
+}
+
+.book-job-tag {
+  display: inline-flex;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: var(--color-accent-wash);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-accent-bright);
+}
+
+.book-job-artisan__rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.book-job-stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.book-job-stars__fill {
+  color: var(--color-accent-button);
+}
+
+.book-job-stars__empty {
+  color: var(--color-line);
+}
+
+.book-job-artisan__distance {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.book-job-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--color-accent-bright);
+  cursor: pointer;
+}
+
+.book-job-link:hover {
+  text-decoration: underline;
+}
+
+.book-job-divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 0 0 1.25rem;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: none;
+}
+
+.book-job-divider::before,
+.book-job-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-line);
+}
+
+.book-job-divider span {
+  white-space: nowrap;
+}
+
+.book-job-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.book-job-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.book-job-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.book-job-field__label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.book-job-field__label--row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.book-job-field__hint {
+  font-size: 0.78rem;
+  color: var(--color-text-sub);
+  line-height: 1.4;
+}
+
+.book-job-field__control {
+  min-height: 2.85rem;
+  padding: 0 0.9rem;
+  border: 1px solid var(--color-input-border);
+  border-radius: 0.65rem;
+  background: var(--color-surface-raised, #f7f7f7);
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.book-job-field__control:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+.book-job-field__control--date {
+  appearance: none;
+}
+
+.book-job-field__control--textarea {
+  min-height: 7rem;
+  padding: 0.75rem 0.9rem;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.book-job-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.35rem;
+}
+
+.book-job-btn {
+  min-height: 3.25rem;
+  border: 0;
+  border-radius: 0.7rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.book-job-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.book-job-btn--primary {
+  color: var(--color-paper);
+  background: var(--color-accent-button, var(--color-accent));
+}
+
+.book-job-btn--primary:hover:not(:disabled) {
+  filter: brightness(0.96);
+}
+
+.book-job-btn--cancel {
+  color: var(--color-paper);
+  background: var(--color-ink);
+}
+
+.book-job-btn--cancel:hover:not(:disabled) {
+  background: var(--color-ink-panel, #1a1a1a);
+}
+
+.book-job-summary__title {
+  margin: 0 0 1.1rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--color-ink);
+}
+
+.book-job-summary__lines {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.book-job-summary__line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.book-job-summary__line dt {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.book-job-summary__line dd {
+  margin: 0;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.book-job-summary__total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1.1rem 0 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-line);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.book-job-summary__total strong {
+  font-size: 1.35rem;
+  font-weight: 900;
+}
+
+.book-job-summary__meta {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.book-job-summary__meta-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.book-job-summary__meta-row dt {
+  margin: 0;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.book-job-summary__meta-row dd {
+  margin: 0;
+  font-weight: 700;
+  color: var(--color-ink);
+  text-align: right;
+}
+
+@media (max-width: 960px) {
+  .book-job-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .book-job-card--summary {
+    order: -1;
+  }
+}
+
+@media (max-width: 1180px) {
+  .book-job-header-search {
+    width: 100%;
+    justify-self: stretch;
+  }
+}
+
+.book-job-success-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: var(--overlay-page, var(--overlay-dim));
+  backdrop-filter: blur(2px);
+}
+
+.book-job-success-dialog {
+  display: grid;
+  width: min(440px, 100%);
+  gap: 1.25rem;
+  justify-items: center;
+  border: 1px solid var(--color-line);
+  border-radius: 0.85rem;
+  padding: 2rem 1.75rem 1.75rem;
+  background: var(--color-paper);
+  box-shadow: 0 24px 80px var(--shadow-modal, rgba(0, 0, 0, 0.18));
+  text-align: center;
+}
+
+.book-job-success-mark {
+  display: grid;
+  width: 4.5rem;
+  height: 4.5rem;
+  place-items: center;
+  border: 3px solid var(--color-accent-button, var(--color-accent));
+  border-radius: 999px;
+  color: var(--color-accent-button, var(--color-accent));
+}
+
+.book-job-success-title {
+  margin: 0;
+  font-size: 1.65rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--color-ink);
+}
+
+.book-job-success-summary {
+  width: 100%;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.book-job-success-summary__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.book-job-success-summary__row dt {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-align: left;
+}
+
+.book-job-success-summary__row dd {
+  margin: 0;
+  max-width: 58%;
+  font-weight: 700;
+  color: var(--color-ink);
+  text-align: right;
+}
+
+.book-job-success-actions {
+  display: grid;
+  width: 100%;
+  gap: 0.75rem;
+  margin-top: 0.35rem;
+}
+
+.book-job-success-btn {
+  min-height: 3.1rem;
+  border: 0;
+  border-radius: 0.7rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--color-paper);
+  cursor: pointer;
+}
+
+.book-job-success-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.book-job-success-btn--primary {
+  background: var(--color-accent-button, var(--color-accent));
+}
+
+.book-job-success-btn--secondary {
+  background: var(--color-ink);
+}
+
+@media (max-width: 720px) {
+  .book-job-header-search {
+    grid-template-columns: 1fr;
+  }
+
+  .book-job-header-search__field:first-child {
+    border-right: 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .book-job-field-row {
+    grid-template-columns: 1fr;
+  }
+
+  .book-job-card--details,
+  .book-job-card--summary {
+    padding: 1.1rem;
+  }
+}

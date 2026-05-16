@@ -1,13 +1,14 @@
 import { FormEvent, useState } from 'react';
 import type { User } from 'firebase/auth';
-import { api } from '../lib/api';
+import { useBookingConfirmedOptional } from '../contexts/BookingConfirmedContext';
+import { createBookingRequest, defaultBookingLocation } from '../lib/bookingRequest';
 import { categoryIcon } from '../lib/categoryIcon';
 import { heroImage } from '../lib/marketingAssets';
 import { money } from '../lib/formatting';
 import { nigeriaStates } from '../lib/geo';
 import { userDisplayName } from '../lib/userDisplayName';
 import type { ActionRunner, BookingSuccessState } from '../appTypes';
-import type { ApiUser, Artisan, Booking, Category, Offering } from '../types';
+import type { ApiUser, Artisan, Category, Offering } from '../types';
 import { EmptyState } from '../components/EmptyState';
 import { AppIcon } from '../components/ui/AppIcon';
 
@@ -54,6 +55,7 @@ export function LoggedInHome({
   const recommendedOfferings = offerings.slice(0, 3);
   const featuredArtisan = artisans[0];
   const [activeOfferingAction, setActiveOfferingAction] = useState<string | null>(null);
+  const bookingConfirmed = useBookingConfirmedOptional();
 
   async function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -66,21 +68,35 @@ export function LoggedInHome({
 
     try {
       await runAction(async () => {
-        const response = await api<{ booking: Booking }>('/bookings', {
-          method: 'POST',
+        const scheduledAt = new Date(Date.now() + 86400000).toISOString();
+        const artisan = offering.artisan;
+
+        const response = await createBookingRequest({
           token,
-          body: JSON.stringify({
-            offeringId: offering.id,
-            note: 'Booked from dashboard',
-          }),
+          offeringId: offering.id,
+          scheduledAt,
+          note: 'Booked from dashboard',
         });
         await reloadPrivate();
-        onBookingSuccess({
+
+        const successState = {
           bookingId: response.booking.id,
+          artisanId: artisan?.id || offering.artisanId,
           serviceTitle: offering.title,
-          artisanName: offering.artisan?.displayName || 'this artisan',
-        });
-      }, 'Booking requested');
+          artisanName: artisan?.displayName || 'this artisan',
+          scheduledAt: response.booking.scheduledAt || scheduledAt,
+          location: defaultBookingLocation(artisan?.area, artisan?.city),
+        };
+
+        if (bookingConfirmed && artisan?.id) {
+          bookingConfirmed.showBookingConfirmed({
+            ...successState,
+            token,
+          });
+        }
+
+        onBookingSuccess(successState);
+      });
     } finally {
       setActiveOfferingAction(null);
     }

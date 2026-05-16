@@ -1,5 +1,10 @@
+import { BookingConfirmedProvider } from './contexts/BookingConfirmedContext';
 import AppRouter from './routes/AppRouter';
 
 export default function App() {
-  return <AppRouter />;
+  return (
+    <BookingConfirmedProvider>
+      <AppRouter />
+    </BookingConfirmedProvider>
+  );
 }

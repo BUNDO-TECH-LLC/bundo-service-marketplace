@@ -60,3 +60,25 @@ export const updateUserFcmToken = async (
     data: { fcmToken },
   });
 };
+
+export const updateUserProfile = async (
+  firebaseUid: string,
+  input: { phone?: string | null }
+) => {
+  const data: { phone?: string | null } = {};
+
+  if (input.phone !== undefined) {
+    data.phone = input.phone;
+  }
+
+  if (!Object.keys(data).length) {
+    return { status: 'no_fields' as const };
+  }
+
+  const user = await db.user.update({
+    where: { firebaseUid },
+    data,
+  });
+
+  return { status: 'updated' as const, user };
+};

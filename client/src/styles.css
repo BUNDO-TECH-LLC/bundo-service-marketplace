@@ -8,6 +8,10 @@
 @import "./views/LoggedInHome.css";
 @import "./pages/artisan/ArtisanToolsPage.css";
 @import "./pages/CategoriesPage.css";
+@import "./pages/customer/BookJobPage.css";
+@import "./pages/customer/MessagesPage.css";
+@import "./components/customer/UserProfileSidebar.css";
+@import "./components/customer/CustomerAccountPanel.css";
 @import "./panels/BookingsPanel.css";
 @import "./panels/NotificationsPanel.css";
 @import "./panels/ChatPanel.css";

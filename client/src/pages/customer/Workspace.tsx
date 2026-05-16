@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { CustomerHeader } from '../../components/customer/CustomerHeader';
 import { BookingsPage } from '../../panels/BookingsPanel';
-import { ChatPanel } from '../../panels/ChatPanel';
 import { NotificationsPanel } from '../../panels/NotificationsPanel';
 import type { ActionRunner, PushStatus, WorkspaceSection } from '../../appTypes';
 import { auth } from '../../lib/firebase';
@@ -14,21 +13,27 @@ import {
   ensureBrowserPushToken,
   hasPushConfig,
 } from '../../lib/messaging';
-import type { ApiUser, Booking, Conversation, Notification } from '../../types';
+import type { ApiUser, Booking, Notification } from '../../types';
 import {
   appRoutes,
   buildCustomerWorkspacePath,
   buildCategoriesPath,
 } from '../../routes/paths';
 
+const workspaceSectionsWithRedirect = new Set(['messages']);
+
+type WorkspaceLocationState = {
+  notice?: string;
+};
+
 export default function CustomerWorkspacePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [token, setToken] = useState('');
   const [me, setMe] = useState<ApiUser | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
@@ -36,6 +41,20 @@ export default function CustomerWorkspacePage() {
   const [pushToken, setPushToken] = useState('');
 
   const section = (searchParams.get('section') as WorkspaceSection) || 'bookings';
+
+  useEffect(() => {
+    if (workspaceSectionsWithRedirect.has(section)) {
+      navigate(buildCustomerWorkspacePath(section), { replace: true });
+    }
+  }, [navigate, section]);
+
+  useEffect(() => {
+    const incomingNotice = (location.state as WorkspaceLocationState | null)?.notice;
+    if (incomingNotice) {
+      setNotice(incomingNotice);
+      navigate(location.pathname + location.search, { replace: true, state: null });
+    }
+  }, [location.pathname, location.search, location.state, navigate]);
 
   useEffect(() => {
     if (!auth) {
@@ -123,14 +142,12 @@ export default function CustomerWorkspacePage() {
     setNotice('');
 
     try {
-      const [bookingResponse, conversationResponse, notificationResponse] = await Promise.all([
+      const [bookingResponse, notificationResponse] = await Promise.all([
         api<{ bookings: Booking[] }>('/bookings/customer?page=1&limit=20', { token }),
-        api<{ conversations: Conversation[] }>('/conversations', { token }),
         api<{ notifications: Notification[] }>('/notifications', { token }),
       ]);
 
       setBookings(bookingResponse.bookings);
-      setConversations(conversationResponse.conversations);
       setNotifications(notificationResponse.notifications);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Could not load your workspace.');
@@ -177,6 +194,7 @@ export default function CustomerWorkspacePage() {
         onOpenMarketplace={() => navigate(buildCategoriesPath({}))}
         onOpenNotifications={() => navigate(buildCustomerWorkspacePath('notifications'))}
         onOpenWorkspace={(nextSection) => navigate(buildCustomerWorkspacePath(nextSection))}
+        onUserUpdated={setMe}
         onLogout={logout}
       />
 
@@ -192,17 +210,6 @@ export default function CustomerWorkspacePage() {
             runAction={runAction}
             refresh={refresh}
             openMessages={() => navigate(buildCustomerWorkspacePath('messages'))}
-          />
-        ) : null}
-
-        {section === 'messages' && me ? (
-          <ChatPanel
-            token={token}
-            currentUserId={me.firebaseUid}
-            conversations={conversations}
-            busy={busy}
-            runAction={runAction}
-            refresh={refresh}
           />
         ) : null}
 

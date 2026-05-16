@@ -18,6 +18,7 @@ import type { ApiUser, Category, Offering } from '../types';
 import {
   appRoutes,
   buildArtisanProfilePath,
+  buildBookJobPath,
   buildCategoriesPath,
   buildCustomerWorkspacePath,
 } from '../routes/paths';
@@ -437,6 +438,7 @@ export default function CategoriesPage() {
           onOpenMarketplace={() => navigate(buildCategoriesPath({}))}
           onOpenNotifications={() => navigate(buildCustomerWorkspacePath('notifications'))}
           onOpenWorkspace={openWorkspace}
+          onUserUpdated={setMe}
           onLogout={logout}
         />
       ) : (
@@ -824,7 +826,14 @@ export default function CategoriesPage() {
                               <button
                                 type="button"
                                 className="categories-btn-accent"
-                                onClick={() => navigate(buildArtisanProfilePath(offering.artisan!.id))}
+                                onClick={() =>
+                                  navigate(
+                                    buildBookJobPath({
+                                      artisanId: offering.artisan!.id,
+                                      offeringId: offering.id,
+                                    })
+                                  )
+                                }
                               >
                                 Book Service
                               </button>
