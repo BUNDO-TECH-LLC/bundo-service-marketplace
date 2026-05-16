@@ -1,0 +1,126 @@
+.help-page {
+  min-height: calc(100vh - 66px);
+  padding: 42px var(--app-screen-gutter, 20px) 86px;
+  background: var(--soft);
+}
+
+.help-panel {
+  width: min(620px, 100%);
+  margin: 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px 0 0;
+  background: var(--color-white);
+  box-shadow: 0 8px 26px var(--shadow-light);
+}
+
+.help-panel > .eyebrow,
+.help-panel > h1 {
+  padding-right: 20px;
+  padding-left: 20px;
+}
+
+.help-highlight {
+  margin: 0 20px 22px;
+  border: 1px solid var(--accent-alpha);
+  border-radius: 8px;
+  padding: 18px;
+  background: linear-gradient(180deg, var(--color-accent-wash) 0%, var(--color-white) 100%);
+}
+
+.help-highlight strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 15px;
+}
+
+.help-highlight p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.help-panel h1 {
+  margin: 18px 0 16px;
+  font-size: 34px;
+  line-height: 1.15;
+}
+
+.help-topic-list,
+.help-section-list {
+  border-top: 1px solid var(--line);
+}
+
+.help-topic-row {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 44px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  padding: 18px 20px;
+  color: var(--ink);
+  background: var(--color-white);
+  text-align: left;
+}
+
+.help-topic-row:hover {
+  background: var(--accent-soft);
+}
+
+.help-topic-row span {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--color-white);
+  background: var(--accent);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.help-topic-row em {
+  color: var(--muted);
+  font-style: normal;
+  font-size: 22px;
+}
+
+.help-section {
+  border-bottom: 12px solid var(--soft);
+  padding: 22px 20px 0;
+}
+
+.help-section:last-child {
+  border-bottom: 0;
+}
+
+.help-section h2 {
+  margin: 0 0 14px;
+  font-size: 20px;
+}
+
+.help-question {
+  border-top: 1px solid var(--line);
+  padding: 16px 0;
+}
+
+.help-question summary {
+  cursor: pointer;
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.help-question p {
+  margin: 12px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+@media (max-width: 620px) {
+  .help-page {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+}

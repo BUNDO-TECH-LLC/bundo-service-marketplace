@@ -55,7 +55,7 @@ export default function LoadingPage() {
             />
           </div>
 
-          <h1 className="text-[36px] font-bold leading-none text-[var(--color-solid)]">
+          <h1 className="text-[36px] font-bold leading-none text-[var(--color-ink)]">
             Bundo
           </h1>
         </div>

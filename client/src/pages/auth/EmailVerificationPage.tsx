@@ -3,6 +3,7 @@ import { sendEmailVerification } from 'firebase/auth';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthLayout } from '../../layouts/AuthLayout';
 import { auth } from '../../lib/firebase';
+import { appRoutes } from '../../routes/paths';
 
 type VerificationState = {
   email?: string;
@@ -72,7 +73,7 @@ export function EmailVerificationPage() {
 
     navigate('/loading', {
       state: {
-        redirectTo: state.accountKind === 'ARTISAN' ? '/?view=workspace' : '/customer/dashboard',
+        redirectTo: state.accountKind === 'ARTISAN' ? appRoutes.artisanDashboard : appRoutes.customerDashboard,
       },
     });
   } finally {

@@ -22,6 +22,7 @@ import { resolveApiSession } from '../lib/resolveApiSession';
 import { userDisplayName } from '../lib/userDisplayName';
 import type { ApiUser, Role } from '../types';
 import type { SignupRole, View, WorkspaceSection } from '../appTypes';
+import { AppIcon } from '../components/ui/AppIcon';
 import bundoLogo from '../assets/bundo-logo.png';
 
 export function AuthBox({
@@ -596,7 +597,7 @@ export function AuthBox({
                 {mode !== 'reset' && (
                   <>
                     <button type="button" className="google-auth-button" onClick={continueWithGoogle} disabled={!firebaseReady || submitting}>
-                      <span aria-hidden="true">G</span>
+                      <span aria-hidden="true"><AppIcon icon="mdi:google" size={18} /></span>
                       Continue with Google
                     </button>
 

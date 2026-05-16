@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { Role } from '@prisma/client';
 import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
-import { updateUserFcmToken, updateUserRole } from './users.service';
+import { updateUserFcmToken, updateUserProfile, updateUserRole } from './users.service';
 
 const router = Router();
 
@@ -33,6 +33,48 @@ router.patch('/role', verifyFirebaseToken, async (req, res) => {
     message: 'Role updated',
     user: result.user,
   });
+});
+
+router.patch('/profile', verifyFirebaseToken, async (req, res) => {
+  const { phone } = req.body;
+  const data: { phone?: string | null } = {};
+
+  if (phone !== undefined) {
+    if (phone !== null && typeof phone !== 'string') {
+      return res.status(400).json({ message: 'phone must be a string' });
+    }
+
+    const trimmed = typeof phone === 'string' ? phone.trim() : '';
+    data.phone = trimmed || null;
+  }
+
+  if (!Object.keys(data).length) {
+    return res.status(400).json({ message: 'No profile fields provided' });
+  }
+
+  try {
+    const result = await updateUserProfile((req as any).user.firebaseUid, data);
+
+    if (result.status === 'no_fields') {
+      return res.status(400).json({ message: 'No profile fields provided' });
+    }
+
+    return res.json({
+      message: 'Profile updated',
+      user: result.user,
+    });
+  } catch (error: unknown) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'P2002'
+    ) {
+      return res.status(409).json({ message: 'Phone number is already in use' });
+    }
+
+    throw error;
+  }
 });
 
 router.patch('/fcm-token', verifyFirebaseToken, async (req, res) => {

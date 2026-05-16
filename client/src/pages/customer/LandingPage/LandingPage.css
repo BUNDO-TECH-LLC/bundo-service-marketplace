@@ -1,0 +1,688 @@
+.landing-shell {
+  min-height: 100vh;
+}
+
+.landing-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: grid;
+  min-height: 66px;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 28px;
+  padding: 10px clamp(20px, 9vw, 144px);
+  color: var(--color-white);
+  background: var(--color-black);
+}
+
+.landing-topbar-signed-in {
+  grid-template-columns: auto auto minmax(280px, 1fr) auto;
+  color: var(--ink);
+  background: var(--color-white);
+}
+
+.landing-brand,
+.landing-topbar nav button {
+  color: var(--color-white);
+  background: transparent;
+}
+
+.landing-topbar-signed-in .landing-brand,
+.landing-topbar-signed-in nav button {
+  color: var(--ink);
+}
+
+.landing-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.landing-brand-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--accent);
+}
+
+.landing-topbar nav {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 20px;
+}
+
+.landing-topbar nav button {
+  padding: 8px 0;
+  color: var(--color-nav-muted);
+}
+
+.landing-topbar nav button.active,
+.landing-topbar nav button:hover {
+  color: var(--color-white);
+}
+
+.landing-topbar-signed-in nav button.active,
+.landing-topbar-signed-in nav button:hover {
+  color: var(--accent);
+}
+
+.landing-topbar-signed-in nav button.active {
+  border-bottom: 2px solid var(--accent);
+}
+
+.artisan-app-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: grid;
+  min-height: 92px;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 28px;
+  padding: 18px clamp(20px, 8vw, 120px);
+  background: var(--color-white);
+}
+
+.artisan-app-header .landing-brand,
+.artisan-app-header nav button,
+.artisan-header-actions button {
+  color: var(--ink);
+  background: transparent;
+}
+
+.artisan-app-header nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+}
+
+.artisan-app-header nav button {
+  border-radius: 0;
+  padding: 10px 0;
+}
+
+.artisan-app-header nav button.active,
+.artisan-app-header nav button:hover {
+  border-bottom: 2px solid var(--accent);
+  color: var(--accent);
+}
+
+.artisan-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.artisan-user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.artisan-user-chip span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--color-white);
+  background: var(--color-ink);
+  font-size: 13px;
+}
+
+.landing-topbar-search {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(160px, 0.72fr);
+  align-items: center;
+  justify-self: end;
+  width: min(100%, 520px);
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: var(--color-white);
+}
+
+.landing-topbar-search label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px 12px;
+}
+
+.landing-topbar-search label + label {
+  border-left: 1px solid var(--line);
+}
+
+.landing-topbar-search span {
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.landing-topbar-search input,
+.landing-topbar-search select {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  color: var(--ink);
+  background: var(--color-white);
+  outline: none;
+}
+
+.hero {
+  display: grid;
+  min-height: 620px;
+  grid-template-columns: minmax(0, 0.92fr) minmax(520px, 1.08fr);
+  background: var(--color-black);
+}
+
+.landing-hero-media {
+  position: relative;
+  min-height: 620px;
+  overflow: hidden;
+}
+
+.landing-hero-media::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background:
+    linear-gradient(90deg, var(--black-transparent) 54%, var(--color-black) 100%),
+    linear-gradient(0deg, var(--black-image-wash), var(--black-image-wash));
+  pointer-events: none;
+}
+
+.landing-hero-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.58;
+}
+
+.landing-hero-copy {
+  display: flex;
+  width: 100%;
+  max-width: 760px;
+  flex-direction: column;
+  justify-content: center;
+  padding: 72px clamp(32px, 6vw, 96px) 72px clamp(28px, 5vw, 76px);
+  color: var(--color-white);
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: 44px;
+  line-height: 1.1;
+}
+
+.hero p,
+.why p,
+.app-promo p {
+  color: var(--muted);
+  line-height: 1.58;
+}
+
+.landing-hero-copy > p:not(.eyebrow) {
+  max-width: 520px;
+  color: var(--color-text-lighter);
+  font-size: 18px;
+}
+
+.landing-hero-search {
+  display: grid;
+  gap: 16px;
+  width: min(100%, 680px);
+  margin-top: 32px;
+  border-radius: 8px;
+  padding: 20px;
+  color: var(--ink);
+  background: var(--color-white);
+  box-shadow: 0 18px 50px var(--shadow-medium);
+}
+
+.landing-hero-search label {
+  font-weight: 900;
+}
+
+.search-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.search-heading span {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.location-control {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.8fr) minmax(230px, 1fr) 112px;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.field-shell {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 9px 12px 10px;
+  background: var(--color-white);
+}
+
+.field-shell span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.field-shell select,
+.field-shell input {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  color: var(--ink);
+  background: var(--color-white);
+  font-weight: 700;
+  outline: none;
+}
+
+.field-shell input {
+  font-weight: 600;
+}
+
+.landing-hero-search button,
+.actions button,
+.form-card button,
+.phone-input button,
+.landing-section-title-row button {
+  padding: 13px 18px;
+  color: var(--color-white);
+  background: var(--accent);
+}
+
+.landing-hero-search button:hover,
+.actions button:hover,
+.form-card button:hover,
+.phone-input button:hover,
+.landing-section-title-row button:hover {
+  background: var(--accent-dark);
+}
+
+.landing-hero-search .browse-link {
+  justify-self: start;
+  padding: 0;
+  color: var(--accent-dark);
+  background: transparent;
+}
+
+.landing-hero-search .browse-link:hover {
+  color: var(--ink);
+  background: transparent;
+}
+
+.why,
+.app-promo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.85fr);
+  gap: 70px;
+  padding: 86px clamp(20px, 10.5vw, 150px);
+}
+
+.why h2,
+.services h2,
+.app-promo h2,
+.preview-band h2 {
+  font-size: 34px;
+  line-height: 1.15;
+}
+
+.why-row {
+  display: grid;
+  grid-template-columns: 68px 1fr;
+  align-items: center;
+  gap: 28px;
+  margin: 34px 0;
+}
+
+.why-row h3 {
+  margin: 0 0 6px;
+}
+
+.why-row p {
+  margin: 0;
+}
+
+.icon-box {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  color: var(--accent-dark);
+  background: var(--accent-soft);
+  font-weight: 900;
+}
+
+.assurance {
+  display: flex;
+  min-height: 300px;
+  flex-direction: column;
+  justify-content: center;
+  border-radius: 8px;
+  padding: 52px;
+  background: var(--success-soft);
+}
+
+.assurance span {
+  color: var(--accent);
+  font-size: 52px;
+  font-weight: 900;
+}
+
+.services,
+.preview-band {
+  border-top: 16px solid var(--soft);
+  padding: 78px clamp(20px, 10.5vw, 150px);
+}
+
+.landing-section-title-row {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 22px;
+  margin-bottom: 32px;
+}
+
+.landing-section-title-row h2 {
+  margin: 0;
+}
+
+.landing-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.landing-chips button,
+.pill {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  gap: 8px;
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: var(--color-ink-body);
+  background: var(--soft);
+}
+
+.landing-chips button:hover {
+  background: var(--accent-soft);
+}
+
+.app-promo {
+  align-items: center;
+  border-top: 1px solid var(--line);
+}
+
+.app-promo img {
+  width: 100%;
+  max-height: 440px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.phone-input {
+  display: grid;
+  max-width: 560px;
+  grid-template-columns: 100px 1fr 110px;
+  margin-top: 28px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 26px var(--shadow-soft);
+  overflow: hidden;
+}
+
+.phone-input span,
+.phone-input input {
+  border: 0;
+  padding: 16px;
+}
+
+.phone-input span {
+  display: grid;
+  place-items: center;
+  background: var(--soft);
+  font-weight: 900;
+}
+
+.phone-input input {
+  min-width: 0;
+}
+
+footer {
+  padding: 34px clamp(20px, 10.5vw, 150px) 48px;
+  color: var(--color-text-light);
+  background: var(--color-black);
+}
+
+.footer-links,
+.city-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 30px;
+  margin-bottom: 26px;
+}
+
+.footer-links button {
+  padding: 0;
+  color: var(--color-text-light);
+  background: transparent;
+  font-weight: 700;
+}
+
+.footer-links button:hover {
+  color: var(--color-white);
+}
+
+.footer-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--color-ink-line);
+  padding-top: 26px;
+}
+
+.landing-page {
+  padding: 70px clamp(20px, 10.5vw, 150px);
+}
+
+.workspace-page {
+  background: linear-gradient(var(--color-white), var(--color-surface-subtle));
+}
+
+.messages-workspace {
+  min-height: calc(100vh - 66px);
+  color: var(--color-white);
+  background: var(--color-black);
+}
+
+.landing-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 22px;
+}
+
+.landing-toolbar span {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--color-white);
+  font-weight: 800;
+}
+
+.marketplace-filters {
+  display: grid;
+  gap: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 26px;
+  padding: 22px;
+  background: var(--color-white);
+  box-shadow: 0 8px 26px var(--shadow-light);
+}
+
+.marketplace-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.marketplace-filter-grid label {
+  display: grid;
+  gap: 8px;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.marketplace-filter-grid input,
+.marketplace-filter-grid select {
+  min-width: 0;
+  border: 1px solid var(--color-line-light);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: var(--color-white);
+}
+
+.marketplace-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+@media (max-width: 1180px) {
+  .landing-topbar {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .landing-topbar-signed-in {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-topbar nav {
+    justify-content: flex-start;
+  }
+
+  .landing-topbar-search {
+    justify-self: stretch;
+    width: 100%;
+  }
+}
+
+@media (max-width: 900px) {
+  .hero,
+  .why,
+  .app-promo,
+  .marketplace-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero {
+    min-height: auto;
+  }
+
+  .landing-hero-media {
+    min-height: 320px;
+  }
+
+  .landing-hero-copy {
+    padding: 42px 20px;
+  }
+
+  .landing-hero-media::after {
+    background:
+      linear-gradient(0deg, var(--color-black) 0%, var(--black-transparent) 42%),
+      linear-gradient(0deg, var(--black-image-veil), var(--black-image-veil));
+  }
+
+  .hero h1,
+  .section-head h1 {
+    font-size: 34px;
+  }
+
+  .why,
+  .services,
+  .preview-band,
+  .app-promo,
+  .landing-page,
+  footer {
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+
+  .landing-section-title-row {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .phone-input,
+  .location-control {
+    grid-template-columns: 1fr;
+  }
+
+  .search-heading {
+    align-items: start;
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+
+@media (max-width: 620px) {
+  .landing-topbar-search {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-topbar-search label + label {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .landing-topbar nav {
+    gap: 14px;
+  }
+
+  .landing-page {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .hero h1,
+  .section-head h1,
+  .why h2,
+  .services h2,
+  .app-promo h2,
+  .preview-band h2 {
+    font-size: 30px;
+  }
+
+  .assurance {
+    padding: 30px;
+  }
+}
