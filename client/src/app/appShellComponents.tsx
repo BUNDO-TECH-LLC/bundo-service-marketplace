@@ -5,6 +5,7 @@ import type { ActionRunner, BookingSuccessState, MarketplaceSort } from '../appT
 import { EmptyState } from '../components/EmptyState';
 import { StatCard } from '../components/StatCard';
 import { api } from '../lib/api';
+import { uploadPortfolioImage } from '../lib/portfolioUpload';
 import { bookingDate } from '../lib/bookingDisplay';
 import { auth, firebaseReady } from '../lib/firebase';
 import { dayLabels, money } from '../lib/formatting';
@@ -17,7 +18,6 @@ import {
   AvailabilitySlot,
   Booking,
   Category,
-  CloudinarySignedUpload,
   Notification,
   Offering,
   PortfolioImage,
@@ -286,12 +286,43 @@ export function ArtisanLanding({
     };
   }, [firebaseUser, token]);
 
+  async function ensureArtisanProfileForUpload() {
+    if (profile?.id) {
+      return;
+    }
+
+    const existing = await api<{ profile: Artisan }>('/artisans/me', { token }).catch(() => null);
+    if (existing?.profile?.id) {
+      setProfile(existing.profile);
+      return;
+    }
+
+    const displayName =
+      setup.businessName.trim() ||
+      setup.fullName.trim() ||
+      firebaseUser?.displayName?.trim() ||
+      'Artisan';
+
+    await api('/artisans/profile', {
+      method: 'POST',
+      token,
+      body: JSON.stringify({
+        displayName,
+        bio: categories.find((category) => category.id === setup.categoryId)?.name || 'Bundo artisan',
+        city: setup.location.trim() || 'Lagos',
+        area: setup.area.trim() || undefined,
+        lat: Number(setup.lat) || 6.5244,
+        lng: Number(setup.lng) || 3.3792,
+      }),
+    });
+  }
+
   async function hydrateOnboarding() {
     const [profileResponse, imageResponse, slotResponse, kycResponse] = await Promise.all([
       api<{ profile: Artisan }>('/artisans/me', { token }).catch(() => ({ profile: null as unknown as Artisan })),
       api<{ images: PortfolioImage[] }>('/artisans/portfolio-images/me', { token }).catch(() => ({ images: [] })),
       api<{ slots: AvailabilitySlot[] }>('/artisans/availability-slots/me', { token }).catch(() => ({ slots: [] })),
-      api<{ submission: ArtisanKycSubmission | null }>('/artisans/kyc', { token }),
+      api<{ submission: ArtisanKycSubmission | null }>('/artisans/kyc', { token }).catch(() => ({ submission: null })),
     ]);
     setProfile(profileResponse.profile || null);
     setPortfolioImages(imageResponse.images);
@@ -398,46 +429,10 @@ export function ArtisanLanding({
   }
 
   async function uploadPortfolioFile(file: File, displayOrder: number) {
-    if (!file.type.startsWith('image/')) {
-      throw new Error('Please choose an image file.');
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      throw new Error('Each image must be 5MB or smaller.');
-    }
-
     setUploadingPortfolio(true);
     try {
-      const signatureResponse = await api<{ upload: CloudinarySignedUpload }>(
-        '/artisans/portfolio-images/sign-upload',
-        { method: 'POST', token }
-      );
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('api_key', signatureResponse.upload.apiKey);
-      formData.append('timestamp', String(signatureResponse.upload.timestamp));
-      formData.append('folder', signatureResponse.upload.folder);
-      formData.append('signature', signatureResponse.upload.signature);
-
-      const uploadResponse = await fetch(
-        `https://api.cloudinary.com/v1_1/${signatureResponse.upload.cloudName}/image/upload`,
-        { method: 'POST', body: formData }
-      );
-      const uploadData = await uploadResponse.json();
-
-      if (!uploadResponse.ok) {
-        throw new Error(uploadData?.error?.message || 'Could not upload image');
-      }
-
-      await api('/artisans/portfolio-images', {
-        method: 'POST',
-        token,
-        body: JSON.stringify({
-          cloudinaryId: uploadData.public_id,
-          url: uploadData.secure_url,
-          displayOrder,
-        }),
-      });
+      await ensureArtisanProfileForUpload();
+      await uploadPortfolioImage(token, file, displayOrder);
       await hydrateOnboarding();
     } finally {
       setUploadingPortfolio(false);
@@ -2064,8 +2059,8 @@ export function ArtisanPanel({
       api<{ profile: Artisan }>('/artisans/me', { token }).catch(() => ({ profile: null as unknown as Artisan })),
       api<{ images: PortfolioImage[] }>('/artisans/portfolio-images/me', { token }).catch(() => ({ images: [] })),
       api<{ slots: AvailabilitySlot[] }>('/artisans/availability-slots/me', { token }).catch(() => ({ slots: [] })),
-      api<{ account: ProviderPayoutAccount | null }>('/artisans/payout-account', { token }),
-      api<{ submission: ArtisanKycSubmission | null }>('/artisans/kyc', { token }),
+      api<{ account: ProviderPayoutAccount | null }>('/artisans/payout-account', { token }).catch(() => ({ account: null })),
+      api<{ submission: ArtisanKycSubmission | null }>('/artisans/kyc', { token }).catch(() => ({ submission: null })),
     ]);
 
     setProfile(profileResponse.profile || null);
@@ -2163,56 +2158,14 @@ export function ArtisanPanel({
   }
 
   async function uploadPortfolioFile(file: File) {
-    if (!file.type.startsWith('image/')) {
-      throw new Error('Please choose an image file.');
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      throw new Error('Each image must be 5MB or smaller.');
+    if (!profile?.id) {
+      throw new Error('Create your artisan profile above before uploading photos.');
     }
 
     setUploadingPortfolio(true);
 
     try {
-      const signatureResponse = await api<{ upload: CloudinarySignedUpload }>(
-        '/artisans/portfolio-images/sign-upload',
-        {
-          method: 'POST',
-          token,
-        }
-      );
-
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('api_key', signatureResponse.upload.apiKey);
-      formData.append('timestamp', String(signatureResponse.upload.timestamp));
-      formData.append('folder', signatureResponse.upload.folder);
-      formData.append('signature', signatureResponse.upload.signature);
-
-      const uploadResponse = await fetch(
-        `https://api.cloudinary.com/v1_1/${signatureResponse.upload.cloudName}/image/upload`,
-        {
-          method: 'POST',
-          body: formData,
-        }
-      );
-
-      const uploadData = await uploadResponse.json();
-
-      if (!uploadResponse.ok) {
-        throw new Error(uploadData?.error?.message || 'Could not upload image');
-      }
-
-      await api('/artisans/portfolio-images', {
-        method: 'POST',
-        token,
-        body: JSON.stringify({
-          cloudinaryId: uploadData.public_id,
-          url: uploadData.secure_url,
-          displayOrder: portfolioImages.length,
-        }),
-      });
-
+      await uploadPortfolioImage(token, file, portfolioImages.length);
       await hydrateWorkspace();
     } finally {
       setUploadingPortfolio(false);

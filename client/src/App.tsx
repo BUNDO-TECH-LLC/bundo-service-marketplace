@@ -163,7 +163,12 @@ function App() {
         setNotice(done);
       }
     } catch (error) {
-      const message = error instanceof ApiError ? error.message : 'Something went wrong';
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : error instanceof Error && error.message.trim()
+            ? error.message
+            : 'Something went wrong';
       setNotice(message);
     } finally {
       setBusy(false);

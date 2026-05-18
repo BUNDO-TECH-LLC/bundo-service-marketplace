@@ -1,10 +1,9 @@
 import { api } from './api';
+import { assertAcceptableImageFile } from './imageFile';
 import type { CloudinarySignedUpload } from '../types';
 
 export async function uploadChatImage(token: string, file: File) {
-  if (!file.type.startsWith('image/')) {
-    throw new Error('Please choose an image file.');
-  }
+  assertAcceptableImageFile(file);
 
   if (file.size > 5 * 1024 * 1024) {
     throw new Error('Chat images must be 5MB or smaller.');

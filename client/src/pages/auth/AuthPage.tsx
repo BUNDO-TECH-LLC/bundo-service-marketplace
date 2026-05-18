@@ -15,6 +15,7 @@ import type { Role } from '../../types';
 import googleLogo from '../../assets/icons/material-icon-theme_google.svg';
 import appleLogo from '../../assets/icons/Vector.svg';
 import LoadingPage from '../LoadingPage';
+import { PasswordInput } from '../../components/PasswordInput';
 
 type AuthMode = 'login' | 'signup';
 type AccountKind = Extract<Role, 'CUSTOMER' | 'ARTISAN'>;
@@ -245,12 +246,11 @@ export function AuthPage({ mode }: AuthPageProps) {
           <span className={requiredLabelClassName}>
             Password<em className={requiredMarkClassName}>*</em>
           </span>
-          <input
-            className={inputClassName}
+          <PasswordInput
+            wrapClassName="password-input-wrap--auth-page"
             value={password}
-            onChange={(event) => setPassword(event.target.value)}
+            onChange={setPassword}
             placeholder={mode === 'login' ? 'Enter your password' : 'Create a password'}
-            type="password"
             autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
             minLength={mode === 'signup' ? 8 : undefined}
             required
@@ -272,12 +272,11 @@ export function AuthPage({ mode }: AuthPageProps) {
             <span className={requiredLabelClassName}>
               Confirm Password<em className={requiredMarkClassName}>*</em>
             </span>
-            <input
-              className={inputClassName}
+            <PasswordInput
+              wrapClassName="password-input-wrap--auth-page"
               value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
+              onChange={setConfirmPassword}
               placeholder="Confirm password"
-              type="password"
               autoComplete="new-password"
               minLength={8}
               required

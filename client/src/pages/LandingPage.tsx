@@ -9,6 +9,7 @@ import {
   User,
 } from 'firebase/auth';
 import { api, ApiError } from '../lib/api';
+import { uploadPortfolioImage } from '../lib/portfolioUpload';
 import { resolveApiSession } from '../lib/authSession';
 import { auth, firebaseReady } from '../lib/firebase';
 import {
@@ -23,7 +24,6 @@ import {
   ArtisanKycSubmission,
   Booking,
   Category,
-  CloudinarySignedUpload,
   Conversation,
   Message,
   Notification,
@@ -37,6 +37,7 @@ import {
   AvailabilitySlot,
 } from '../types';
 import bundoLogo from '../assets/BundoLogo.png';
+import { PasswordInput } from '../components/PasswordInput';
 
 type View = 'home' | 'marketplace' | 'workspace' | 'admin' | 'help' | 'artisan-profile';
 type WorkspaceSection = 'overview' | 'bookings' | 'messages' | 'offers' | 'notifications';
@@ -222,7 +223,12 @@ function LandingPage() {
         setNotice(done);
       }
     } catch (error) {
-      const message = error instanceof ApiError ? error.message : 'Something went wrong';
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : error instanceof Error && error.message.trim()
+            ? error.message
+            : 'Something went wrong';
       setNotice(message);
     } finally {
       setBusy(false);
@@ -1188,7 +1194,13 @@ function AuthBox({
               </label>
               <label>
                 Password
-                <input value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Your password" type="password" required />
+                <PasswordInput
+                  value={password}
+                  onChange={setPassword}
+                  placeholder="Your password"
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                  required
+                />
               </label>
               <button disabled={!firebaseReady || submitting}>
                 {preferredRole === 'ARTISAN'
@@ -2294,48 +2306,14 @@ function ArtisanPanel({
   }
 
   async function uploadPortfolioFile(file: File) {
+    if (!profile?.id) {
+      throw new Error('Create your artisan profile above before uploading photos.');
+    }
+
     setUploadingPortfolio(true);
 
     try {
-      const signatureResponse = await api<{ upload: CloudinarySignedUpload }>(
-        '/artisans/portfolio-images/sign-upload',
-        {
-          method: 'POST',
-          token,
-        }
-      );
-
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('api_key', signatureResponse.upload.apiKey);
-      formData.append('timestamp', String(signatureResponse.upload.timestamp));
-      formData.append('folder', signatureResponse.upload.folder);
-      formData.append('signature', signatureResponse.upload.signature);
-
-      const uploadResponse = await fetch(
-        `https://api.cloudinary.com/v1_1/${signatureResponse.upload.cloudName}/image/upload`,
-        {
-          method: 'POST',
-          body: formData,
-        }
-      );
-
-      const uploadData = await uploadResponse.json();
-
-      if (!uploadResponse.ok) {
-        throw new Error(uploadData?.error?.message || 'Could not upload image');
-      }
-
-      await api('/artisans/portfolio-images', {
-        method: 'POST',
-        token,
-        body: JSON.stringify({
-          cloudinaryId: uploadData.public_id,
-          url: uploadData.secure_url,
-          displayOrder: portfolioImages.length,
-        }),
-      });
-
+      await uploadPortfolioImage(token, file, portfolioImages.length);
       await hydrateWorkspace();
     } finally {
       setUploadingPortfolio(false);

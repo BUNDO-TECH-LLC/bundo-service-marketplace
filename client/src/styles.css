@@ -873,19 +873,38 @@ canvas {
 }
 
 .password-toggle {
-  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  min-width: 44px;
+  padding: 0;
   border: 0;
   border-left: 1px solid var(--line);
   color: var(--muted);
   background: #f6f4f1;
-  font-size: 13px;
-  font-weight: 800;
-  white-space: nowrap;
+  cursor: pointer;
 }
 
 .password-toggle:hover {
   color: var(--ink);
   background: #ece8e3;
+}
+
+.password-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.password-input-wrap--auth-page {
+  border-radius: 8px;
+}
+
+.password-input-wrap--auth-page input {
+  min-height: 43px;
+  padding: 10px 14px;
+  font-size: 15px;
+  color: var(--color-ink);
 }
 
 .auth-form button {

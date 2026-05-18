@@ -118,7 +118,7 @@ router.post(
   '/portfolio-images/sign-upload',
   verifyFirebaseToken,
   requireRole(Role.ARTISAN),
-  async (_req, res) => {
+  asyncHandler(async (_req, res) => {
     const timestamp = Math.floor(Date.now() / 1000);
     const folder = 'bundo/artisan-portfolio';
     const signature = buildCloudinaryUploadSignature(
@@ -136,7 +136,7 @@ router.post(
         signature,
       },
     });
-  }
+  })
 );
 
 router.post(
@@ -274,7 +274,7 @@ router.post(
   '/portfolio-images',
   verifyFirebaseToken,
   requireRole(Role.ARTISAN),
-  async (req, res) => {
+  asyncHandler(async (req, res) => {
     const { cloudinaryId, url, displayOrder } = req.body;
 
     if (!cloudinaryId || typeof cloudinaryId !== 'string') {
@@ -285,9 +285,14 @@ router.post(
       throw httpError(400, 'url is required');
     }
 
+    const normalizedOrder =
+      displayOrder === undefined ? undefined : Math.floor(Number(displayOrder));
+
     if (
-      displayOrder !== undefined &&
-      (!Number.isInteger(displayOrder) || displayOrder < 0)
+      normalizedOrder !== undefined &&
+      (!Number.isFinite(normalizedOrder) ||
+        !Number.isInteger(normalizedOrder) ||
+        normalizedOrder < 0)
     ) {
       throw httpError(400, 'displayOrder must be a non-negative integer');
     }
@@ -295,15 +300,18 @@ router.post(
     const image = await addPortfolioImage((req as any).user.firebaseUid, {
       cloudinaryId,
       url,
-      displayOrder,
+      ...(normalizedOrder !== undefined ? { displayOrder: normalizedOrder } : {}),
     });
 
     if (!image) {
       throw httpError(404, 'Create an artisan profile before adding portfolio images');
     }
 
-    throw httpError(201, 'Portfolio image added');
-  }
+    res.status(201).json({
+      message: 'Portfolio image added',
+      image,
+    });
+  })
 );
 
 router.post(
@@ -427,20 +435,16 @@ router.get(
   '/portfolio-images/me',
   verifyFirebaseToken,
   requireRole(Role.ARTISAN),
-  async (req, res) => {
+  asyncHandler(async (req, res) => {
     const images = await getPortfolioImagesForArtisanUser(
       (req as any).user.firebaseUid
     );
 
-    if (!images) {
-      throw httpError(404, 'Artisan profile not found');
-    }
-
     res.json({
       message: 'My portfolio images fetched',
-      images,
+      images: images ?? [],
     });
-  }
+  })
 );
 
 router.patch(
