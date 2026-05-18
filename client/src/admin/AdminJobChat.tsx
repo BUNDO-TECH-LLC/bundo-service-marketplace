@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import { ChatComposer, type ChatComposerPayload } from '../components/ChatComposer';
 import { uploadChatImage } from '../lib/chatUpload';
 import type { ActionRunner } from '../appTypes';
 import type { Conversation } from '../types';
@@ -51,12 +52,9 @@ export function AdminJobChat({
     setConversation(response.conversation);
   }
 
-  async function sendAdminReply(formElement: HTMLFormElement) {
-    const form = new FormData(formElement);
-    const body = String(form.get('body') || '').trim();
-    const imageFile = form.get('image');
+  async function sendAdminReply({ body, imageFile }: ChatComposerPayload) {
     const imagePayload =
-      imageFile instanceof File && imageFile.size > 0 ? await uploadChatImage(token, imageFile) : {};
+      imageFile && imageFile.size > 0 ? await uploadChatImage(token, imageFile) : {};
 
     if (!body && !('imageUrl' in imagePayload)) {
       throw new Error('Write a message or attach an image.');
@@ -67,7 +65,6 @@ export function AdminJobChat({
       token,
       body: JSON.stringify({ body, ...imagePayload }),
     });
-    formElement.reset();
     await reload();
   }
 
@@ -93,23 +90,13 @@ export function AdminJobChat({
         ))}
       </div>
 
-      <form
-        className="reply-form admin-reply-form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const form = event.currentTarget;
-          runAction(() => sendAdminReply(form), 'Admin reply sent');
-        }}
-      >
-        <label className="chat-attach-button">
-          Photo
-          <input name="image" type="file" accept="image/*" disabled={busy} />
-        </label>
-        <input name="body" placeholder="Reply as Bundo support in this thread" />
-        <button disabled={busy} type="submit">
-          Send reply
-        </button>
-      </form>
+      <ChatComposer
+        busy={busy}
+        className="admin-reply-form"
+        placeholder="Reply as Bundo support in this thread"
+        submitLabel="Send reply"
+        onSubmit={(payload) => runAction(() => sendAdminReply(payload), 'Admin reply sent')}
+      />
     </div>
   );
 }

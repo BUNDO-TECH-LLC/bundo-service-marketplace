@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import { ChatComposer, type ChatComposerPayload } from '../components/ChatComposer';
 import { uploadChatImage } from '../lib/chatUpload';
 import type { ActionRunner } from '../appTypes';
 import type { Conversation } from '../types';
@@ -54,13 +55,11 @@ export function AdminChatPanel({
     await refresh();
   }
 
-  async function sendAdminReply(formElement: HTMLFormElement) {
+  async function sendAdminReply({ body, imageFile }: ChatComposerPayload) {
     if (!activeConversation) return;
-    const form = new FormData(formElement);
-    const body = String(form.get('body') || '').trim();
-    const imageFile = form.get('image');
+
     const imagePayload =
-      imageFile instanceof File && imageFile.size > 0 ? await uploadChatImage(token, imageFile) : {};
+      imageFile && imageFile.size > 0 ? await uploadChatImage(token, imageFile) : {};
 
     if (!body && !('imageUrl' in imagePayload)) {
       throw new Error('Write a message or attach an image.');
@@ -71,7 +70,6 @@ export function AdminChatPanel({
       token,
       body: JSON.stringify({ body, ...imagePayload }),
     });
-    formElement.reset();
     await openConversation(activeConversation.id);
     await refresh();
   }
@@ -112,21 +110,13 @@ export function AdminChatPanel({
                 ))}
               </div>
 
-              <form
-                className="reply-form admin-reply-form"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  const form = event.currentTarget;
-                  runAction(() => sendAdminReply(form), 'Admin reply sent');
-                }}
-              >
-                <label className="chat-attach-button">
-                  Photo
-                  <input name="image" type="file" accept="image/*" disabled={busy} />
-                </label>
-                <input name="body" placeholder="Reply in this customer-artisan chat as Bundo support" />
-                <button disabled={busy}>Send reply</button>
-              </form>
+              <ChatComposer
+                busy={busy}
+                className="admin-reply-form"
+                placeholder="Reply in this customer-artisan chat as Bundo support"
+                submitLabel="Send reply"
+                onSubmit={(payload) => runAction(() => sendAdminReply(payload), 'Admin reply sent')}
+              />
 
               <h3>Admin notes</h3>
               {(activeConversation.adminNotes || []).length === 0 && <p>No notes yet.</p>}

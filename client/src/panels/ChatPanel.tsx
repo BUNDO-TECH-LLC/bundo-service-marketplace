@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { formatMessageTime } from '../lib/formatting';
+import { ChatComposer, type ChatComposerPayload } from '../components/ChatComposer';
 import { uploadChatImage } from '../lib/chatUpload';
 import type { ActionRunner } from '../appTypes';
 import type { Conversation, Message } from '../types';
@@ -60,13 +61,11 @@ export function ChatPanel({
     return () => window.clearInterval(intervalId);
   }, [activeConversation?.id, token]);
 
-  async function reply(formElement: HTMLFormElement) {
+  async function reply({ body, imageFile }: ChatComposerPayload) {
     if (!activeConversation) return;
-    const form = new FormData(formElement);
-    const body = String(form.get('body') || '').trim();
-    const imageFile = form.get('image');
+
     const imagePayload =
-      imageFile instanceof File && imageFile.size > 0 ? await uploadChatImage(token, imageFile) : {};
+      imageFile && imageFile.size > 0 ? await uploadChatImage(token, imageFile) : {};
 
     if (!body && !('imageUrl' in imagePayload)) {
       throw new Error('Write a message or attach an image.');
@@ -77,7 +76,6 @@ export function ChatPanel({
       token,
       body: JSON.stringify({ body, ...imagePayload }),
     });
-    formElement.reset();
     await openConversation(activeConversation.id);
     await refresh();
   }
@@ -190,21 +188,12 @@ export function ChatPanel({
                 })}
               </div>
 
-              <form
-                className="chat-composer"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  const form = event.currentTarget;
-                  runAction(() => reply(form), 'Reply sent');
-                }}
-              >
-                <label className="chat-attach-button">
-                  Photo
-                  <input name="image" type="file" accept="image/*" disabled={busy} />
-                </label>
-                <input name="body" placeholder="Write a message" />
-                <button disabled={busy}>Send</button>
-              </form>
+              <ChatComposer
+                busy={busy}
+                placeholder="Write a message"
+                submitLabel="Send"
+                onSubmit={(payload) => runAction(() => reply(payload), 'Reply sent')}
+              />
             </>
           )}
         </section>
