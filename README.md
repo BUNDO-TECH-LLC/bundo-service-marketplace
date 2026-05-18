@@ -21,7 +21,9 @@ npm run build   # server tsc + client tsc/vite
 npm test        # server unit tests (Vitest)
 ```
 
-**Production database:** `cd server && npm run db:migrate:deploy` after `DIRECT_URL` (or Supabase session pooler on port 5432) is set. See [docs/PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md) — *Build, test, and database*.
+**Production database:** `cd server && npm run db:migrate:deploy:pooler` (recommended for Supabase) or `db:migrate:deploy` when `DIRECT_URL` uses the session pooler on port 5432. See [docs/PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md).
+
+**Production URLs:** Web https://bundo-service-marketplace.vercel.app · API https://bundo-service-marketplace.onrender.com
 
 ## Documentation
 
@@ -30,8 +32,8 @@ Product architecture, API index, payment flows, deployment steps, and launch che
 ## Deploy checklist (production)
 
 1. `npm run build` and `npm test` locally (or rely on CI on `main`).
-2. `cd server && npm run db:migrate:deploy` on the production database.
-3. Push to `main` and redeploy API + client (Vercel auto-builds `client/` when connected).
+2. `cd server && npm run db:migrate:deploy:pooler` on the production database.
+3. Push to `main`; Vercel rebuilds the client when connected. On Render, trigger **Manual Deploy** (or confirm auto-deploy from `main`) for the API service.
 4. Confirm `VITE_API_BASE_URL`, `CORS_ORIGIN`, and `PAYSTACK_CALLBACK_URL` match your live URLs.
 
 ## Scripts (root `package.json`)

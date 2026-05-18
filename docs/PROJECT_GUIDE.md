@@ -987,6 +987,7 @@ From `server/`:
 
 ```bash
 npm run db:migrate:deploy   # apply migrations in staging/production
+npm run db:migrate:deploy:pooler   # same, but DIRECT_URL = DATABASE_URL with port 5432 (Supabase session pooler)
 ```
 
 **Migrations and `DIRECT_URL`:** Prisma uses `DIRECT_URL` when set (see [prisma.config.ts](/Users/macbook/bundo/server/prisma.config.ts)), otherwise `DATABASE_URL`. Supabase **direct** hosts (`db.<ref>.supabase.co`) must resolve in DNS; if not, use the **session pooler** on port **5432** as `DIRECT_URL` for `migrate deploy`. The app runtime can keep using the transaction pooler on port **6543** for `DATABASE_URL`.
@@ -1002,6 +1003,13 @@ npm run test:smoke
 ---
 
 ## Production deployment
+
+**Live URLs (current):**
+
+| Service | URL |
+|---------|-----|
+| Web (Vercel) | https://bundo-service-marketplace.vercel.app |
+| API (Render) | https://bundo-service-marketplace.onrender.com |
 
 Typical layout for Bundo today:
 
