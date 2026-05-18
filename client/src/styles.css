@@ -2263,7 +2263,7 @@ footer h4 {
   display: none;
 }
 
-.artisan-stepper span {
+.artisan-stepper-num {
   display: grid;
   width: 52px;
   height: 52px;
@@ -2272,13 +2272,19 @@ footer h4 {
   border-radius: 999px;
   color: var(--ink);
   background: #e8e8e9;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.artisan-stepper-label-short {
+  display: none;
 }
 
 .artisan-stepper .active {
   color: var(--accent);
 }
 
-.artisan-stepper .active span {
+.artisan-stepper .active .artisan-stepper-num {
   color: #fff;
   background: #ec7f2c;
 }
@@ -5246,11 +5252,6 @@ footer h4 {
     display: grid;
   }
 
-  .artisan-stepper {
-    grid-template-columns: 1fr 1fr;
-    gap: 18px;
-  }
-
   .artisan-stepper button::after {
     display: none;
   }
@@ -5297,6 +5298,242 @@ footer h4 {
 
   .booking-card {
     position: static;
+  }
+}
+
+@media (max-width: 768px) {
+  .artisan-setup-topline.artisan-setup-topline--menu {
+    min-height: 60px;
+    padding: 10px 16px;
+  }
+
+  .artisan-setup-topline-actions .secondary-button {
+    min-height: 36px;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .artisan-setup-topline-actions .account-chip {
+    width: 38px;
+    height: 38px;
+  }
+
+  .artisan-setup-topline-actions .account-avatar {
+    width: 30px;
+    height: 30px;
+    font-size: 12px;
+  }
+
+  .artisan-setup-page,
+  .artisan-pending-page {
+    min-height: calc(100vh - 60px);
+    padding: 76px 16px 88px;
+  }
+
+  .artisan-pending-card {
+    padding: 20px 16px;
+    gap: 14px;
+  }
+
+  .artisan-pending-page h1 {
+    font-size: 26px;
+    line-height: 1.2;
+  }
+
+  .artisan-pending-lead {
+    font-size: 14px;
+  }
+
+  .artisan-setup-head {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .artisan-setup-head h1 {
+    font-size: 26px;
+    line-height: 1.15;
+  }
+
+  .artisan-setup-head .muted {
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .artisan-setup-head strong {
+    justify-self: start;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    background: #fff3eb;
+  }
+
+  .artisan-stepper {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    margin-bottom: 18px;
+  }
+
+  .artisan-stepper button {
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 6px;
+    min-height: 0;
+    padding: 8px 4px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #faf9f8;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-align: center;
+  }
+
+  .artisan-stepper button::after {
+    display: none;
+  }
+
+  .artisan-stepper-label {
+    display: none;
+  }
+
+  .artisan-stepper-label-short {
+    display: block;
+  }
+
+  .artisan-stepper-num {
+    width: 30px;
+    height: 30px;
+    font-size: 13px;
+  }
+
+  .artisan-stepper .active {
+    border-color: #f0c2a7;
+    background: #fff8f3;
+  }
+
+  .artisan-review-note {
+    margin: 0 0 16px;
+    padding: 12px 14px;
+    font-size: 14px;
+  }
+
+  .artisan-setup-card,
+  .artisan-setup-card.wide,
+  .artisan-setup-card.media-step,
+  .artisan-setup-card.availability-step {
+    gap: 10px;
+    padding: 16px 14px;
+    border-radius: 12px;
+  }
+
+  .artisan-setup-card.wide,
+  .artisan-setup-card.media-step,
+  .artisan-setup-card.availability-step {
+    border: 1px solid #d2d2d4;
+    padding-top: 16px;
+  }
+
+  .artisan-setup-card h2 {
+    font-size: 22px;
+  }
+
+  .artisan-setup-card h3 {
+    margin-top: 12px;
+    font-size: 17px;
+  }
+
+  .artisan-setup-card p,
+  .artisan-setup-card small {
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .artisan-setup-card input,
+  .artisan-setup-card select,
+  .artisan-setup-card textarea {
+    padding: 11px 12px;
+    font-size: 15px;
+  }
+
+  .artisan-setup-card textarea {
+    min-height: 110px;
+  }
+
+  .terms-row {
+    margin-top: 14px;
+    gap: 10px !important;
+  }
+
+  .setup-package-card {
+    padding: 14px 12px;
+    gap: 10px;
+  }
+
+  .setup-package-head h3 {
+    font-size: 16px;
+  }
+
+  .setup-two-col {
+    gap: 8px;
+  }
+
+  .full-orange {
+    margin-top: 12px;
+    padding: 14px;
+    font-size: 15px;
+  }
+
+  .profile-upload {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .profile-upload strong {
+    justify-self: stretch;
+    text-align: center;
+  }
+
+  .setup-portfolio-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .day-picker,
+  .availability-dots {
+    gap: 8px;
+  }
+
+  .day-picker button,
+  .availability-dots span {
+    width: 42px;
+    height: 42px;
+    font-size: 16px;
+  }
+
+  .artisan-setup-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 12;
+    flex-direction: row;
+    gap: 10px;
+    margin: 20px -16px 0;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--line);
+    background: rgb(255 255 255 / 96%);
+    backdrop-filter: blur(8px);
+  }
+
+  .artisan-setup-actions button,
+  .artisan-setup-actions .secondary-button {
+    flex: 1;
+    min-width: 0;
+    padding: 12px 16px;
+    font-size: 15px;
   }
 }
 
@@ -5355,37 +5592,15 @@ footer h4 {
     grid-template-columns: 1fr;
   }
 
-  .artisan-setup-page,
   .artisan-dashboard-page {
     padding-right: 16px;
     padding-left: 16px;
   }
 
-  .artisan-setup-head h1,
   .artisan-dashboard-hero h1 {
     font-size: 32px;
   }
 
-  .artisan-stepper,
-  .artisan-stat-grid,
-  .setup-portfolio-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .artisan-stepper button {
-    font-size: 18px;
-  }
-
-  .artisan-stepper span {
-    width: 42px;
-    height: 42px;
-  }
-
-  .artisan-setup-card {
-    padding: 24px 18px;
-  }
-
-  .profile-upload,
   .artisan-request-card {
     grid-template-columns: 1fr;
   }
@@ -5429,16 +5644,6 @@ footer h4 {
     width: 46px;
     height: 46px;
     font-size: 18px;
-  }
-
-  .artisan-setup-actions {
-    align-items: stretch;
-    flex-direction: column-reverse;
-    gap: 12px;
-  }
-
-  .artisan-setup-actions button {
-    width: 100%;
   }
 
   .auth-drawer {

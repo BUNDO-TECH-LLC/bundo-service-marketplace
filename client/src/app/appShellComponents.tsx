@@ -573,17 +573,24 @@ export function ArtisanLanding({
       </section>
 
       <div className="artisan-stepper" aria-label="Artisan setup steps">
-        {['Basic info', 'Services & pricing', 'Portfolio', 'Availability & submit'].map((label, index) => {
+        {[
+          { id: 'basic', label: 'Basic info', shortLabel: 'Basic' },
+          { id: 'pricing', label: 'Services & pricing', shortLabel: 'Pricing' },
+          { id: 'portfolio', label: 'Portfolio', shortLabel: 'Photos' },
+          { id: 'submit', label: 'Availability & submit', shortLabel: 'Submit' },
+        ].map((stepItem, index) => {
           const number = index + 1;
           return (
             <button
-              key={label}
+              key={stepItem.id}
               type="button"
               className={number <= step ? 'active' : ''}
               onClick={() => setStep(number)}
+              aria-current={number === step ? 'step' : undefined}
             >
-              <span>{number}</span>
-              {label}
+              <span className="artisan-stepper-num">{number}</span>
+              <span className="artisan-stepper-label">{stepItem.label}</span>
+              <span className="artisan-stepper-label-short">{stepItem.shortLabel}</span>
             </button>
           );
         })}
