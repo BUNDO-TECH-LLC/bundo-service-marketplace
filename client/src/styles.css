@@ -241,30 +241,44 @@ canvas {
   top: 0;
   z-index: 20;
   display: grid;
-  min-height: 92px;
+  min-height: 72px;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 28px;
-  padding: 18px clamp(20px, 8vw, 120px);
+  gap: 20px;
+  padding: 14px clamp(20px, 8vw, 120px);
+  border-bottom: 1px solid var(--line);
   background: #fff;
 }
 
 .artisan-app-header .brand,
 .artisan-app-header nav button,
-.artisan-header-actions button {
+.artisan-header-actions button,
+.artisan-header-mobile-actions button {
   color: var(--ink);
   background: transparent;
+}
+
+.artisan-header-collapse {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  min-width: 0;
 }
 
 .artisan-app-header nav {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 22px;
 }
 
 .artisan-app-header nav button {
   border-radius: 0;
   padding: 10px 0;
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .artisan-app-header nav button.active,
@@ -273,16 +287,91 @@ canvas {
   color: var(--accent);
 }
 
+.artisan-header-end {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .artisan-header-actions {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 12px;
+}
+
+.artisan-header-mobile-actions {
+  display: none;
+}
+
+.artisan-header-menu-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #faf9f8;
+}
+
+.artisan-header-menu-toggle-bars,
+.artisan-header-menu-toggle-bars::before,
+.artisan-header-menu-toggle-bars::after {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentcolor;
+  content: '';
+}
+
+.artisan-header-menu-toggle-bars {
+  position: relative;
+}
+
+.artisan-header-menu-toggle-bars::before,
+.artisan-header-menu-toggle-bars::after {
+  position: absolute;
+  left: 0;
+}
+
+.artisan-header-menu-toggle-bars::before {
+  top: -6px;
+}
+
+.artisan-header-menu-toggle-bars::after {
+  top: 6px;
+}
+
+.artisan-app-header--nav-open .artisan-header-menu-toggle-bars {
+  background: transparent;
+}
+
+.artisan-app-header--nav-open .artisan-header-menu-toggle-bars::before {
+  top: 0;
+  transform: rotate(45deg);
+}
+
+.artisan-app-header--nav-open .artisan-header-menu-toggle-bars::after {
+  top: 0;
+  transform: rotate(-45deg);
+}
+
+.artisan-header-mobile-backdrop {
+  display: none;
 }
 
 .artisan-user-chip {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  max-width: 140px;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .artisan-user-chip span {
@@ -2186,8 +2275,8 @@ footer h4 {
 }
 
 .artisan-dashboard-page {
-  min-height: calc(100vh - 66px);
-  padding: 48px clamp(20px, 8vw, 120px) 72px;
+  min-height: calc(100vh - 72px);
+  padding: 24px clamp(20px, 8vw, 120px) 48px;
   background: #fff;
 }
 
@@ -2531,7 +2620,13 @@ footer h4 {
 
 .artisan-dashboard-hero {
   display: grid;
-  gap: 36px;
+  gap: 20px;
+}
+
+.artisan-dashboard-hero > .muted {
+  margin: 0;
+  max-width: 52ch;
+  line-height: 1.5;
 }
 
 .artisan-stat-grid {
@@ -2586,6 +2681,19 @@ footer h4 {
   border-radius: 8px;
   padding: 22px;
   background: #fff;
+}
+
+.artisan-request-card .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.artisan-request-card .actions button {
+  flex: 1 1 120px;
+  min-width: 0;
+  padding: 11px 14px;
 }
 
 .artisan-request-card h3,
@@ -5535,6 +5643,222 @@ footer h4 {
     padding: 12px 16px;
     font-size: 15px;
   }
+
+  .artisan-app-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    min-height: 60px;
+    padding: 10px 16px;
+  }
+
+  .artisan-app-header .brand {
+    font-size: 20px;
+  }
+
+  .artisan-app-header .brand-logo {
+    width: 28px;
+    height: 28px;
+  }
+
+  .artisan-header-menu-toggle {
+    display: inline-flex;
+  }
+
+  .artisan-header-actions--desktop {
+    display: none;
+  }
+
+  .artisan-header-collapse {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    z-index: 25;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    max-height: min(72vh, calc(100dvh - 60px));
+    overflow: auto;
+    border-top: 1px solid var(--line);
+    padding: 8px 16px 16px;
+    background: #fff;
+    box-shadow: 0 18px 40px rgb(18 18 18 / 10%);
+  }
+
+  .artisan-app-header--nav-open .artisan-header-collapse {
+    display: flex;
+  }
+
+  .artisan-app-header nav {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .artisan-app-header nav button {
+    width: 100%;
+    padding: 14px 4px;
+    text-align: left;
+    font-size: 15px;
+    border-bottom: 1px solid var(--line);
+    border-radius: 0;
+  }
+
+  .artisan-app-header nav button.active {
+    border-bottom: 1px solid var(--line);
+    color: var(--accent);
+    background: #fff8f3;
+  }
+
+  .artisan-header-mobile-actions {
+    display: grid;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .artisan-header-mobile-actions .secondary-button,
+  .artisan-header-mobile-actions .text-button {
+    width: 100%;
+    justify-content: center;
+    padding: 12px 16px;
+    text-align: center;
+  }
+
+  .artisan-user-chip-name {
+    display: none;
+  }
+
+  .artisan-user-chip {
+    max-width: none;
+  }
+
+  .artisan-user-chip span:first-child {
+    width: 36px;
+    height: 36px;
+  }
+
+  .artisan-header-mobile-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 15;
+    display: block;
+    padding: 0;
+    border: 0;
+    background: rgb(8 8 8 / 45%);
+    cursor: pointer;
+  }
+
+  .artisan-dashboard-page {
+    padding: 16px 16px 32px;
+  }
+
+  .artisan-dashboard-hero {
+    gap: 14px;
+  }
+
+  .artisan-dashboard-hero h1 {
+    font-size: 26px;
+    line-height: 1.15;
+  }
+
+  .artisan-dashboard-hero > .muted {
+    font-size: 14px;
+  }
+
+  .artisan-stat-grid {
+    gap: 10px;
+  }
+
+  .artisan-stat-card {
+    gap: 8px;
+    padding: 14px 12px;
+  }
+
+  .artisan-stat-card strong {
+    font-size: 28px;
+  }
+
+  .artisan-stat-card span,
+  .artisan-stat-card small {
+    font-size: 12px;
+  }
+
+  .artisan-dashboard-grid {
+    gap: 16px;
+    margin-top: 16px;
+  }
+
+  .artisan-request-stack,
+  .artisan-side-stack {
+    gap: 14px;
+  }
+
+  .logged-section-head {
+    align-items: center;
+    gap: 8px;
+  }
+
+  .logged-section-head h2 {
+    font-size: 18px;
+  }
+
+  .artisan-request-card {
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .artisan-request-card .recommended-avatar {
+    width: 48px;
+    height: 48px;
+    font-size: 18px;
+  }
+
+  .artisan-request-card h3 {
+    font-size: 17px;
+  }
+
+  .artisan-request-card p,
+  .artisan-request-card small {
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .artisan-request-card .actions {
+    flex-direction: column;
+    margin-top: 10px;
+  }
+
+  .artisan-request-card .actions button {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
+  .artisan-soft-card {
+    gap: 12px;
+    padding: 14px 12px;
+  }
+
+  .artisan-soft-card h2 {
+    font-size: 17px;
+  }
+
+  .summary-list {
+    gap: 12px;
+  }
+
+  .quick-links button {
+    padding: 10px 0;
+    font-size: 14px;
+  }
+
+  .artisan-jobs-page,
+  .artisan-job-detail-page,
+  .artisan-reviews-page,
+  .artisan-profile-settings-page {
+    gap: 18px;
+    padding: 16px;
+  }
 }
 
 @media (max-width: 620px) {
@@ -5589,19 +5913,6 @@ footer h4 {
 
   .recommended-card-head,
   .recommended-meta {
-    grid-template-columns: 1fr;
-  }
-
-  .artisan-dashboard-page {
-    padding-right: 16px;
-    padding-left: 16px;
-  }
-
-  .artisan-dashboard-hero h1 {
-    font-size: 32px;
-  }
-
-  .artisan-request-card {
     grid-template-columns: 1fr;
   }
 
