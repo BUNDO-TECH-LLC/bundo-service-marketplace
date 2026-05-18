@@ -29,6 +29,7 @@ import {
 import bundoLogo from '../assets/bundo-logo.png';
 import { artisanVerificationPhase } from '../lib/artisanVerification';
 import { ArtisanPendingApproval } from '../views/ArtisanPendingApproval';
+import { ArtisanOnboardingMediaStep } from '../views/ArtisanOnboardingMediaStep';
 import { ArtisanSetupShell } from '../views/ArtisanSetupShell';
 
 export function ArtisanAppHeader({
@@ -458,6 +459,14 @@ export function ArtisanLanding({
     }
   }
 
+  async function removePortfolioImage(imageId: string) {
+    await api(`/artisans/portfolio-images/${imageId}`, {
+      method: 'DELETE',
+      token,
+    });
+    await hydrateOnboarding();
+  }
+
   async function submitForVerification() {
     await Promise.all(
       selectedDays
@@ -764,37 +773,15 @@ export function ArtisanLanding({
       )}
 
       {step === 3 && (
-        <section className="artisan-setup-card media-step">
-          <h2>Add your photos</h2>
-          <p>A great profile photo and strong portfolio help customers choose you with confidence.</p>
-          <label className="profile-upload">
-            <span>Upload a photo <small>JPG or PNG · Max 5MB · Square crop recommended</small></span>
-            <strong>Choose file</strong>
-            <input type="file" accept="image/*" multiple disabled={busy || uploadingPortfolio} onChange={(event) => {
-              const files = Array.from(event.target.files || []);
-              if (!files.length) return;
-              void runAction(() => uploadPortfolioFiles(files), files.length > 1 ? 'Photos uploaded' : 'Photo uploaded');
-              event.currentTarget.value = '';
-            }} />
-          </label>
-          <h3>Portfolio images</h3>
-          <small>Show customers examples of your past work. Upload up to 12 photos.</small>
-          <div className="setup-portfolio-grid">
-            <label className="portfolio-upload-tile">
-              <span>⇧</span>
-              Upload a photo
-              <input type="file" accept="image/*" multiple disabled={busy || uploadingPortfolio || portfolioImages.length >= 12} onChange={(event) => {
-                const files = Array.from(event.target.files || []);
-                if (!files.length) return;
-                void runAction(() => uploadPortfolioFiles(files), files.length > 1 ? 'Portfolio images uploaded' : 'Portfolio image uploaded');
-                event.currentTarget.value = '';
-              }} />
-            </label>
-            {portfolioImages.slice(0, 11).map((image) => <img key={image.id} src={image.url} alt="Portfolio" />)}
-            {Array.from({ length: Math.max(0, 11 - portfolioImages.length) }).map((_, index) => <div className="portfolio-placeholder" key={index}>▧</div>)}
-          </div>
-          <p className="muted">Artisans with 6+ portfolio photos get up to 3x more booking requests.</p>
-        </section>
+        <ArtisanOnboardingMediaStep
+          portfolioImages={portfolioImages}
+          busy={busy}
+          uploadingPortfolio={uploadingPortfolio}
+          runAction={runAction}
+          uploadPortfolioFile={uploadPortfolioFile}
+          uploadPortfolioFiles={uploadPortfolioFiles}
+          removePortfolioImage={removePortfolioImage}
+        />
       )}
 
       {step === 4 && (
