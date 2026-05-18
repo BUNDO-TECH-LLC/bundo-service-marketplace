@@ -1013,8 +1013,8 @@ Typical layout for Bundo today:
 
 **After pushing to `main`:**
 
-1. Confirm GitHub Actions CI is green (build + tests).
-2. **Database:** apply migrations on production (`db:migrate:deploy`) before or immediately after API deploy.
+1. Confirm [GitHub Actions CI](https://github.com/BUNDO-TECH-LLC/bundo-service-marketplace/actions) is green (build + tests in `server/` and `client/`).
+2. **Database:** apply migrations on production (`db:migrate:deploy`) before or immediately after API deploy. This release adds `20260516120000_add_booking_ongoing_status` (`ONGOING` on `BookingStatus`). If `migrate deploy` fails with Prisma `P1001` on `db.<ref>.supabase.co`, set `DIRECT_URL` to the Supabase **session pooler** hostname on port **5432** (keep transaction pooler on **6543** for `DATABASE_URL` at runtime).
 3. **API:** redeploy or restart so the new build is live; verify `GET /health` and `GET /ready`.
 4. **Web:** Vercel (if connected to the repo) usually auto-deploys `client/` on push; confirm `VITE_API_BASE_URL` points at the live API.
 5. **Paystack:** callback URL must be `{production-web-origin}/workspace/bookings` (see `PAYSTACK_CALLBACK_URL` in server env).
