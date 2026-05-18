@@ -747,6 +747,47 @@ canvas {
   background: var(--color-white);
 }
 
+.password-input-wrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--color-white);
+}
+
+.password-input-wrap:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.password-input-wrap input {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.password-input-wrap input:focus {
+  outline: none;
+}
+
+.password-toggle {
+  padding: 0 14px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  color: var(--muted);
+  background: #f6f4f1;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.password-toggle:hover {
+  color: var(--ink);
+  background: #ece8e3;
+}
+
 .auth-form button {
   padding: 13px 18px;
   color: var(--color-white);

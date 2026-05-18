@@ -50,11 +50,20 @@ export function AuthBox({
   const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
   const [authStep, setAuthStep] = useState<'role' | 'account' | 'verify'>('account');
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [preferredRole, setPreferredRole] = useState<SignupRole | null>(null);
   const [pendingAuthUser, setPendingAuthUser] = useState<User | null>(null);
   const [pendingEmailVerificationUser, setPendingEmailVerificationUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    if (!drawerOpen) {
+      setShowPassword(false);
+      setShowConfirmPassword(false);
+    }
+  }, [drawerOpen]);
 
   useEffect(() => {
     if (!authPromptSignal) return;
@@ -637,29 +646,51 @@ export function AuthBox({
                   {mode !== 'reset' && (
                     <label>
                       Password
-                      <input
-                        value={password}
-                        onChange={(event) => setPassword(event.target.value)}
-                        placeholder="Your password"
-                        type="password"
-                        autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                        minLength={6}
-                        required
-                      />
+                      <span className="password-input-wrap">
+                        <input
+                          value={password}
+                          onChange={(event) => setPassword(event.target.value)}
+                          placeholder="Your password"
+                          type={showPassword ? 'text' : 'password'}
+                          autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                          minLength={6}
+                          required
+                        />
+                        <button
+                          type="button"
+                          className="password-toggle"
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                          aria-pressed={showPassword}
+                          onClick={() => setShowPassword((visible) => !visible)}
+                        >
+                          {showPassword ? 'Hide' : 'Show'}
+                        </button>
+                      </span>
                     </label>
                   )}
                   {mode === 'signup' && (
                     <label>
                       Verify password
-                      <input
-                        value={confirmPassword}
-                        onChange={(event) => setConfirmPassword(event.target.value)}
-                        placeholder="Retype your password"
-                        type="password"
-                        autoComplete="new-password"
-                        minLength={6}
-                        required
-                      />
+                      <span className="password-input-wrap">
+                        <input
+                          value={confirmPassword}
+                          onChange={(event) => setConfirmPassword(event.target.value)}
+                          placeholder="Retype your password"
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          autoComplete="new-password"
+                          minLength={6}
+                          required
+                        />
+                        <button
+                          type="button"
+                          className="password-toggle"
+                          aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                          aria-pressed={showConfirmPassword}
+                          onClick={() => setShowConfirmPassword((visible) => !visible)}
+                        >
+                          {showConfirmPassword ? 'Hide' : 'Show'}
+                        </button>
+                      </span>
                     </label>
                   )}
               <button disabled={!firebaseReady || submitting}>
