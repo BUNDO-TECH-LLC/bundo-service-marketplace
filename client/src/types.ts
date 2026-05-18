@@ -82,7 +82,8 @@ export type Booking = {
   customerId?: string;
   artisanId?: string;
   offeringId?: string;
-  status: 'REQUESTED' | 'ACCEPTED' | 'DECLINED' | 'CANCELLED' | 'COMPLETED';
+  status: 'REQUESTED' | 'ACCEPTED' | 'ONGOING' | 'DECLINED' | 'CANCELLED' | 'COMPLETED';
+  conversationId?: string | null;
   note: string | null;
   scheduledAt: string | null;
   customerUser?: Pick<ApiUser, 'firebaseUid' | 'email' | 'phone'>;
@@ -91,6 +92,12 @@ export type Booking = {
   payment?: Payment | null;
   payouts?: Payout[];
   disputes?: Dispute[];
+  review?: {
+    id: string;
+    rating: number;
+    comment: string | null;
+    createdAt: string;
+  } | null;
 };
 
 export type Payment = {

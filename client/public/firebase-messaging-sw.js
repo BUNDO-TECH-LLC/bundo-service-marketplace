@@ -20,7 +20,7 @@ messaging.onBackgroundMessage((payload) => {
   const options = {
     body: payload.notification?.body || 'You have a new notification',
     data: {
-      url: '/?view=workspace&section=notifications',
+      url: '/workspace/notifications',
     },
   };
 

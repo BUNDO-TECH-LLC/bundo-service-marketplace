@@ -1,5 +1,6 @@
 import type { Role } from '../types';
 import type { AdminSection, View, WorkspaceSection } from '../appTypes';
+import { buildAppPath } from './appPaths';
 
 export const routeStorageKey = 'bundo:last-route';
 
@@ -54,4 +55,16 @@ export function readStoredRoute(role: Role | null) {
   } catch {
     return null;
   }
+}
+
+export function storedRouteToPath(stored: {
+  view: View;
+  workspaceSection: WorkspaceSection;
+  adminSection: AdminSection;
+}): string {
+  return buildAppPath({
+    view: stored.view,
+    workspaceSection: stored.workspaceSection,
+    adminSection: stored.adminSection,
+  });
 }

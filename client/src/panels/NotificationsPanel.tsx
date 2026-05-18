@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from '../lib/api';
 import { bookingDate } from '../lib/bookingDisplay';
+import { normalizeNotificationLink } from '../lib/notificationNavigation';
 import { notificationTypeLabel, relativeNotificationTime } from '../lib/notificationDisplay';
 import type { ActionRunner, PushStatus } from '../appTypes';
 import type { Notification } from '../types';
@@ -15,6 +16,7 @@ export function NotificationsPanel({
   pushStatus,
   pushEnabled,
   enablePushAlerts,
+  onNavigate,
 }: {
   token: string;
   notifications: Notification[];
@@ -24,6 +26,7 @@ export function NotificationsPanel({
   pushStatus: PushStatus;
   pushEnabled: boolean;
   enablePushAlerts: () => Promise<void>;
+  onNavigate: (path: string) => void;
 }) {
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
@@ -33,6 +36,16 @@ export function NotificationsPanel({
       token,
     });
     await refresh();
+  }
+
+  async function openNotification(notification: Notification) {
+    if (!notification.readAt) {
+      await markRead(notification.id);
+    }
+    const path = normalizeNotificationLink(notification.link);
+    if (path) {
+      onNavigate(path);
+    }
   }
 
   async function markAllRead() {
@@ -51,9 +64,24 @@ export function NotificationsPanel({
     await refresh();
   }
 
+  const isProduction = import.meta.env.PROD;
   const unreadCount = notifications.filter((notification) => !notification.readAt).length;
   const visibleNotifications =
     filter === 'unread' ? notifications.filter((notification) => !notification.readAt) : notifications;
+
+  function isCardInteractive(notification: Notification, targetPath: string | null) {
+    return Boolean(targetPath) || !notification.readAt;
+  }
+
+  async function handleCardActivate(notification: Notification, targetPath: string | null) {
+    if (targetPath) {
+      await openNotification(notification);
+      return;
+    }
+    if (!notification.readAt) {
+      await markRead(notification.id);
+    }
+  }
 
   return (
     <section className="notifications-page">
@@ -112,13 +140,15 @@ export function NotificationsPanel({
           >
             {pushEnabled ? 'Alerts enabled' : 'Enable push alerts'}
           </button>
-          <button
-            className="secondary-button"
-            disabled={busy}
-            onClick={() => runAction(sendTestNotification, 'Test notification sent')}
-          >
-            Send test notification
-          </button>
+          {!isProduction && (
+            <button
+              className="secondary-button"
+              disabled={busy}
+              onClick={() => runAction(sendTestNotification, 'Test notification sent')}
+            >
+              Send test notification
+            </button>
+          )}
         </div>
       </section>
 
@@ -152,10 +182,37 @@ export function NotificationsPanel({
           />
         ) : (
           <div className="notification-list">
-            {visibleNotifications.map((notification) => (
+            {visibleNotifications.map((notification) => {
+              const targetPath = normalizeNotificationLink(notification.link);
+              const interactive = isCardInteractive(notification, targetPath);
+              return (
               <article
-                className={`notification-card ${notification.readAt ? 'read' : 'unread'}`}
+                className={`notification-card ${notification.readAt ? 'read' : 'unread'}${interactive ? ' notification-card-clickable' : ''}`}
                 key={notification.id}
+                role={interactive ? (targetPath ? 'link' : 'button') : undefined}
+                tabIndex={interactive && !busy ? 0 : undefined}
+                aria-label={
+                  targetPath
+                    ? `${notification.title}. Open notification.`
+                    : !notification.readAt
+                      ? `${notification.title}. Mark as read.`
+                      : undefined
+                }
+                onClick={
+                  interactive && !busy
+                    ? () => void runAction(() => handleCardActivate(notification, targetPath), '')
+                    : undefined
+                }
+                onKeyDown={
+                  interactive && !busy
+                    ? (event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          void runAction(() => handleCardActivate(notification, targetPath), '');
+                        }
+                      }
+                    : undefined
+                }
               >
                 <div className={`notification-dot ${notification.readAt ? 'read' : 'unread'}`} aria-hidden="true" />
                 <div className="notification-copy">
@@ -168,11 +225,18 @@ export function NotificationsPanel({
                   <small>{bookingDate(notification.createdAt)}</small>
                 </div>
                 <div className="notification-card-actions">
+                  {targetPath ? (
+                    <span className="notification-open-hint">Tap to open</span>
+                  ) : null}
                   {!notification.readAt ? (
                     <button
+                      type="button"
                       className="secondary-button"
                       disabled={busy}
-                      onClick={() => runAction(() => markRead(notification.id), 'Notification marked as read')}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void runAction(() => markRead(notification.id), 'Notification marked as read');
+                      }}
                     >
                       Mark read
                     </button>
@@ -181,7 +245,8 @@ export function NotificationsPanel({
                   )}
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

@@ -11,6 +11,7 @@
     "db:migrate": "npm run db:migrate --prefix server",
     "db:seed": "npm run db:seed --prefix server",
     "db:studio": "npm run db:studio --prefix server",
-    "test": "npm run test --prefix server"
+    "test": "npm run test --prefix server",
+    "test:smoke": "npm run test:e2e --prefix server -- src/smoke.lifecycle.e2e.test.ts"
   }
 }

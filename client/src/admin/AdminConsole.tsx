@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { AdminChatPanel } from '../panels/AdminChatPanel';
 import type { ActionRunner, AdminArtisanRecord, AdminCategoryRecord, AdminSection, AdminUserRecord } from '../appTypes';
 import type { ArtisanKycSubmission, Booking, Conversation } from '../types';
@@ -40,6 +41,8 @@ export function AdminConsole({
   refresh: () => Promise<void>;
   onSignOut: () => void;
 }) {
+  const [messagesFocusConversationId, setMessagesFocusConversationId] = useState<string | null>(null);
+
   const sections: Array<{
     id: AdminSection;
     label: string;
@@ -48,7 +51,7 @@ export function AdminConsole({
   }> = [
     { id: 'overview', label: 'Overview', description: 'Signals and open work' },
     { id: 'profiles', label: 'Profiles', description: 'Users and artisans', count: users.length + artisans.length },
-    { id: 'jobs', label: 'Jobs', description: 'Bookings and payouts', count: bookings.length },
+    { id: 'jobs', label: 'Jobs', description: 'Lifecycle, chat, payouts', count: bookings.length },
     { id: 'messages', label: 'Messages', description: 'Threads and notes', count: conversations.length },
     { id: 'verification', label: 'Verification', description: 'KYC and approvals', count: submissions.length },
     { id: 'catalog', label: 'Catalog', description: 'Service categories', count: categories.length },
@@ -112,6 +115,8 @@ export function AdminConsole({
             busy={busy}
             runAction={runAction}
             refresh={refresh}
+            setSection={setSection}
+            onOpenConversation={setMessagesFocusConversationId}
           />
         )}
         {section === 'messages' && (
@@ -121,6 +126,8 @@ export function AdminConsole({
             busy={busy}
             runAction={runAction}
             refresh={refresh}
+            initialConversationId={messagesFocusConversationId}
+            onConversationOpened={() => setMessagesFocusConversationId(null)}
           />
         )}
         {section === 'verification' && (

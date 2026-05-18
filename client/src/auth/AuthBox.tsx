@@ -113,8 +113,11 @@ export function AuthBox({
     clearPendingSignupRole(firebaseAuthUser.email);
     onReady(session.token, session.user);
     if (session.user.role === 'ARTISAN') {
-      onWorkspaceSection('overview');
-      onNavigate(authMode === 'signup' || intendedRole === 'ARTISAN' ? 'home' : 'workspace');
+      if (authMode === 'signup' || intendedRole === 'ARTISAN') {
+        onNavigate('home');
+      } else {
+        onWorkspaceSection('overview');
+      }
       onNotice(
         'Your artisan onboarding is ready. Complete your profile, KYC, and offerings for admin review.'
       );
@@ -409,8 +412,11 @@ export function AuthBox({
     };
 
     const goToWorkspace = (section: WorkspaceSection, message?: string) => {
+      setMenuOpen(false);
       onWorkspaceSection(section);
-      goTo('workspace', message);
+      if (message) {
+        onNotice(message);
+      }
     };
 
     return (
@@ -468,7 +474,6 @@ export function AuthBox({
               className="danger-menu-item"
               onClick={() => {
                 setMenuOpen(false);
-                onWorkspaceSection('overview');
                 onNavigate('home');
                 onNotice('Signed out');
                 auth && signOut(auth);

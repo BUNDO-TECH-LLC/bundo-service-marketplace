@@ -1,6 +1,7 @@
 import { NotificationType, Prisma, Role } from '@prisma/client';
 import db from '../../db/client';
 import { getArtisanProfileByUserId } from '../artisans/artisans.service';
+import { workspaceLink } from '../../lib/appLinks';
 import { createNotification } from '../notifications/notifications.service';
 
 async function ensureBookingConversationsForUser(input: {
@@ -148,7 +149,7 @@ export const createMessage = async (input: {
         type: NotificationType.MESSAGE,
         title: 'New message',
         body: 'You have a new chat message waiting.',
-        link: '/?view=workspace&section=messages',
+        link: workspaceLink('messages'),
       });
     }
 
@@ -221,7 +222,7 @@ export const createMessage = async (input: {
     type: NotificationType.MESSAGE,
     title: 'New message',
     body: 'A customer started a conversation with you.',
-    link: '/?view=workspace&section=messages',
+    link: workspaceLink('messages'),
   });
 
   return { status: 'created' as const, conversation, message };

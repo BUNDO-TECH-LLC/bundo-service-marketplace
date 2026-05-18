@@ -49,7 +49,40 @@ export class NotFoundError extends AppError {
 
 // 409 — conflict (e.g. duplicate review on same booking)
 export class ConflictError extends AppError {
-  constructor(message: string) {
-    super(message, 409, 'CONFLICT');
+  constructor(message: string, code = 'CONFLICT') {
+    super(message, 409, code);
   }
+}
+
+// 502 — upstream provider failure (e.g. Paystack)
+export class BadGatewayError extends AppError {
+  constructor(message: string, code = 'BAD_GATEWAY') {
+    super(message, 502, code);
+  }
+}
+
+// 503 — required integration not configured
+export class ServiceUnavailableError extends AppError {
+  constructor(message: string, code = 'SERVICE_UNAVAILABLE') {
+    super(message, 503, code);
+  }
+}
+
+export function isAppError(error: unknown): error is AppError {
+  return error instanceof AppError;
+}
+
+const defaultCodes: Record<number, string> = {
+  400: 'VALIDATION_ERROR',
+  401: 'UNAUTHORIZED',
+  403: 'FORBIDDEN',
+  404: 'NOT_FOUND',
+  409: 'CONFLICT',
+  502: 'BAD_GATEWAY',
+  503: 'SERVICE_UNAVAILABLE',
+};
+
+/** Preserve legacy route messages while migrating to thrown errors. */
+export function httpError(statusCode: number, message: string, code?: string) {
+  return new AppError(message, statusCode, code ?? defaultCodes[statusCode] ?? 'HTTP_ERROR');
 }

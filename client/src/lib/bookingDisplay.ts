@@ -1,6 +1,8 @@
 import type { Booking, PaymentStatus } from '../types';
 
 export function statusLabel(status: Booking['status']) {
+  if (status === 'ONGOING') return 'in progress';
+  if (status === 'ACCEPTED') return 'appointment';
   return status.toLowerCase().replace(/_/g, ' ');
 }
 

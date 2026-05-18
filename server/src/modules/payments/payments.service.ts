@@ -12,6 +12,7 @@ import db from '../../db/client';
 import logger from '../../utils/logger';
 import { resolvePaymentConfirmationGate } from './paymentConfirmPolicy';
 import { getArtisanProfileByUserId } from '../artisans/artisans.service';
+import { workspaceLink } from '../../lib/appLinks';
 import { createNotifications } from '../notifications/notifications.service';
 import {
   createPaystackTransferRecipient,
@@ -340,14 +341,14 @@ export const markPaymentReferencePaid = async (reference: string) => {
         type: NotificationType.PAYMENT,
         title: 'Payment secured',
         body: `Your payment for ${booking.offering?.title || 'this booking'} is now held by Bundo.`,
-        link: '/?view=workspace&section=bookings',
+        link: workspaceLink('bookings'),
       },
       {
         userId: booking.artisan.userId,
         type: NotificationType.PAYMENT,
         title: 'Customer payment received',
         body: `Payment for ${booking.offering?.title || 'a booking'} is secured and pending completion.`,
-        link: '/?view=workspace&section=bookings',
+        link: workspaceLink('bookings'),
       },
     ]);
   }
@@ -519,14 +520,14 @@ export const releaseBookingPayment = async (bookingId: string) => {
       type: NotificationType.PAYMENT,
       title: 'Payout released',
       body: `Your payout for ${offering?.title || 'a completed booking'} has been released.`,
-      link: '/?view=workspace&section=bookings',
+      link: workspaceLink('bookings'),
     },
     {
       userId: booking.customerId,
       type: NotificationType.PAYMENT,
       title: 'Provider payout sent',
       body: `Bundo has released payment for ${offering?.title || 'your completed booking'}.`,
-      link: '/?view=workspace&section=bookings',
+      link: workspaceLink('bookings'),
     },
   ]);
 
@@ -582,14 +583,14 @@ export const createBookingDispute = async (input: {
       type: NotificationType.DISPUTE,
       title: 'Dispute opened',
       body: 'Your dispute has been recorded and is awaiting admin review.',
-      link: '/?view=workspace&section=bookings',
+      link: workspaceLink('bookings'),
     },
     {
       userId: booking.artisan.userId,
       type: NotificationType.DISPUTE,
       title: 'Booking dispute opened',
       body: 'A dispute has been opened on one of your bookings.',
-      link: '/?view=workspace&section=bookings',
+      link: workspaceLink('bookings'),
     },
   ]);
 
@@ -763,7 +764,7 @@ export const resolveBookingDispute = async (input: {
         refundAmount === payment.amount
           ? 'Bundo issued a full refund after dispute resolution.'
           : `Bundo issued a partial refund of ${refundAmount} NGN after dispute resolution.`,
-      link: '/?view=workspace&section=bookings',
+      link: workspaceLink('bookings'),
     },
     {
       userId: dispute.booking.artisan.userId,
@@ -773,7 +774,7 @@ export const resolveBookingDispute = async (input: {
         refundAmount === payment.amount
           ? 'A disputed booking was resolved with a full refund to the customer.'
           : `A disputed booking was resolved with a partial refund of ${refundAmount} NGN.`,
-      link: '/?view=workspace&section=bookings',
+      link: workspaceLink('bookings'),
     },
   ]);
 

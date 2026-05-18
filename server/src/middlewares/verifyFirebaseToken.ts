@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { UserStatus } from '@prisma/client';
 import admin from '../config/firebase';
 import { findOrCreateUser } from '../modules/users/users.service';
+import { ForbiddenError, UnauthorizedError } from '../utils/errors';
 import logger from '../utils/logger';
 
 export const verifyFirebaseToken = async (
@@ -12,7 +13,7 @@ export const verifyFirebaseToken = async (
   const authHeader = req.headers.authorization;
 
   if (!authHeader?.startsWith('Bearer ')) {
-    return res.status(401).json({ message: 'Unauthorized' });
+    return next(new UnauthorizedError());
   }
 
   const token = authHeader.slice('Bearer '.length);
@@ -22,14 +23,14 @@ export const verifyFirebaseToken = async (
     decoded = await admin.auth().verifyIdToken(token);
   } catch (error: unknown) {
     logger.warn({ error }, 'Firebase token verification failed');
-    return res.status(401).json({ message: 'Invalid token' });
+    return next(new UnauthorizedError('Invalid token'));
   }
 
   try {
     const user = await findOrCreateUser(decoded);
 
     if (user.status === UserStatus.BANNED) {
-      return res.status(403).json({ message: 'Account banned' });
+      return next(new ForbiddenError('Account banned'));
     }
 
     (req as any).user = user;
@@ -37,6 +38,6 @@ export const verifyFirebaseToken = async (
     next();
   } catch (error: unknown) {
     logger.error({ error, firebaseUid: decoded.uid }, 'Failed to sync authenticated user');
-    return res.status(500).json({ message: 'Could not finish account sync' });
+    next(error);
   }
 };

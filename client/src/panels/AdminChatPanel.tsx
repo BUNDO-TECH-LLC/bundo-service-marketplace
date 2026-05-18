@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { uploadChatImage } from '../lib/chatUpload';
 import type { ActionRunner } from '../appTypes';
@@ -10,12 +10,16 @@ export function AdminChatPanel({
   busy,
   runAction,
   refresh,
+  initialConversationId,
+  onConversationOpened,
 }: {
   token: string;
   conversations: Conversation[];
   busy: boolean;
   runAction: ActionRunner;
   refresh: () => Promise<void>;
+  initialConversationId?: string | null;
+  onConversationOpened?: () => void;
 }) {
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
 
@@ -23,6 +27,17 @@ export function AdminChatPanel({
     const response = await api<{ conversation: Conversation }>(`/admin/conversations/${conversationId}`, { token });
     setActiveConversation(response.conversation);
   }
+
+  useEffect(() => {
+    if (!initialConversationId) {
+      return;
+    }
+
+    void (async () => {
+      await openConversation(initialConversationId);
+      onConversationOpened?.();
+    })();
+  }, [initialConversationId, onConversationOpened, token]);
 
   async function createNote(formElement: HTMLFormElement) {
     if (!activeConversation) return;

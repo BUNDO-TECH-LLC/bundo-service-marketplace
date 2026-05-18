@@ -1,6 +1,7 @@
 import { KycStatus, Prisma, VerifyStatus } from '@prisma/client';
 import db from '../../db/client';
 import { Pagination, paginationArgs } from '../../utils/pagination';
+import { workspaceLink } from '../../lib/appLinks';
 import { createNotification } from '../notifications/notifications.service';
 
 type CreateArtisanProfileInput = {
@@ -340,7 +341,7 @@ export const createOrUpdateKycSubmission = async (
     type: 'ADMIN',
     title: 'KYC submitted',
     body: 'Your identity documents were submitted for review. We will update you once they are checked.',
-    link: '/?view=workspace&section=overview',
+    link: workspaceLink('overview'),
   });
 
   return submission;

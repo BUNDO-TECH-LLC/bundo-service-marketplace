@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { LeaveReviewDialog } from '../components/LeaveReviewDialog';
 import { api } from '../lib/api';
 import { formatMessageTime, money } from '../lib/formatting';
 import {
@@ -10,6 +11,11 @@ import {
   paymentLabel,
   statusLabel,
 } from '../lib/bookingDisplay';
+import {
+  canLeaveReview,
+  canStartOrCompleteBooking,
+  isBookingPaymentSecured,
+} from '../lib/bookingPayment';
 import type { ActionRunner } from '../appTypes';
 import type { Booking } from '../types';
 import { EmptyState } from '../components/EmptyState';
@@ -109,13 +115,31 @@ function ArtisanJobsPage({
         </article>
 
         <div className="artisan-job-actions">
+          {!canStartOrCompleteBooking(selectedBooking) &&
+            ['ACCEPTED', 'ONGOING'].includes(selectedBooking.status) && (
+              <p className="booking-payment-notice" role="status">
+                Waiting for customer payment via Paystack. The service cannot start or be completed until
+                payment is secured.
+              </p>
+            )}
           {selectedBooking.status === 'REQUESTED' && (
             <button disabled={busy} onClick={() => updateBookingStatus(selectedBooking.id, 'ACCEPTED')}>
               Accept request
             </button>
           )}
           {selectedBooking.status === 'ACCEPTED' && (
-            <button disabled={busy} onClick={() => updateBookingStatus(selectedBooking.id, 'COMPLETED')}>
+            <button
+              disabled={busy || !canStartOrCompleteBooking(selectedBooking)}
+              onClick={() => updateBookingStatus(selectedBooking.id, 'ONGOING')}
+            >
+              Start service
+            </button>
+          )}
+          {(selectedBooking.status === 'ACCEPTED' || selectedBooking.status === 'ONGOING') && (
+            <button
+              disabled={busy || !canStartOrCompleteBooking(selectedBooking)}
+              onClick={() => updateBookingStatus(selectedBooking.id, 'COMPLETED')}
+            >
               Mark as completed
             </button>
           )}
@@ -204,6 +228,22 @@ export function BookingsPage({
   const visibleBookings = filter === 'ALL' ? bookings : bookings.filter((booking) => booking.status === filter);
   const [selectedArtisanBookingId, setSelectedArtisanBookingId] = useState<string | null>(null);
   const selectedArtisanBooking = bookings.find((booking) => booking.id === selectedArtisanBookingId) || null;
+  const [reviewBooking, setReviewBooking] = useState<Booking | null>(null);
+
+  async function submitReview(input: { rating: number; comment: string }) {
+    if (!reviewBooking) return;
+    await api('/reviews', {
+      method: 'POST',
+      token,
+      body: JSON.stringify({
+        bookingId: reviewBooking.id,
+        rating: input.rating,
+        comment: input.comment || undefined,
+      }),
+    });
+    setReviewBooking(null);
+    await refresh();
+  }
 
   async function cancelBooking(bookingId: string) {
     await api(`/bookings/${bookingId}/cancel`, {
@@ -297,6 +337,15 @@ export function BookingsPage({
   }
 
   return (
+    <>
+    {reviewBooking && (
+      <LeaveReviewDialog
+        booking={reviewBooking}
+        busy={busy}
+        onClose={() => setReviewBooking(null)}
+        onSubmit={(input) => runAction(() => submitReview(input), 'Review submitted')}
+      />
+    )}
     <section className="bookings-page">
       <div className="bookings-toolbar">
         <div>
@@ -339,10 +388,15 @@ export function BookingsPage({
           const price = booking.offering?.priceFrom ? money(booking.offering.priceFrom) : 'To be confirmed';
           const paymentStatus = booking.payment?.status;
           const latestDispute = booking.disputes?.[0];
+          const paymentSecured = isBookingPaymentSecured(paymentStatus);
           const canPay =
             mode === 'customer' &&
             !['CANCELLED', 'DECLINED', 'COMPLETED'].includes(booking.status) &&
-            (!paymentStatus || ['UNPAID', 'PAYMENT_PENDING', 'FAILED'].includes(paymentStatus));
+            !paymentSecured;
+          const awaitingPaymentToStart =
+            mode === 'customer' &&
+            booking.status === 'ACCEPTED' &&
+            !paymentSecured;
           const canDispute =
             mode === 'customer' &&
             paymentStatus === 'PAID_HELD' &&
@@ -401,6 +455,12 @@ export function BookingsPage({
                 <strong>{price}</strong>
               </div>
 
+              {awaitingPaymentToStart && (
+                <p className="booking-payment-notice" role="status">
+                  Your booking was accepted. Pay securely below so your artisan can start the service.
+                </p>
+              )}
+
               <div className="booking-card-actions">
                 {canPay && (
                   <button
@@ -435,14 +495,6 @@ export function BookingsPage({
                     Reschedule
                   </button>
                 )}
-                {booking.status === 'COMPLETED' && (
-                  <button
-                    disabled={busy}
-                    onClick={() => runAction(async () => undefined, 'Reviews are created from completed booking flow')}
-                  >
-                    Leave review
-                  </button>
-                )}
                 {booking.status === 'ACCEPTED' && (
                   <button className="secondary-button" onClick={openMessages}>
                     Open chat
@@ -457,11 +509,25 @@ export function BookingsPage({
                     Raise dispute
                   </button>
                 )}
+                {canLeaveReview(booking) && (
+                  <button type="button" disabled={busy} onClick={() => setReviewBooking(booking)}>
+                    Leave review
+                  </button>
+                )}
+                {booking.status === 'COMPLETED' && !booking.review && !paymentSecured && (
+                  <span className="review-submitted-label">Review opens after payment is secured</span>
+                )}
+                {booking.status === 'COMPLETED' && booking.review && (
+                  <span className="review-submitted-label">
+                    Review submitted · {booking.review.rating}/5
+                  </span>
+                )}
               </div>
             </article>
           );
         })}
       </div>
     </section>
+    </>
   );
 }

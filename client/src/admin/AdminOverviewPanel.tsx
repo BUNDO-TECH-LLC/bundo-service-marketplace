@@ -28,6 +28,12 @@ export function AdminOverviewPanel({
       section: 'verification' as AdminSection,
     },
     {
+      title: 'New appointments',
+      value: bookings.filter((booking) => booking.status === 'ACCEPTED').length,
+      action: 'Open jobs',
+      section: 'jobs' as AdminSection,
+    },
+    {
       title: 'Open booking issues',
       value: bookings.filter((booking) =>
         booking.disputes?.some((dispute) => dispute.status === 'OPEN' || dispute.status === 'UNDER_REVIEW')

@@ -1,7 +1,14 @@
 import { BookingStatus, NotificationType, Prisma, Role } from '@prisma/client';
 import db from '../../db/client';
+import { appendBookingLifecycleMessage } from '../../lib/bookingConversations';
+import { bookingPaymentRequiredForStatus } from '../../lib/bookingPayment';
+import {
+  bookingStatusNotificationCopy,
+  canTransitionBookingStatus,
+} from '../../lib/bookingStatus';
 import { Pagination, paginationArgs } from '../../utils/pagination';
 import { getArtisanProfileByUserId } from '../artisans/artisans.service';
+import { workspaceLink } from '../../lib/appLinks';
 import { createNotifications } from '../notifications/notifications.service';
 
 function toMinutes(value: string) {
@@ -82,6 +89,14 @@ export const createBooking = async (input: {
         artisan: true,
         payment: true,
         disputes: true,
+      review: {
+        select: {
+          id: true,
+          rating: true,
+          comment: true,
+          createdAt: true,
+        },
+      },
         offering: {
           include: { category: true },
         },
@@ -128,14 +143,14 @@ export const createBooking = async (input: {
         type: NotificationType.BOOKING,
         title: 'Booking requested',
         body: `Your booking for ${booking.offering?.title || 'a service'} has been sent.`,
-        link: '/?view=workspace&section=bookings',
+        link: workspaceLink('bookings'),
       },
       {
         userId: artisan.userId,
         type: NotificationType.BOOKING,
         title: 'New booking request',
         body: `You received a new booking request for ${booking.offering?.title || 'a service'}.`,
-        link: '/?view=workspace&section=bookings',
+        link: workspaceLink('bookings'),
       },
     ]);
   }
@@ -170,6 +185,14 @@ export const getBookingsForUser = async (input: {
         },
         payment: true,
         disputes: true,
+      review: {
+        select: {
+          id: true,
+          rating: true,
+          comment: true,
+          createdAt: true,
+        },
+      },
       },
     });
   }
@@ -181,6 +204,14 @@ export const getBookingsForUser = async (input: {
       artisan: true,
       payment: true,
       disputes: true,
+      review: {
+        select: {
+          id: true,
+          rating: true,
+          comment: true,
+          createdAt: true,
+        },
+      },
       offering: {
         include: { category: true },
       },
@@ -200,6 +231,14 @@ export const getCustomerBookings = async (
       artisan: true,
       payment: true,
       disputes: true,
+      review: {
+        select: {
+          id: true,
+          rating: true,
+          comment: true,
+          createdAt: true,
+        },
+      },
       offering: {
         include: { category: true },
       },
@@ -238,6 +277,14 @@ export const getArtisanBookings = async (
       },
       payment: true,
       disputes: true,
+      review: {
+        select: {
+          id: true,
+          rating: true,
+          comment: true,
+          createdAt: true,
+        },
+      },
     },
   });
 };
@@ -270,6 +317,14 @@ export const getBookingForUser = async (input: {
       artisan: true,
       payment: true,
       disputes: true,
+      review: {
+        select: {
+          id: true,
+          rating: true,
+          comment: true,
+          createdAt: true,
+        },
+      },
       offering: {
         include: { category: true },
       },
@@ -330,6 +385,14 @@ export const cancelBookingForCustomer = async (input: {
       },
       payment: true,
       disputes: true,
+      review: {
+        select: {
+          id: true,
+          rating: true,
+          comment: true,
+          createdAt: true,
+        },
+      },
     },
   });
 
@@ -340,14 +403,14 @@ export const cancelBookingForCustomer = async (input: {
         type: NotificationType.BOOKING,
         title: 'Booking cancelled',
         body: `Your booking for ${updated.offering?.title || 'a service'} has been cancelled.`,
-        link: '/?view=workspace&section=bookings',
+        link: workspaceLink('bookings'),
       },
       {
         userId: updated.artisan.userId,
         type: NotificationType.BOOKING,
         title: 'Booking cancelled by customer',
         body: `The customer cancelled ${updated.offering?.title || 'a service'}.`,
-        link: '/?view=workspace&section=bookings',
+        link: workspaceLink('bookings'),
       },
     ]);
   }
@@ -368,6 +431,7 @@ export const updateBookingStatusForArtisan = async (input: {
 
   const booking = await db.booking.findUnique({
     where: { id: input.bookingId },
+    include: { payment: true },
   });
 
   if (!booking) {
@@ -376,6 +440,27 @@ export const updateBookingStatusForArtisan = async (input: {
 
   if (booking.artisanId !== artisan.id) {
     return { status: 'forbidden' as const };
+  }
+
+  if (!canTransitionBookingStatus(booking.status, input.status, 'artisan')) {
+    return { status: 'invalid_transition' as const, from: booking.status };
+  }
+
+  if (bookingPaymentRequiredForStatus(booking.payment, input.status)) {
+    return { status: 'payment_required' as const };
+  }
+
+  if (
+    input.status === BookingStatus.ACCEPTED ||
+    input.status === BookingStatus.ONGOING ||
+    input.status === BookingStatus.COMPLETED
+  ) {
+    await appendBookingLifecycleMessage({
+      customerId: booking.customerId,
+      artisanId: booking.artisanId,
+      senderId: input.artisanUserId,
+      status: input.status,
+    });
   }
 
   const updated = await db.booking.update({
@@ -394,31 +479,30 @@ export const updateBookingStatusForArtisan = async (input: {
       },
       payment: true,
       disputes: true,
+      review: {
+        select: {
+          id: true,
+          rating: true,
+          comment: true,
+          createdAt: true,
+        },
+      },
       artisan: true,
     },
+  });
+
+  const notification = bookingStatusNotificationCopy({
+    status: input.status,
+    serviceTitle: updated.offering?.title,
   });
 
   await createNotifications([
     {
       userId: updated.customerId,
       type: NotificationType.BOOKING,
-      title:
-        input.status === BookingStatus.ACCEPTED
-          ? 'Booking accepted'
-          : input.status === BookingStatus.DECLINED
-            ? 'Booking declined'
-            : input.status === BookingStatus.COMPLETED
-              ? 'Booking completed'
-              : 'Booking updated',
-      body:
-        input.status === BookingStatus.ACCEPTED
-          ? `Your booking for ${updated.offering?.title || 'a service'} was accepted.`
-          : input.status === BookingStatus.DECLINED
-            ? `Your booking for ${updated.offering?.title || 'a service'} was declined.`
-            : input.status === BookingStatus.COMPLETED
-              ? `Your booking for ${updated.offering?.title || 'a service'} was marked completed.`
-              : `Your booking for ${updated.offering?.title || 'a service'} was updated.`,
-      link: '/?view=workspace&section=bookings',
+      title: notification.title,
+      body: notification.body,
+      link: workspaceLink('bookings'),
     },
   ]);
 
@@ -455,6 +539,14 @@ export const rescheduleBooking = async (input: {
       },
       payment: true,
       disputes: true,
+      review: {
+        select: {
+          id: true,
+          rating: true,
+          comment: true,
+          createdAt: true,
+        },
+      },
     },
   });
 
@@ -506,6 +598,14 @@ export const rescheduleBooking = async (input: {
       artisan: true,
       payment: true,
       disputes: true,
+      review: {
+        select: {
+          id: true,
+          rating: true,
+          comment: true,
+          createdAt: true,
+        },
+      },
       offering: {
         include: { category: true },
       },
@@ -524,7 +624,7 @@ export const rescheduleBooking = async (input: {
         body: isCustomer
           ? `You moved ${serviceName} to ${updated.scheduledAt?.toLocaleString()}.`
           : `${updated.artisan.displayName || 'Your artisan'} moved ${serviceName} to ${updated.scheduledAt?.toLocaleString()}.`,
-        link: '/?view=workspace&section=bookings',
+        link: workspaceLink('bookings'),
       },
       {
         userId: updated.artisan.userId,
@@ -533,7 +633,7 @@ export const rescheduleBooking = async (input: {
         body: isCustomer
           ? `The customer moved ${serviceName} to ${updated.scheduledAt?.toLocaleString()}.`
           : `You moved ${serviceName} to ${updated.scheduledAt?.toLocaleString()}.`,
-        link: '/?view=workspace&section=bookings',
+        link: workspaceLink('bookings'),
       },
     ]);
   }

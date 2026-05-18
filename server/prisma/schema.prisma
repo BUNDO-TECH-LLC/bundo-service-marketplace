@@ -36,6 +36,7 @@ enum KycStatus {
 enum BookingStatus {
   REQUESTED
   ACCEPTED
+  ONGOING
   DECLINED
   CANCELLED
   COMPLETED

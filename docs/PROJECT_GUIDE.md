@@ -10,8 +10,8 @@ Bundo is a service marketplace that connects customers with artisans. The curren
 - 4-step artisan profile onboarding
 - Artisan KYC submission and admin review
 - Category-based offerings
-- Booking requests
-- Artisan jobs dashboard, request handling, active bookings, profile settings, and reviews
+- Booking requests with a full lifecycle: `REQUESTED` → `ACCEPTED` (appointment) → `ONGOING` → `COMPLETED`
+- Artisan jobs dashboard, request handling, in-progress work, profile settings, and reviews
 - Direct chat between customer and artisan, with image attachments
 - Reviews for completed jobs
 - In-app notifications
@@ -72,8 +72,9 @@ An admin can:
 - approve or reject artisan verification
 - review artisan KYC submissions
 - manage categories
-- inspect bookings
-- inspect conversations, reply as Bundo support with text or images, and write internal admin notes
+- manage the **jobs queue**: filter by stage, confirm appointments, mark in progress or completed, release payouts, resolve disputes
+- open the customer–artisan chat from any job entry (inline thread or full support view)
+- inspect conversations globally, reply as Bundo support with text or images, and write internal admin notes
 - moderate reviews
 - release held payments to artisans
 - resolve disputes with release, full refund, or partial refund
@@ -115,6 +116,65 @@ Mounted route groups:
   [src/db/client.ts](/Users/macbook/bundo/server/src/db/client.ts)
 - Payment confirmation gate (Paystack vs simulation policy):
   [src/modules/payments/paymentConfirmPolicy.ts](/Users/macbook/bundo/server/src/modules/payments/paymentConfirmPolicy.ts)
+- Central HTTP errors and route wrappers:
+  [src/middlewares/errorHandler.ts](/Users/macbook/bundo/server/src/middlewares/errorHandler.ts),
+  [src/utils/errors.ts](/Users/macbook/bundo/server/src/utils/errors.ts),
+  [src/utils/resultErrors.ts](/Users/macbook/bundo/server/src/utils/resultErrors.ts)
+- Booking lifecycle rules (shared artisan + admin transitions):
+  [src/lib/bookingStatus.ts](/Users/macbook/bundo/server/src/lib/bookingStatus.ts)
+- Conversation linking and lifecycle chat messages on status changes:
+  [src/lib/bookingConversations.ts](/Users/macbook/bundo/server/src/lib/bookingConversations.ts)
+- Path-based notification deep links (aligned with the React router):
+  [src/lib/appLinks.ts](/Users/macbook/bundo/server/src/lib/appLinks.ts)
+
+Most API routes use `asyncHandler` so thrown `AppError` subclasses map to consistent JSON error responses.
+
+---
+
+## Booking status lifecycle
+
+`BookingStatus` enum in Prisma:
+
+| Status | Meaning |
+|--------|---------|
+| `REQUESTED` | Customer sent a booking; artisan has not decided. |
+| `ACCEPTED` | Artisan (or admin) confirmed — **appointment**; customer and artisan are connected in chat. |
+| `ONGOING` | Service work has started. |
+| `COMPLETED` | Job finished; customer may leave a review; admin may release held payout. |
+| `DECLINED` / `CANCELLED` | Closed without completion. |
+
+**Who can change status**
+
+- **Artisan** (`PATCH /bookings/:id/status`): accept/decline/cancel from `REQUESTED`; start service (`ONGOING`) and complete from `ACCEPTED`/`ONGOING`. Invalid jumps return **409**.
+- **Admin** (`PATCH /admin/bookings/:id/status`): confirm appointment (`REQUESTED` → `ACCEPTED`), mark `ONGOING` / `COMPLETED`, or cancel. Same transition rules enforced server-side.
+
+**Chat on lifecycle events**
+
+- A conversation is created when the customer books (with an automatic booking summary message).
+- When status becomes `ACCEPTED`, `ONGOING`, or `COMPLETED`, the backend appends a lifecycle message to that thread (artisan or admin as sender).
+- Admin booking list responses include `conversationId` for support access.
+
+Rules and tests: [bookingStatus.ts](/Users/macbook/bundo/server/src/lib/bookingStatus.ts), [bookingStatus.test.ts](/Users/macbook/bundo/server/src/lib/bookingStatus.test.ts).
+
+Migration adding `ONGOING`: `server/prisma/migrations/20260516120000_add_booking_ongoing_status/`.
+
+### Payment required before work starts or completes
+
+Paystack checkout must complete and funds must reach a **secured** payment status (`PAID_HELD`, `PARTIALLY_RELEASED`, `RELEASED`, or `PARTIALLY_REFUNDED`) before:
+
+- artisan or admin marks a job **in progress** (`ONGOING`)
+- artisan or admin marks a job **completed**
+- customer leaves a **review** on a completed job
+
+Implemented in [bookingPayment.ts](/Users/macbook/bundo/server/src/lib/bookingPayment.ts) and enforced in:
+
+- [bookings.service.ts](/Users/macbook/bundo/server/src/modules/bookings/bookings.service.ts) (artisan status updates → `409` / `PAYMENT_REQUIRED`)
+- [admin.service.ts](/Users/macbook/bundo/server/src/modules/admin/admin.service.ts) (admin status updates)
+- [reviews.service.ts](/Users/macbook/bundo/server/src/modules/reviews/reviews.service.ts) (reviews → `PAYMENT_NOT_SECURED`)
+
+**Typical order:** request → accept → **pay** (Paystack) → start service → complete → review.
+
+Client mirrors the same rules in [client/src/lib/bookingPayment.ts](/Users/macbook/bundo/client/src/lib/bookingPayment.ts) (disabled buttons and notices in bookings UI).
 
 ---
 
@@ -163,7 +223,31 @@ These power the marketplace money flow:
 
 ## Frontend Architecture
 
-The main frontend entrypoint is:
+The app uses **React Router** with lazy-loaded pages and a shared layout shell.
+
+Entry and routing:
+
+- [client/src/main.tsx](/Users/macbook/bundo/client/src/main.tsx) — `BrowserRouter`
+- [client/src/app/AppRoutes.tsx](/Users/macbook/bundo/client/src/app/AppRoutes.tsx) — routes: `/`, `/marketplace`, `/workspace/:section`, `/admin/:section`, `/help`, `/artisans/:artisanId`
+- [client/src/app/MainLayout.tsx](/Users/macbook/bundo/client/src/app/MainLayout.tsx) — global header/footer wrapper
+- [client/src/app/appRootContext.tsx](/Users/macbook/bundo/client/src/app/appRootContext.tsx) — shared app state for pages
+
+Path helpers (must stay aligned with server `appLinks.ts`):
+
+- [client/src/lib/appPaths.ts](/Users/macbook/bundo/client/src/lib/appPaths.ts)
+- [client/src/lib/workspaceRoute.ts](/Users/macbook/bundo/client/src/lib/workspaceRoute.ts)
+- [client/src/lib/notificationNavigation.ts](/Users/macbook/bundo/client/src/lib/notificationNavigation.ts)
+
+Pages:
+
+- [client/src/pages/HomePage.tsx](/Users/macbook/bundo/client/src/pages/HomePage.tsx) — landing (Why Bundo, curated categories, social proof, footer)
+- [client/src/pages/MarketplacePage.tsx](/Users/macbook/bundo/client/src/pages/MarketplacePage.tsx)
+- [client/src/pages/WorkspacePage.tsx](/Users/macbook/bundo/client/src/pages/WorkspacePage.tsx)
+- [client/src/pages/AdminPage.tsx](/Users/macbook/bundo/client/src/pages/AdminPage.tsx)
+- [client/src/pages/HelpPage.tsx](/Users/macbook/bundo/client/src/pages/HelpPage.tsx)
+- [client/src/pages/ArtisanProfileRoute.tsx](/Users/macbook/bundo/client/src/pages/ArtisanProfileRoute.tsx)
+
+The main data/orchestration layer is still:
 
 - [client/src/App.tsx](/Users/macbook/bundo/client/src/App.tsx)
 
@@ -191,6 +275,8 @@ Supporting client files:
   [client/src/lib/chatUpload.ts](/Users/macbook/bundo/client/src/lib/chatUpload.ts)
 - Booking and payment labels for UI (shared by bookings panel and admin):
   [client/src/lib/bookingDisplay.ts](/Users/macbook/bundo/client/src/lib/bookingDisplay.ts)
+- Admin job filters and stage labels:
+  [client/src/lib/adminJobStages.ts](/Users/macbook/bundo/client/src/lib/adminJobStages.ts)
 - Notification label and relative time helpers:
   [client/src/lib/notificationDisplay.ts](/Users/macbook/bundo/client/src/lib/notificationDisplay.ts)
 - Last-route persistence for workspace/admin restore:
@@ -215,14 +301,17 @@ Supporting client files:
 - Help center content and topic data:
   [client/src/help/HelpCenter.tsx](/Users/macbook/bundo/client/src/help/HelpCenter.tsx),
   [client/src/help/helpTopics.ts](/Users/macbook/bundo/client/src/help/helpTopics.ts)
-- Admin console and section panels (overview, bookings, KYC, profiles, catalog):
+- Admin console and section panels (overview, jobs, messages, KYC, profiles, catalog):
   [client/src/admin/AdminConsole.tsx](/Users/macbook/bundo/client/src/admin/AdminConsole.tsx),
   [client/src/admin/AdminOverviewPanel.tsx](/Users/macbook/bundo/client/src/admin/AdminOverviewPanel.tsx),
-  [client/src/admin/AdminBookingsPanel.tsx](/Users/macbook/bundo/client/src/admin/AdminBookingsPanel.tsx),
+  [client/src/admin/AdminBookingsPanel.tsx](/Users/macbook/bundo/client/src/admin/AdminBookingsPanel.tsx) — job entries, appointment alerts, status actions, inline chat,
+  [client/src/admin/AdminJobChat.tsx](/Users/macbook/bundo/client/src/admin/AdminJobChat.tsx),
   [client/src/admin/AdminKycPanel.tsx](/Users/macbook/bundo/client/src/admin/AdminKycPanel.tsx),
   [client/src/admin/AdminProfilesPanel.tsx](/Users/macbook/bundo/client/src/admin/AdminProfilesPanel.tsx),
   [client/src/admin/AdminCatalogPanel.tsx](/Users/macbook/bundo/client/src/admin/AdminCatalogPanel.tsx),
   [client/src/admin/adminMetricLabel.ts](/Users/macbook/bundo/client/src/admin/adminMetricLabel.ts)
+- Customer review dialog for completed bookings:
+  [client/src/components/LeaveReviewDialog.tsx](/Users/macbook/bundo/client/src/components/LeaveReviewDialog.tsx)
 - Workspace-oriented panels (imported into `App.tsx`):
   [client/src/panels/BookingsPanel.tsx](/Users/macbook/bundo/client/src/panels/BookingsPanel.tsx),
   [client/src/panels/ChatPanel.tsx](/Users/macbook/bundo/client/src/panels/ChatPanel.tsx),
@@ -248,7 +337,8 @@ The current frontend is a single-page React app that manages:
 - approved artisan dashboard screens switch to a single artisan-specific header; the global marketplace header is hidden there to avoid duplicate navigation
 - chat with photo attachments
 - bookings
-- a dedicated admin operations console with its own navigation for overview, profiles, jobs, messages, verification, and catalog; admin sessions do not show the customer/artisan marketplace navbar
+- a dedicated admin operations console with its own navigation for overview, profiles, jobs, messages, verification, and catalog; the **Jobs** section is a structured queue (requests, appointments, in progress, completed, payouts) with chat access per entry; admin sessions do not show the customer/artisan marketplace navbar
+- URL-based navigation (`/workspace/bookings`, `/admin/jobs`, etc.) instead of query-string views
 - payment actions in the booking flow
 - help-center and trust-policy content for payments, disputes, cancellations, KYC, privacy, and support
 
@@ -335,17 +425,26 @@ Result:
 - validated flow:
   artisan submit -> artisan fetch -> admin list -> admin review -> artisan sees final reviewed status
 
+### Artisan awaiting approval (post-submit)
+
+After step 4 submit, artisans with `PENDING` KYC are **not** left on the setup wizard:
+
+- [ArtisanPendingApproval.tsx](/Users/macbook/bundo/client/src/views/ArtisanPendingApproval.tsx) — success screen, “profile awaiting approval”, timeline, and what unlocks after approval
+- [ArtisanSetupShell.tsx](/Users/macbook/bundo/client/src/views/ArtisanSetupShell.tsx) — top bar with **Help** and account menu including **Log out** (global header stays hidden on artisan home during setup)
+- [artisanVerification.ts](/Users/macbook/bundo/client/src/lib/artisanVerification.ts) — routes among setup, awaiting approval, changes requested, rejected, and approved
+- Unapproved artisans who open `/workspace/*` are redirected to `/` with a notice
+
 ## 2C. Approved artisan workspace
 
 After KYC/admin approval, the artisan home becomes an operations dashboard:
 
 1. Dashboard is the default approved-artisan landing page and shows booking totals, rating summary, active jobs, new requests, weekly summary, availability, quick links, and a simple approval badge.
-2. Jobs tab shows active bookings with filters for all, pending, accepted, completed, and declined.
+2. Jobs tab shows bookings with filters for all, pending, accepted, in progress, completed, and declined.
 3. Selecting a job opens the booking detail screen:
    - customer details
    - service, date, time, note, and status
    - request accept/decline for pending jobs
-   - mark completed for accepted jobs
+   - **Start service** (`ONGOING`) and **Mark completed** for accepted or in-progress jobs
    - open chat
 4. Messages tab opens the shared conversation UI.
 5. Reviews tab shows rating summary, rating bars, and review cards from completed bookings.
@@ -368,9 +467,12 @@ Result:
 4. Booking starts in `REQUESTED`.
 5. Backend creates or updates the customer-artisan conversation and inserts an automatic booking message.
 6. Frontend shows a booking success confirmation with actions to go directly to messages or continue browsing while the request stays active.
-7. Artisan accepts or declines.
-8. Customer or artisan can reschedule while the booking is still `REQUESTED` or `ACCEPTED`.
-9. If accepted, customer can chat and pay.
+7. Artisan accepts or declines (`ACCEPTED` posts a connection message in chat).
+8. Customer pays via Paystack (`Pay securely` → `PAID_HELD`); artisan cannot start or complete until payment is secured.
+9. Artisan marks **Start service** (`ONGOING`) then **Mark completed** (blocked server-side if unpaid).
+10. Customer or artisan can reschedule while the booking is still `REQUESTED` or `ACCEPTED`.
+11. Customer can chat throughout; payment notice shown when accepted but unpaid.
+12. After `COMPLETED` with secured payment, customer submits a review via `POST /reviews`.
 
 Result:
 
@@ -417,10 +519,10 @@ Environment templates: [server/.env.example](/Users/macbook/bundo/server/.env.ex
 
 ## 5. Completion and payout release
 
-1. Artisan completes the booking.
+1. Artisan (or admin) marks the booking `COMPLETED` (only if payment is already secured).
 2. Payment remains held.
-3. Admin reviews the booking state.
-4. Admin triggers payout release.
+3. Admin reviews the job in the **Jobs** queue (filters, appointment alerts, disputes).
+4. Admin triggers payout release from the job entry or dispute tools.
 5. Backend calls Paystack transfer.
 6. Backend stores `Payout`.
 7. Payment becomes `RELEASED`.
@@ -447,9 +549,9 @@ Result:
 
 ## 7. Reviews
 
-1. Customer completes a booking.
-2. Customer posts a review tied to that booking.
-3. Backend prevents duplicate booking reviews.
+1. Customer booking is `COMPLETED` and payment is secured (`PAID_HELD` or later).
+2. Customer posts a review tied to that booking via `POST /reviews`.
+3. Backend prevents duplicate booking reviews and rejects unpaid completed jobs (`PAYMENT_NOT_SECURED`).
 4. Artisan average rating and rating count are recalculated.
 
 Result:
@@ -463,7 +565,8 @@ Result:
 3. Artisan replies in the same thread.
 4. Customer, artisan, and admin support replies can include a message body, an image attachment, or both.
 5. Image attachments are signed by the backend and uploaded directly to Cloudinary from the browser.
-6. Admin can inspect conversations and attach internal notes.
+6. The workspace **Messages** tab polls for new messages about every **12 seconds** while open.
+7. Admin can inspect conversations globally, open chat from a job row, reply as support, and attach internal notes.
 
 Result:
 
@@ -485,7 +588,7 @@ Current notification-producing events:
 
 - booking created
 - booking cancelled
-- booking accepted, declined, or completed
+- booking accepted, declined, in progress (`ONGOING`), or completed
 - customer payment secured
 - provider payout released
 - dispute opened
@@ -640,7 +743,7 @@ Base path: `/bookings`
 - `PATCH /bookings/:id/reschedule`
   Customer or artisan moves a requested or accepted booking to a new future time. If availability slots exist, the new time must fit an active artisan window.
 - `PATCH /bookings/:id/status`
-  Artisan updates booking status. Current artisan UI uses this for request accept/decline and marking accepted jobs completed.
+  Artisan updates booking status: `ACCEPTED`, `ONGOING`, `DECLINED`, `COMPLETED`, or `CANCELLED`. Transitions are validated server-side; invalid moves return **409**.
 - `POST /bookings/:id/dispute`
   Customer or artisan opens a dispute.
 
@@ -733,7 +836,11 @@ Categories:
 Bookings and payments:
 
 - `GET /admin/bookings`
+  List bookings with `conversationId`. Optional query: `?stage=requests|appointments|ongoing|completed`.
 - `GET /admin/bookings/:id`
+  Single booking with `conversationId`.
+- `PATCH /admin/bookings/:id/status`
+  Admin lifecycle: `ACCEPTED`, `ONGOING`, `COMPLETED`, or `CANCELLED` (validated transitions).
 - `POST /admin/bookings/:id/release-payment`
 - `POST /admin/disputes/:id/resolve`
 
@@ -755,6 +862,7 @@ Reviews:
 Stats:
 
 - `GET /admin/stats`
+  Includes aggregate counts plus `bookingRequests`, `bookingAppointments`, `bookingOngoing`, and `bookingCompleted`.
 
 ---
 
@@ -806,9 +914,11 @@ Best for local dev without public webhook:
 4. backend verifies the payment directly with Paystack
 5. frontend refreshes workspace bookings
 
-This is why the callback URL is configured as:
+Paystack callback and notification links use path routes, for example:
 
-- `http://localhost:5173/?view=workspace&section=bookings`
+- `http://localhost:5173/workspace/bookings`
+
+Set `PAYSTACK_CALLBACK_URL` in server env to your deployed origin + `/workspace/bookings` (see `server/.env.example` and `client/.env.production.example`).
 
 For local development, the API now accepts both:
 
@@ -863,10 +973,63 @@ Reference environment template:
 
 ---
 
+## Build, test, and database
+
+From the repo root:
+
+```bash
+npm run build          # tsc server + tsc/vite client
+npm test               # server Vitest suite
+npm run db:migrate     # prisma migrate dev (local)
+```
+
+From `server/`:
+
+```bash
+npm run db:migrate:deploy   # apply migrations in staging/production
+```
+
+**Migrations and `DIRECT_URL`:** Prisma uses `DIRECT_URL` when set (see [prisma.config.ts](/Users/macbook/bundo/server/prisma.config.ts)), otherwise `DATABASE_URL`. Supabase **direct** hosts (`db.<ref>.supabase.co`) must resolve in DNS; if not, use the **session pooler** on port **5432** as `DIRECT_URL` for `migrate deploy`. The app runtime can keep using the transaction pooler on port **6543** for `DATABASE_URL`.
+
+**Client production deploy:** [client/vercel.json](/Users/macbook/bundo/client/vercel.json) rewrites all paths to `index.html` for SPA routing.
+
+**Lifecycle API smoke test (optional, needs `server/.env` + DB):**
+
+```bash
+npm run test:smoke
+```
+
+---
+
+## Production deployment
+
+Typical layout for Bundo today:
+
+| Piece | Where | Notes |
+|-------|--------|--------|
+| **Web app** | Vercel (or similar) from `client/` | Set `VITE_*` env vars; root directory `client`; build `npm run build`; output `dist`. SPA rewrites in `vercel.json`. |
+| **API** | Node host (Railway, Render, Fly, VPS, etc.) from `server/` | `npm run build` → `npm start`; set all `server/.env` vars including `CORS_ORIGIN` (production web origin), Paystack keys, Firebase Admin, Cloudinary, `DATABASE_URL`. |
+| **Database** | Supabase PostgreSQL | Run `npm run db:migrate:deploy` in `server/` after each release that adds migrations. Use session pooler `:5432` for `DIRECT_URL` if the direct host does not resolve. |
+
+**After pushing to `main`:**
+
+1. Confirm GitHub Actions CI is green (build + tests).
+2. **Database:** apply migrations on production (`db:migrate:deploy`) before or immediately after API deploy.
+3. **API:** redeploy or restart so the new build is live; verify `GET /health` and `GET /ready`.
+4. **Web:** Vercel (if connected to the repo) usually auto-deploys `client/` on push; confirm `VITE_API_BASE_URL` points at the live API.
+5. **Paystack:** callback URL must be `{production-web-origin}/workspace/bookings` (see `PAYSTACK_CALLBACK_URL` in server env).
+
+Templates: [client/.env.production.example](/Users/macbook/bundo/client/.env.production.example), [server/.env.production.example](/Users/macbook/bundo/server/.env.production.example).
+
+---
+
 ## Automated tests and CI
 
 - **Vitest** runs from `server/` with `npm test` (see [vitest.config.ts](/Users/macbook/bundo/server/vitest.config.ts)). Test files live next to modules as `*.test.ts` and are excluded from the production TypeScript build output.
 - **Policy tests** cover [paymentConfirmPolicy.ts](/Users/macbook/bundo/server/src/modules/payments/paymentConfirmPolicy.ts) so production vs simulation rules cannot regress silently.
+- **Booking transition tests** cover [bookingStatus.ts](/Users/macbook/bundo/server/src/lib/bookingStatus.ts).
+- **Payment guard tests** cover [bookingPayment.ts](/Users/macbook/bundo/server/src/lib/bookingPayment.ts).
+- **E2E smoke** ([smoke.lifecycle.e2e.test.ts](/Users/macbook/bundo/server/src/smoke.lifecycle.e2e.test.ts)): booking lifecycle, admin jobs, and chat — run with `BUNDO_E2E=1` / `npm run test:smoke`.
 - **CI** (`.github/workflows/ci.yml`) runs `npm ci`, `npm test`, and `npm run build` in `server/`, and `npm ci` + `npm run build` in `client/`, on pushes and pull requests to `main` / `master`.
 
 ---
@@ -884,8 +1047,13 @@ Reference environment template:
 - [x] 4-step artisan onboarding flow
 - [x] Public artisan discovery
 - [x] Offerings and categories
-- [x] Booking creation and lifecycle
-- [x] Artisan jobs list and booking detail flow
+- [x] Booking creation and lifecycle (`REQUESTED` → `ACCEPTED` → `ONGOING` → `COMPLETED`)
+- [x] Server-enforced booking status transitions (artisan + admin)
+- [x] Artisan jobs list and booking detail flow (accept, start service, complete)
+- [x] Admin jobs queue with appointments, lifecycle actions, and per-job chat
+- [x] Customer reviews on completed bookings (UI + `POST /reviews`)
+- [x] Paystack payment required before service start or job completion (server + UI)
+- [x] Artisan post-submit awaiting-approval screen with logout
 - [x] Basic rescheduling flow
 - [x] Chat between customer and artisan
 - [x] Chat image attachments for customers, artisans, and admin support
@@ -907,7 +1075,9 @@ Reference environment template:
 - [x] Direct browser media upload flow for artisan portfolio
 - [x] Artisan profile/settings surface
 - [x] Basic production observability with health, readiness, request IDs, and structured request logging
-- [x] Server unit tests for payment confirmation policy and CI build pipeline
+- [x] Server unit tests for payment confirmation policy, booking transitions, and CI build pipeline
+- [x] React Router path-based navigation and notification deep links
+- [x] Central API error handling (`AppError` + `asyncHandler`)
 
 ### Still needed before a stronger public MVP launch
 
@@ -959,7 +1129,11 @@ If someone new joins the project, these are the best first reads:
 - [src/modules/admin/admin.routes.ts](/Users/macbook/bundo/server/src/modules/admin/admin.routes.ts)
 - [src/modules/bookings/bookings.routes.ts](/Users/macbook/bundo/server/src/modules/bookings/bookings.routes.ts)
 - [src/modules/artisans/artisans.routes.ts](/Users/macbook/bundo/server/src/modules/artisans/artisans.routes.ts)
+- [client/src/app/AppRoutes.tsx](/Users/macbook/bundo/client/src/app/AppRoutes.tsx)
+- [client/src/lib/appPaths.ts](/Users/macbook/bundo/client/src/lib/appPaths.ts)
 - [client/src/App.tsx](/Users/macbook/bundo/client/src/App.tsx)
+- [server/src/lib/bookingStatus.ts](/Users/macbook/bundo/server/src/lib/bookingStatus.ts)
+- [server/src/lib/bookingConversations.ts](/Users/macbook/bundo/server/src/lib/bookingConversations.ts)
 - [client/src/lib/api.ts](/Users/macbook/bundo/client/src/lib/api.ts)
 - [client/src/lib/formatting.ts](/Users/macbook/bundo/client/src/lib/formatting.ts)
 - [client/src/appTypes.ts](/Users/macbook/bundo/client/src/appTypes.ts)

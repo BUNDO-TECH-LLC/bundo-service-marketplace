@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { formatMessageTime } from '../lib/formatting';
 import { uploadChatImage } from '../lib/chatUpload';
@@ -34,7 +34,9 @@ export function ChatPanel({
   );
   const visibleConversations = filter === 'incoming' ? incomingConversations : conversations;
 
-  async function openConversation(conversationId: string) {
+  const CHAT_POLL_MS = 12_000;
+
+  async function fetchMessages(conversationId: string) {
     const response = await api<{
       conversation: Conversation;
       messages: Message[];
@@ -42,6 +44,21 @@ export function ChatPanel({
     setActiveConversation(response.conversation);
     setMessages(response.messages);
   }
+
+  async function openConversation(conversationId: string) {
+    await fetchMessages(conversationId);
+  }
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      void refresh().catch(() => undefined);
+      if (activeConversation) {
+        void fetchMessages(activeConversation.id).catch(() => undefined);
+      }
+    }, CHAT_POLL_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, [activeConversation?.id, token]);
 
   async function reply(formElement: HTMLFormElement) {
     if (!activeConversation) return;

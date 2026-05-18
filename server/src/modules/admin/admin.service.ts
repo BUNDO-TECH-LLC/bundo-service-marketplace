@@ -1,4 +1,5 @@
 import {
+  BookingStatus,
   DisputeStatus,
   KycStatus,
   NotificationType,
@@ -8,7 +9,17 @@ import {
   VerifyStatus,
 } from '@prisma/client';
 import db from '../../db/client';
+import {
+  appendBookingLifecycleMessage,
+  attachConversationIdsToBookings,
+} from '../../lib/bookingConversations';
+import { bookingPaymentRequiredForStatus } from '../../lib/bookingPayment';
+import {
+  bookingStatusNotificationCopy,
+  canTransitionBookingStatus,
+} from '../../lib/bookingStatus';
 import { Pagination, paginationArgs } from '../../utils/pagination';
+import { workspaceLink } from '../../lib/appLinks';
 import { createNotification } from '../notifications/notifications.service';
 
 export const getAdminStats = async () => {
@@ -23,6 +34,10 @@ export const getAdminStats = async () => {
     pendingKycSubmissions,
     offerings,
     bookings,
+    bookingRequests,
+    bookingAppointments,
+    bookingOngoing,
+    bookingCompleted,
     payments,
     openDisputes,
     reviews,
@@ -38,6 +53,10 @@ export const getAdminStats = async () => {
     db.artisanKycSubmission.count({ where: { status: KycStatus.PENDING } }),
     db.offering.count(),
     db.booking.count(),
+    db.booking.count({ where: { status: BookingStatus.REQUESTED } }),
+    db.booking.count({ where: { status: BookingStatus.ACCEPTED } }),
+    db.booking.count({ where: { status: BookingStatus.ONGOING } }),
+    db.booking.count({ where: { status: BookingStatus.COMPLETED } }),
     db.payment.count(),
     db.dispute.count({
       where: {
@@ -61,6 +80,10 @@ export const getAdminStats = async () => {
     pendingKycSubmissions,
     offerings,
     bookings,
+    bookingRequests,
+    bookingAppointments,
+    bookingOngoing,
+    bookingCompleted,
     payments,
     openDisputes,
     reviews,
@@ -271,7 +294,7 @@ export const reviewKycSubmission = async (input: {
         : input.status === KycStatus.REJECTED
           ? 'Your KYC submission was rejected. Review the admin note and resubmit.'
           : 'Your KYC submission needs changes before approval.',
-    link: '/?view=workspace&section=overview',
+    link: workspaceLink('overview'),
   });
 
   return submission;
@@ -304,7 +327,7 @@ export const verifyArtisan = async (
         : verifyStatus === VerifyStatus.REJECTED
           ? 'Your artisan profile review was rejected. Please review your submission details.'
           : 'Your artisan verification status was updated.',
-    link: '/?view=workspace&section=overview',
+    link: workspaceLink('overview'),
   });
 
   return artisan;
@@ -371,8 +394,34 @@ export const deleteCategory = async (id: string) => {
   return { status: 'deleted' as const };
 };
 
-export const getAdminBookings = async (pagination?: Pagination) => {
-  return db.booking.findMany({
+export type AdminBookingStage =
+  | 'requests'
+  | 'appointments'
+  | 'ongoing'
+  | 'completed';
+
+function adminBookingStageWhere(stage?: AdminBookingStage) {
+  switch (stage) {
+    case 'requests':
+      return { status: BookingStatus.REQUESTED };
+    case 'appointments':
+      return { status: BookingStatus.ACCEPTED };
+    case 'ongoing':
+      return { status: BookingStatus.ONGOING };
+    case 'completed':
+      return { status: BookingStatus.COMPLETED };
+    default:
+      return undefined;
+  }
+}
+
+export const getAdminBookings = async (
+  pagination?: Pagination,
+  options?: { stage?: AdminBookingStage }
+) => {
+  const stageWhere = adminBookingStageWhere(options?.stage);
+  const bookings = await db.booking.findMany({
+    ...(stageWhere ? { where: stageWhere } : {}),
     orderBy: { createdAt: 'desc' },
     ...paginationArgs(pagination, 50),
     include: {
@@ -407,14 +456,136 @@ export const getAdminBookings = async (pagination?: Pagination) => {
       disputes: true,
     },
   });
+
+  return attachConversationIdsToBookings(bookings);
 };
 
-export const countAdminBookings = async () => {
-  return db.booking.count();
+export const updateAdminBookingStatus = async (input: {
+  bookingId: string;
+  status: BookingStatus;
+  adminUserId: string;
+}) => {
+  const booking = await db.booking.findUnique({
+    where: { id: input.bookingId },
+    include: {
+      offering: true,
+      artisan: true,
+      payment: true,
+    },
+  });
+
+  if (!booking) {
+    return { status: 'missing_booking' as const };
+  }
+
+  if (!canTransitionBookingStatus(booking.status, input.status, 'admin')) {
+    return { status: 'invalid_transition' as const, from: booking.status };
+  }
+
+  if (bookingPaymentRequiredForStatus(booking.payment, input.status)) {
+    return { status: 'payment_required' as const };
+  }
+
+  if (
+    input.status === BookingStatus.ACCEPTED ||
+    input.status === BookingStatus.ONGOING ||
+    input.status === BookingStatus.COMPLETED
+  ) {
+    await appendBookingLifecycleMessage({
+      customerId: booking.customerId,
+      artisanId: booking.artisanId,
+      senderId: input.adminUserId,
+      status: input.status,
+    });
+  }
+
+  const updated = await db.booking.update({
+    where: { id: input.bookingId },
+    data: { status: input.status },
+    include: {
+      customerUser: {
+        select: {
+          firebaseUid: true,
+          email: true,
+          phone: true,
+          status: true,
+        },
+      },
+      artisan: {
+        select: {
+          id: true,
+          userId: true,
+          displayName: true,
+          city: true,
+          area: true,
+          verifyStatus: true,
+        },
+      },
+      offering: {
+        select: {
+          id: true,
+          title: true,
+          priceFrom: true,
+          priceTo: true,
+          category: true,
+        },
+      },
+      payment: true,
+      payouts: true,
+      disputes: true,
+    },
+  });
+
+  const [withConversation] = await attachConversationIdsToBookings([updated]);
+
+  const statusCopy: Partial<Record<BookingStatus, { title: string; body: string }>> = {
+    [BookingStatus.ONGOING]: {
+      title: 'Service in progress',
+      body: `Your booking for ${updated.offering?.title || 'a service'} is now in progress.`,
+    },
+    [BookingStatus.COMPLETED]: {
+      title: 'Booking completed',
+      body: `Your booking for ${updated.offering?.title || 'a service'} was marked completed.`,
+    },
+    [BookingStatus.CANCELLED]: {
+      title: 'Booking cancelled',
+      body: `Your booking for ${updated.offering?.title || 'a service'} was cancelled by support.`,
+    },
+  };
+
+  const copy = statusCopy[input.status];
+
+  if (copy) {
+    const recipients = [updated.customerId];
+    if (updated.artisan?.userId) {
+      recipients.push(updated.artisan.userId);
+    }
+
+    await Promise.all(
+      recipients.map((userId) =>
+        createNotification({
+          userId,
+          type: NotificationType.BOOKING,
+          title: copy.title,
+          body: copy.body,
+          link: workspaceLink('bookings'),
+        })
+      )
+    );
+  }
+
+  return { status: 'updated' as const, booking: withConversation };
+};
+
+export const countAdminBookings = async (options?: { stage?: AdminBookingStage }) => {
+  const stageWhere = adminBookingStageWhere(options?.stage);
+  return db.booking.count({
+    ...(stageWhere ? { where: stageWhere } : {}),
+  });
 };
 
 export const getAdminBookingById = async (id: string) => {
-  return db.booking.findUnique({
+  const booking = await db.booking.findUnique({
     where: { id },
     include: {
       customerUser: true,
@@ -429,6 +600,13 @@ export const getAdminBookingById = async (id: string) => {
       ledgerEntries: true,
     },
   });
+
+  if (!booking) {
+    return null;
+  }
+
+  const [withConversation] = await attachConversationIdsToBookings([booking]);
+  return withConversation;
 };
 
 export const getAdminReviews = async (pagination?: Pagination) => {
@@ -707,7 +885,7 @@ export const createAdminConversationMessage = async (input: {
         type: NotificationType.ADMIN,
         title: 'Admin joined your conversation',
         body: 'Bundo support replied in your service chat.',
-        link: '/?view=workspace&section=messages',
+        link: workspaceLink('messages'),
       })
     )
   );

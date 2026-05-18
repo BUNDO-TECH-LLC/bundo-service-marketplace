@@ -1,5 +1,6 @@
 import { BookingStatus, NotificationType, Prisma } from '@prisma/client';
 import db from '../../db/client';
+import { isBookingPaymentSecured } from '../../lib/bookingPayment';
 import { createNotification } from '../notifications/notifications.service';
 
 export const createReview = async (input: {
@@ -13,6 +14,7 @@ export const createReview = async (input: {
     include: {
       artisan: true,
       review: true,
+      payment: true,
     },
   });
 
@@ -30,6 +32,10 @@ export const createReview = async (input: {
 
   if (booking.status !== BookingStatus.COMPLETED) {
     return { status: 'booking_not_completed' as const };
+  }
+
+  if (!isBookingPaymentSecured(booking.payment)) {
+    return { status: 'payment_not_secured' as const };
   }
 
   if (booking.review) {

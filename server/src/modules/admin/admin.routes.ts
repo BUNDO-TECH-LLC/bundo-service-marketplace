@@ -1,5 +1,7 @@
 import { Router } from 'express';
-import { KycStatus, Prisma, Role, UserStatus, VerifyStatus } from '@prisma/client';
+import { asyncHandler } from '../../middlewares/errorHandler';
+import { httpError } from '../../utils/errors';
+import { BookingStatus, KycStatus, Prisma, Role, UserStatus, VerifyStatus } from '@prisma/client';
 import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
 import { requireRole } from '../../middlewares/requireRole';
 import { getPagination, paginationMeta } from '../../utils/pagination';
@@ -24,6 +26,7 @@ import {
   getAdminArtisans,
   getAdminBookingById,
   getAdminBookings,
+  updateAdminBookingStatus,
   getAdminCategories,
   getAdminConversationById,
   getAdminConversations,
@@ -44,23 +47,26 @@ const router = Router();
 
 router.use(verifyFirebaseToken, requireRole(Role.ADMIN));
 
-router.get('/stats', async (_req, res) => {
-  const stats = await getAdminStats();
+router.get(
+  '/stats',
+  asyncHandler(async (_req, res) => {
+    const stats = await getAdminStats();
 
-  return res.json({
-    message: 'Admin stats fetched',
-    stats,
-  });
-});
+    res.json({
+      message: 'Admin stats fetched',
+      stats,
+    });
+  })
+);
 
-router.get('/users', async (req, res) => {
+router.get('/users', asyncHandler(async (req, res) => {
   const pagination = getPagination(req);
   const [users, total] = await Promise.all([
     getUsers(pagination),
     countUsers(),
   ]);
 
-  return res.json({
+  res.json({
     message: 'Users fetched',
     users,
     meta: {
@@ -68,34 +74,32 @@ router.get('/users', async (req, res) => {
       total,
     },
   });
-});
+}));
 
-router.get('/users/:id', async (req, res) => {
+router.get('/users/:id', asyncHandler(async (req, res) => {
   const user = await getUserById(String(req.params.id));
 
   if (!user) {
-    return res.status(404).json({ message: 'User not found' });
+    throw httpError(404, 'User not found');
   }
 
-  return res.json({
+  res.json({
     message: 'User fetched',
     user,
   });
-});
+}));
 
-router.patch('/users/:id/status', async (req, res) => {
+router.patch('/users/:id/status', asyncHandler(async (req, res) => {
   const { status } = req.body;
 
   if (![UserStatus.ACTIVE, UserStatus.BANNED].includes(status)) {
-    return res.status(400).json({
-      message: 'status must be ACTIVE or BANNED',
-    });
+    throw httpError(400, 'status must be ACTIVE or BANNED');
   }
 
   try {
     const user = await updateUserStatus(String(req.params.id), status);
 
-    return res.json({
+    res.json({
       message: 'User status updated',
       user,
     });
@@ -104,26 +108,24 @@ router.patch('/users/:id/status', async (req, res) => {
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2025'
     ) {
-      return res.status(404).json({ message: 'User not found' });
+      throw httpError(404, 'User not found');
     }
 
     throw error;
   }
-});
+}));
 
-router.patch('/users/:id/role', async (req, res) => {
+router.patch('/users/:id/role', asyncHandler(async (req, res) => {
   const { role } = req.body;
 
   if (![Role.CUSTOMER, Role.ARTISAN, Role.ADMIN].includes(role)) {
-    return res.status(400).json({
-      message: 'role must be CUSTOMER, ARTISAN, or ADMIN',
-    });
+    throw httpError(400, 'role must be CUSTOMER, ARTISAN, or ADMIN');
   }
 
   try {
     const user = await updateUserRole(String(req.params.id), role);
 
-    return res.json({
+    res.json({
       message: 'User role updated',
       user,
     });
@@ -132,21 +134,21 @@ router.patch('/users/:id/role', async (req, res) => {
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2025'
     ) {
-      return res.status(404).json({ message: 'User not found' });
+      throw httpError(404, 'User not found');
     }
 
     throw error;
   }
-});
+}));
 
-router.get('/artisans', async (req, res) => {
+router.get('/artisans', asyncHandler(async (req, res) => {
   const pagination = getPagination(req);
   const [artisans, total] = await Promise.all([
     getAdminArtisans(pagination),
     countAdminArtisans(),
   ]);
 
-  return res.json({
+  res.json({
     message: 'Admin artisans fetched',
     artisans,
     meta: {
@@ -154,29 +156,29 @@ router.get('/artisans', async (req, res) => {
       total,
     },
   });
-});
+}));
 
-router.get('/artisans/:id', async (req, res) => {
+router.get('/artisans/:id', asyncHandler(async (req, res) => {
   const artisan = await getAdminArtisanById(String(req.params.id));
 
   if (!artisan) {
-    return res.status(404).json({ message: 'Artisan not found' });
+    throw httpError(404, 'Artisan not found');
   }
 
-  return res.json({
+  res.json({
     message: 'Admin artisan fetched',
     artisan,
   });
-});
+}));
 
-router.get('/kyc-submissions', async (req, res) => {
+router.get('/kyc-submissions', asyncHandler(async (req, res) => {
   const pagination = getPagination(req);
   const [submissions, total] = await Promise.all([
     getAdminKycSubmissions(pagination),
     countAdminKycSubmissions(),
   ]);
 
-  return res.json({
+  res.json({
     message: 'Admin KYC submissions fetched',
     submissions,
     meta: {
@@ -184,22 +186,22 @@ router.get('/kyc-submissions', async (req, res) => {
       total,
     },
   });
-});
+}));
 
-router.get('/kyc-submissions/:id', async (req, res) => {
+router.get('/kyc-submissions/:id', asyncHandler(async (req, res) => {
   const submission = await getAdminKycSubmissionById(String(req.params.id));
 
   if (!submission) {
-    return res.status(404).json({ message: 'KYC submission not found' });
+    throw httpError(404, 'KYC submission not found');
   }
 
-  return res.json({
+  res.json({
     message: 'Admin KYC submission fetched',
     submission,
   });
-});
+}));
 
-router.patch('/kyc-submissions/:id/review', async (req, res) => {
+router.patch('/kyc-submissions/:id/review', asyncHandler(async (req, res) => {
   const { status, reviewNote } = req.body;
 
   if (
@@ -207,9 +209,7 @@ router.patch('/kyc-submissions/:id/review', async (req, res) => {
       status
     )
   ) {
-    return res.status(400).json({
-      message: 'status must be APPROVED, REJECTED, or CHANGES_REQUESTED',
-    });
+    throw httpError(400, 'status must be APPROVED, REJECTED, or CHANGES_REQUESTED');
   }
 
   if (
@@ -217,7 +217,7 @@ router.patch('/kyc-submissions/:id/review', async (req, res) => {
     reviewNote !== null &&
     typeof reviewNote !== 'string'
   ) {
-    return res.status(400).json({ message: 'reviewNote must be a string' });
+    throw httpError(400, 'reviewNote must be a string');
   }
 
   try {
@@ -227,7 +227,7 @@ router.patch('/kyc-submissions/:id/review', async (req, res) => {
       reviewNote,
     });
 
-    return res.json({
+    res.json({
       message: 'KYC submission reviewed',
       submission,
     });
@@ -236,14 +236,14 @@ router.patch('/kyc-submissions/:id/review', async (req, res) => {
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2025'
     ) {
-      return res.status(404).json({ message: 'KYC submission not found' });
+      throw httpError(404, 'KYC submission not found');
     }
 
     throw error;
   }
-});
+}));
 
-router.patch('/artisans/:id/verify', async (req, res) => {
+router.patch('/artisans/:id/verify', asyncHandler(async (req, res) => {
   const { verifyStatus } = req.body;
 
   if (
@@ -253,15 +253,13 @@ router.patch('/artisans/:id/verify', async (req, res) => {
       VerifyStatus.REJECTED,
     ].includes(verifyStatus)
   ) {
-    return res.status(400).json({
-      message: 'verifyStatus must be PENDING, APPROVED, or REJECTED',
-    });
+    throw httpError(400, 'verifyStatus must be PENDING, APPROVED, or REJECTED');
   }
 
   try {
     const artisan = await verifyArtisan(String(req.params.id), verifyStatus);
 
-    return res.json({
+    res.json({
       message: 'Artisan verification updated',
       artisan,
     });
@@ -270,21 +268,21 @@ router.patch('/artisans/:id/verify', async (req, res) => {
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2025'
     ) {
-      return res.status(404).json({ message: 'Artisan not found' });
+      throw httpError(404, 'Artisan not found');
     }
 
     throw error;
   }
-});
+}));
 
-router.get('/categories', async (req, res) => {
+router.get('/categories', asyncHandler(async (req, res) => {
   const pagination = getPagination(req);
   const [categories, total] = await Promise.all([
     getAdminCategories(pagination),
     countAdminCategories(),
   ]);
 
-  return res.json({
+  res.json({
     message: 'Admin categories fetched',
     categories,
     meta: {
@@ -292,21 +290,21 @@ router.get('/categories', async (req, res) => {
       total,
     },
   });
-});
+}));
 
-router.post('/categories', async (req, res) => {
+router.post('/categories', asyncHandler(async (req, res) => {
   const { name, slug, iconKey } = req.body;
 
   if (!name || typeof name !== 'string') {
-    return res.status(400).json({ message: 'name is required' });
+    throw httpError(400, 'name is required');
   }
 
   if (!slug || typeof slug !== 'string') {
-    return res.status(400).json({ message: 'slug is required' });
+    throw httpError(400, 'slug is required');
   }
 
   if (!iconKey || typeof iconKey !== 'string') {
-    return res.status(400).json({ message: 'iconKey is required' });
+    throw httpError(400, 'iconKey is required');
   }
 
   try {
@@ -316,53 +314,51 @@ router.post('/categories', async (req, res) => {
       message: 'Category created',
       category,
     });
-  } catch (error: unknown) {
+  } catch (error) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2002'
     ) {
-      return res.status(409).json({
-        message: 'Category name or slug already exists',
-      });
+      throw httpError(409, 'Category name or slug already exists');
     }
 
     throw error;
   }
-});
+}));
 
-router.patch('/categories/:id', async (req, res) => {
+router.patch('/categories/:id', asyncHandler(async (req, res) => {
   const { name, slug, iconKey } = req.body;
   const data: { name?: string; slug?: string; iconKey?: string } = {};
 
   if (name !== undefined) {
     if (typeof name !== 'string' || !name.trim()) {
-      return res.status(400).json({ message: 'name must be a string' });
+      throw httpError(400, 'name must be a string');
     }
     data.name = name;
   }
 
   if (slug !== undefined) {
     if (typeof slug !== 'string' || !slug.trim()) {
-      return res.status(400).json({ message: 'slug must be a string' });
+      throw httpError(400, 'slug must be a string');
     }
     data.slug = slug;
   }
 
   if (iconKey !== undefined) {
     if (typeof iconKey !== 'string' || !iconKey.trim()) {
-      return res.status(400).json({ message: 'iconKey must be a string' });
+      throw httpError(400, 'iconKey must be a string');
     }
     data.iconKey = iconKey;
   }
 
   if (!Object.keys(data).length) {
-    return res.status(400).json({ message: 'No category fields provided' });
+    throw httpError(400, 'No category fields provided');
   }
 
   try {
     const category = await updateCategory(String(req.params.id), data);
 
-    return res.json({
+    res.json({
       message: 'Category updated',
       category,
     });
@@ -371,46 +367,53 @@ router.patch('/categories/:id', async (req, res) => {
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2025'
     ) {
-      return res.status(404).json({ message: 'Category not found' });
+      throw httpError(404, 'Category not found');
     }
 
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === 'P2002'
     ) {
-      return res.status(409).json({
-        message: 'Category name or slug already exists',
-      });
+      throw httpError(409, 'Category name or slug already exists');
     }
 
     throw error;
   }
-});
+}));
 
-router.delete('/categories/:id', async (req, res) => {
+router.delete('/categories/:id', asyncHandler(async (req, res) => {
   const result = await deleteCategory(String(req.params.id));
 
   if (result.status === 'missing_category') {
-    return res.status(404).json({ message: 'Category not found' });
+    throw httpError(404, 'Category not found');
   }
 
   if (result.status === 'has_offerings') {
-    return res.status(409).json({
-      message: 'Categories with offerings cannot be deleted',
-    });
+    throw httpError(409, 'Categories with offerings cannot be deleted');
   }
 
-  return res.json({ message: 'Category deleted' });
-});
+  res.json({ message: 'Category deleted' });
+}));
 
-router.get('/bookings', async (req, res) => {
+router.get('/bookings', asyncHandler(async (req, res) => {
   const pagination = getPagination(req);
+  const stageParam = typeof req.query.stage === 'string' ? req.query.stage : undefined;
+  const allowedStages = ['requests', 'appointments', 'ongoing', 'completed'] as const;
+  const stage = allowedStages.includes(stageParam as (typeof allowedStages)[number])
+    ? (stageParam as (typeof allowedStages)[number])
+    : undefined;
+
+  if (stageParam && !stage) {
+    throw httpError(400, 'stage must be requests, appointments, ongoing, or completed');
+  }
+
+  const stageFilter = stage ? { stage } : {};
   const [bookings, total] = await Promise.all([
-    getAdminBookings(pagination),
-    countAdminBookings(),
+    getAdminBookings(pagination, stageFilter),
+    countAdminBookings(stageFilter),
   ]);
 
-  return res.json({
+  res.json({
     message: 'Admin bookings fetched',
     bookings,
     meta: {
@@ -418,53 +421,94 @@ router.get('/bookings', async (req, res) => {
       total,
     },
   });
-});
+}));
 
-router.post('/bookings/:id/release-payment', async (req, res) => {
+router.patch('/bookings/:id/status', asyncHandler(async (req, res) => {
+  const { status } = req.body;
+  const allowedStatuses = [
+    BookingStatus.ACCEPTED,
+    BookingStatus.ONGOING,
+    BookingStatus.COMPLETED,
+    BookingStatus.CANCELLED,
+  ];
+
+  if (!allowedStatuses.includes(status)) {
+    throw httpError(400, 'status must be ACCEPTED, ONGOING, COMPLETED, or CANCELLED');
+  }
+
+  const result = await updateAdminBookingStatus({
+    bookingId: String(req.params.id),
+    status,
+    adminUserId: (req as any).user.firebaseUid,
+  });
+
+  if (result.status === 'missing_booking') {
+    throw httpError(404, 'Booking not found');
+  }
+
+  if (result.status === 'invalid_transition') {
+    throw httpError(
+      409,
+      `Cannot move booking from ${result.from} to ${status}`
+    );
+  }
+
+  if (result.status === 'payment_required') {
+    throw httpError(
+      409,
+      'Customer payment must be secured before the service can start or be marked completed'
+    );
+  }
+
+  res.json({
+    message: 'Booking status updated',
+    booking: result.booking,
+  });
+}));
+
+router.post('/bookings/:id/release-payment', asyncHandler(async (req, res) => {
   const result = await releaseBookingPayment(String(req.params.id));
 
   if (result.status === 'paystack_not_configured') {
-    return res.status(503).json({ message: 'Paystack is not configured' });
+    throw httpError(503, 'Paystack is not configured');
   }
 
   if (result.status === 'missing_booking') {
-    return res.status(404).json({ message: 'Booking not found' });
+    throw httpError(404, 'Booking not found');
   }
 
   if (result.status === 'booking_not_completed') {
-    return res.status(409).json({ message: 'Only completed bookings can be released' });
+    throw httpError(409, 'Only completed bookings can be released');
   }
 
   if (result.status === 'payment_not_held') {
-    return res.status(409).json({ message: 'Booking payment is not paid and held' });
+    throw httpError(409, 'Booking payment is not paid and held');
   }
 
   if (result.status === 'blocked_by_dispute') {
-    return res.status(409).json({ message: 'Resolve the active dispute before releasing payout' });
+    throw httpError(409, 'Resolve the active dispute before releasing payout');
   }
 
   if (result.status === 'missing_payout_account') {
-    return res.status(409).json({ message: 'Artisan payout account is missing or unverified' });
+    throw httpError(409, 'Artisan payout account is missing or unverified');
   }
 
   if (result.status === 'already_released') {
-    return res.status(409).json({ message: 'Payment has already been released' });
+    throw httpError(409, 'Payment has already been released');
   }
 
-  return res.json({
+  res.json({
     message: 'Payment released to artisan',
     payment: result.payment,
     payout: result.payout,
   });
-});
+}));
 
-router.post('/disputes/:id/resolve', async (req, res) => {
+router.post('/disputes/:id/resolve', asyncHandler(async (req, res) => {
   const { action, resolution, refundAmount } = req.body;
 
   if (!['RELEASE', 'REFUND_FULL', 'REFUND_PARTIAL'].includes(action)) {
-    return res.status(400).json({
-      message: 'action must be RELEASE, REFUND_FULL, or REFUND_PARTIAL',
-    });
+    throw httpError(400, 'action must be RELEASE, REFUND_FULL, or REFUND_PARTIAL');
   }
 
   const parsedRefundAmount =
@@ -480,51 +524,51 @@ router.post('/disputes/:id/resolve', async (req, res) => {
   });
 
   if (result.status === 'paystack_not_configured') {
-    return res.status(503).json({ message: 'Paystack is not configured' });
+    throw httpError(503, 'Paystack is not configured');
   }
 
   if (result.status === 'missing_dispute') {
-    return res.status(404).json({ message: 'Dispute not found' });
+    throw httpError(404, 'Dispute not found');
   }
 
   if (result.status === 'already_resolved') {
-    return res.status(409).json({ message: 'Dispute is already resolved', dispute: result.dispute });
+    throw httpError(409, 'Dispute is already resolved');
   }
 
   if (result.status === 'missing_payment') {
-    return res.status(404).json({ message: 'Booking payment not found' });
+    throw httpError(404, 'Booking payment not found');
   }
 
   if (result.status === 'payment_not_held') {
-    return res.status(409).json({ message: 'Only held payments can be resolved through dispute tools' });
+    throw httpError(409, 'Only held payments can be resolved through dispute tools');
   }
 
   if (result.status === 'invalid_refund_amount') {
-    return res.status(400).json({ message: 'refundAmount must be a positive number' });
+    throw httpError(400, 'refundAmount must be a positive number');
   }
 
   if (result.status === 'refund_too_large') {
-    return res.status(400).json({ message: 'refundAmount cannot be greater than the original payment amount' });
+    throw httpError(400, 'refundAmount cannot be greater than the original payment amount');
   }
 
   if (result.status === 'booking_not_completed') {
-    return res.status(409).json({ message: 'Booking must be completed before payout release' });
+    throw httpError(409, 'Booking must be completed before payout release');
   }
 
   if (result.status === 'missing_payout_account') {
-    return res.status(409).json({ message: 'Artisan payout account is missing or unverified' });
+    throw httpError(409, 'Artisan payout account is missing or unverified');
   }
 
   if (result.status === 'blocked_by_dispute') {
-    return res.status(409).json({ message: 'This dispute must be resolved directly, not via payout release' });
+    throw httpError(409, 'This dispute must be resolved directly, not via payout release');
   }
 
   if (result.status === 'already_released') {
-    return res.status(409).json({ message: 'Payout has already been released' });
+    throw httpError(409, 'Payout has already been released');
   }
 
   if (result.status === 'resolved_release') {
-    return res.json({
+    res.json({
       message: 'Dispute resolved and payout released',
       dispute: result.dispute,
       payment: result.payment,
@@ -533,7 +577,7 @@ router.post('/disputes/:id/resolve', async (req, res) => {
   }
 
   if (result.status === 'resolved_refund') {
-    return res.json({
+    res.json({
       message: 'Dispute resolved with refund action',
       dispute: result.dispute,
       payment: result.payment,
@@ -541,30 +585,30 @@ router.post('/disputes/:id/resolve', async (req, res) => {
     });
   }
 
-  return res.status(500).json({ message: 'Unexpected dispute resolution outcome' });
-});
+  throw httpError(500, 'Unexpected dispute resolution outcome');
+}));
 
-router.get('/bookings/:id', async (req, res) => {
+router.get('/bookings/:id', asyncHandler(async (req, res) => {
   const booking = await getAdminBookingById(String(req.params.id));
 
   if (!booking) {
-    return res.status(404).json({ message: 'Booking not found' });
+    throw httpError(404, 'Booking not found');
   }
 
-  return res.json({
+  res.json({
     message: 'Admin booking fetched',
     booking,
   });
-});
+}));
 
-router.get('/conversations', async (req, res) => {
+router.get('/conversations', asyncHandler(async (req, res) => {
   const pagination = getPagination(req);
   const [conversations, total] = await Promise.all([
     getAdminConversations(pagination),
     countAdminConversations(),
   ]);
 
-  return res.json({
+  res.json({
     message: 'Admin conversations fetched',
     conversations,
     meta: {
@@ -572,29 +616,29 @@ router.get('/conversations', async (req, res) => {
       total,
     },
   });
-});
+}));
 
-router.get('/conversations/:id', async (req, res) => {
+router.get('/conversations/:id', asyncHandler(async (req, res) => {
   const conversation = await getAdminConversationById(String(req.params.id));
 
   if (!conversation) {
-    return res.status(404).json({ message: 'Conversation not found' });
+    throw httpError(404, 'Conversation not found');
   }
 
-  return res.json({
+  res.json({
     message: 'Admin conversation fetched',
     conversation,
   });
-});
+}));
 
-router.get('/conversations/:id/messages', async (req, res) => {
+router.get('/conversations/:id/messages', asyncHandler(async (req, res) => {
   const conversation = await getAdminConversationById(String(req.params.id));
 
   if (!conversation) {
-    return res.status(404).json({ message: 'Conversation not found' });
+    throw httpError(404, 'Conversation not found');
   }
 
-  return res.json({
+  res.json({
     message: 'Admin conversation messages fetched',
     conversation: {
       id: conversation.id,
@@ -607,13 +651,13 @@ router.get('/conversations/:id/messages', async (req, res) => {
     },
     messages: conversation.messages,
   });
-});
+}));
 
-router.post('/conversations/:id/notes', async (req, res) => {
+router.post('/conversations/:id/notes', asyncHandler(async (req, res) => {
   const { body } = req.body;
 
   if (!body || typeof body !== 'string' || !body.trim()) {
-    return res.status(400).json({ message: 'body is required' });
+    throw httpError(400, 'body is required');
   }
 
   const result = await createAdminConversationNote({
@@ -623,34 +667,31 @@ router.post('/conversations/:id/notes', async (req, res) => {
   });
 
   if (result.status === 'missing_conversation') {
-    return res.status(404).json({ message: 'Conversation not found' });
+    throw httpError(404, 'Conversation not found');
   }
 
-  return res.status(201).json({
-    message: 'Admin note created',
-    note: result.note,
-  });
-});
+  throw httpError(201, 'Admin note created');
+}));
 
-router.post('/conversations/:id/messages', async (req, res) => {
+router.post('/conversations/:id/messages', asyncHandler(async (req, res) => {
   const { body, imageUrl, imageCloudinaryId } = req.body;
   const hasBody = typeof body === 'string' && body.trim().length > 0;
   const hasImageUrl = typeof imageUrl === 'string' && imageUrl.trim().length > 0;
 
   if (body !== undefined && typeof body !== 'string') {
-    return res.status(400).json({ message: 'body must be a string' });
+    throw httpError(400, 'body must be a string');
   }
 
   if (imageUrl !== undefined && !hasImageUrl) {
-    return res.status(400).json({ message: 'imageUrl must be a non-empty string' });
+    throw httpError(400, 'imageUrl must be a non-empty string');
   }
 
   if (imageCloudinaryId !== undefined && typeof imageCloudinaryId !== 'string') {
-    return res.status(400).json({ message: 'imageCloudinaryId must be a string' });
+    throw httpError(400, 'imageCloudinaryId must be a string');
   }
 
   if (!hasBody && !hasImageUrl) {
-    return res.status(400).json({ message: 'body or imageUrl is required' });
+    throw httpError(400, 'body or imageUrl is required');
   }
 
   const result = await createAdminConversationMessage({
@@ -664,23 +705,20 @@ router.post('/conversations/:id/messages', async (req, res) => {
   });
 
   if (result.status === 'missing_conversation') {
-    return res.status(404).json({ message: 'Conversation not found' });
+    throw httpError(404, 'Conversation not found');
   }
 
-  return res.status(201).json({
-    message: 'Admin message sent',
-    chatMessage: result.message,
-  });
-});
+  throw httpError(201, 'Admin message sent');
+}));
 
-router.get('/reviews', async (req, res) => {
+router.get('/reviews', asyncHandler(async (req, res) => {
   const pagination = getPagination(req);
   const [reviews, total] = await Promise.all([
     getAdminReviews(pagination),
     countAdminReviews(),
   ]);
 
-  return res.json({
+  res.json({
     message: 'Admin reviews fetched',
     reviews,
     meta: {
@@ -688,19 +726,19 @@ router.get('/reviews', async (req, res) => {
       total,
     },
   });
-});
+}));
 
-router.delete('/reviews/:id', async (req, res) => {
+router.delete('/reviews/:id', asyncHandler(async (req, res) => {
   const result = await deleteReviewAndRecalculateRating(String(req.params.id));
 
   if (result.status === 'missing_review') {
-    return res.status(404).json({ message: 'Review not found' });
+    throw httpError(404, 'Review not found');
   }
 
-  return res.json({
+  res.json({
     message: 'Review deleted',
     artisan: result.artisan,
   });
-});
+}));
 
 export default router;
