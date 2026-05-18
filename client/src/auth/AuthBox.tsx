@@ -172,9 +172,20 @@ export function AuthBox({
         return;
       }
 
-      await finishAuth(refreshedUser, 'signup', readPendingSignupRole(refreshedUser.email) || preferredRole, true);
+      await finishAuth(
+        refreshedUser,
+        'signup',
+        readPendingSignupRole(refreshedUser.email) || preferredRole,
+        true
+      );
     } catch (error) {
-      onNotice(error instanceof Error ? error.message : 'Could not check verification status');
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : 'Could not check verification status';
+      onNotice(message);
     } finally {
       setSubmitting(false);
     }

@@ -1,24 +1,129 @@
+import { Prisma, Role } from '@prisma/client';
 import db from '../../db/client';
-import { Role } from '@prisma/client';
+import { ConflictError } from '../../utils/errors';
 
-export const findOrCreateUser = async (firebaseUser: any) => {
-  const { uid, email, phone_number } = firebaseUser;
+function normalizeEmail(email?: string | null) {
+  const trimmed = email?.trim();
+  return trimmed ? trimmed : null;
+}
 
-  let user = await db.user.findUnique({
+function normalizePhone(phone?: string | null) {
+  const trimmed = phone?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function isUniqueConstraintError(error: unknown) {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
+  );
+}
+
+export const findOrCreateUser = async (firebaseUser: {
+  uid: string;
+  email?: string | null;
+  phone_number?: string | null;
+}) => {
+  const { uid } = firebaseUser;
+  const normalizedEmail = normalizeEmail(firebaseUser.email);
+  const normalizedPhone = normalizePhone(firebaseUser.phone_number);
+
+  const existing = await db.user.findUnique({
     where: { firebaseUid: uid },
   });
 
-  if (!user) {
-    user = await db.user.create({
-      data: {
-        firebaseUid: uid,
-        email: email || null,
-        phone: phone_number || null,
-      },
-    });
+  if (existing) {
+    const updates: { email?: string | null; phone?: string | null } = {};
+
+    if (normalizedEmail && existing.email !== normalizedEmail) {
+      updates.email = normalizedEmail;
+    }
+
+    if (normalizedPhone && existing.phone !== normalizedPhone) {
+      updates.phone = normalizedPhone;
+    }
+
+    if (!Object.keys(updates).length) {
+      return existing;
+    }
+
+    try {
+      return await db.user.update({
+        where: { firebaseUid: uid },
+        data: updates,
+      });
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        throw new ConflictError(
+          'This email or phone is already linked to another Bundo account. Try logging in instead.',
+          'ACCOUNT_EXISTS'
+        );
+      }
+
+      throw error;
+    }
   }
 
-  return user;
+  if (normalizedEmail) {
+    const byEmail = await db.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (byEmail) {
+      try {
+        return await db.user.update({
+          where: { email: normalizedEmail },
+          data: {
+            firebaseUid: uid,
+            ...(normalizedPhone ? { phone: normalizedPhone } : {}),
+          },
+        });
+      } catch (error) {
+        if (isUniqueConstraintError(error)) {
+          throw new ConflictError(
+            'This email is already linked to another Bundo account. Try logging in instead.',
+            'ACCOUNT_EXISTS'
+          );
+        }
+
+        throw error;
+      }
+    }
+  }
+
+  try {
+    return await db.user.create({
+      data: {
+        firebaseUid: uid,
+        email: normalizedEmail,
+        phone: normalizedPhone,
+      },
+    });
+  } catch (error) {
+    if (isUniqueConstraintError(error)) {
+      if (normalizedEmail) {
+        const byEmail = await db.user.findUnique({
+          where: { email: normalizedEmail },
+        });
+
+        if (byEmail) {
+          return db.user.update({
+            where: { email: normalizedEmail },
+            data: {
+              firebaseUid: uid,
+              ...(normalizedPhone ? { phone: normalizedPhone } : {}),
+            },
+          });
+        }
+      }
+
+      throw new ConflictError(
+        'An account with this email or phone already exists. Try logging in instead.',
+        'ACCOUNT_EXISTS'
+      );
+    }
+
+    throw error;
+  }
 };
 
 export const updateUserRole = async (firebaseUid: string, role: Role) => {

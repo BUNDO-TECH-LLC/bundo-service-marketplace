@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { sendEmailVerification } from 'firebase/auth';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthLayout } from '../../layouts/AuthLayout';
+import { api, ApiError } from '../../lib/api';
+import { resolveApiSession } from '../../lib/authSession';
 import { auth } from '../../lib/firebase';
 
 type VerificationState = {
@@ -70,11 +72,30 @@ export function EmailVerificationPage() {
       return;
     }
 
+    const session = await resolveApiSession(auth.currentUser, true);
+    const accountKind = state.accountKind || 'CUSTOMER';
+
+    if (!session.user.role) {
+      await api('/users/role', {
+        method: 'PATCH',
+        token: session.token,
+        body: JSON.stringify({ role: accountKind }),
+      });
+    }
+
     navigate('/loading', {
       state: {
-        redirectTo: state.accountKind === 'ARTISAN' ? '/?view=workspace' : '/customer/dashboard',
+        redirectTo: accountKind === 'ARTISAN' ? '/?view=workspace' : '/customer/dashboard',
       },
     });
+  } catch (error) {
+    setMessage(
+      error instanceof ApiError
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : 'Could not finish signing you in after verification.'
+    );
   } finally {
     setBusy(false);
   }

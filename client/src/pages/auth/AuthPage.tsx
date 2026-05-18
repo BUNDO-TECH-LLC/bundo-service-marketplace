@@ -82,8 +82,6 @@ export function AuthPage({ mode }: AuthPageProps) {
   }
 
   async function ensureRole(token: string, role: AccountKind) {
-    if (role === 'CUSTOMER') return;
-
     await api('/users/role', {
       method: 'PATCH',
       token,
