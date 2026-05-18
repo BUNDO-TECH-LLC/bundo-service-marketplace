@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
-import { EmptyState } from '../components/EmptyState';
+import { BundoLoadingScreen } from '../components/BundoLoadingScreen';
 import { MainLayout } from './MainLayout';
 
 const HomePage = lazy(() => import('../pages/HomePage'));
@@ -11,11 +11,7 @@ const HelpPage = lazy(() => import('../pages/HelpPage'));
 const ArtisanProfileRoute = lazy(() => import('../pages/ArtisanProfileRoute'));
 
 function PageFallback() {
-  return (
-    <main className="page route-loading">
-      <EmptyState title="Loading page" body="Preparing this section of the app." />
-    </main>
-  );
+  return <BundoLoadingScreen />;
 }
 
 export function AppRoutes() {

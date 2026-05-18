@@ -9,6 +9,7 @@
   --accent: var(--color-accent);
   --accent-dark: var(--color-accent-dark);
   --accent-soft: var(--color-accent-soft);
+  --accent-wash: var(--color-accent-wash);
   --success-soft: var(--color-success-soft);
 }
 
@@ -370,19 +371,29 @@ canvas {
   gap: 8px;
   max-width: 140px;
   padding: 0;
+  color: var(--ink);
   font-size: 14px;
   font-weight: 700;
+  background: transparent;
 }
 
-.artisan-user-chip span {
+.artisan-user-chip-avatar {
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
   place-items: center;
   border-radius: 999px;
   color: #fff;
   background: #111;
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.artisan-user-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .topbar-search {
@@ -5725,17 +5736,31 @@ footer h4 {
     text-align: center;
   }
 
-  .artisan-user-chip-name {
+  .artisan-app-header .brand span:not(.brand-logo) {
     display: none;
   }
 
-  .artisan-user-chip {
-    max-width: none;
+  .artisan-user-chip-name {
+    display: none !important;
   }
 
-  .artisan-user-chip span:first-child {
+  .artisan-user-chip {
+    gap: 0;
+    width: 36px;
+    max-width: 36px;
+    min-width: 36px;
+    height: 36px;
+    justify-content: center;
+  }
+
+  .artisan-user-chip-avatar {
     width: 36px;
     height: 36px;
+  }
+
+  .artisan-header-end {
+    flex-shrink: 0;
+    gap: 8px;
   }
 
   .artisan-header-mobile-backdrop {
@@ -6118,5 +6143,62 @@ footer h4 {
   .notification-filter-tabs button,
   .notification-card-actions button {
     width: 100%;
+  }
+}
+
+.bundo-loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: var(--accent-wash, #fff9f4);
+}
+
+.bundo-loading-screen-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.bundo-loading-logo {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+}
+
+.bundo-loading-wordmark {
+  color: var(--ink);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.bundo-loading-bar {
+  width: 200px;
+  height: 4px;
+  margin-top: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--accent-soft);
+}
+
+.bundo-loading-bar-fill {
+  display: block;
+  width: 42%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-button, #ef812d);
+  animation: bundo-loading-slide 1.15s ease-in-out infinite;
+}
+
+@keyframes bundo-loading-slide {
+  0% {
+    transform: translateX(-120%);
+  }
+
+  100% {
+    transform: translateX(320%);
   }
 }

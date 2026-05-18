@@ -143,8 +143,15 @@ export function ArtisanAppHeader({
             </button>
           )}
         </div>
-        <button type="button" className="artisan-user-chip" onClick={() => runNav(onProfile)}>
-          <span>{initial}</span>
+        <button
+          type="button"
+          className="artisan-user-chip"
+          onClick={() => runNav(onProfile)}
+          aria-label={`${displayName} profile`}
+        >
+          <span className="artisan-user-chip-avatar" aria-hidden="true">
+            {initial}
+          </span>
           <span className="artisan-user-chip-name">{firstName}</span>
         </button>
       </div>

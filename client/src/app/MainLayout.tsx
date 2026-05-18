@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { signOut } from 'firebase/auth';
 import { Outlet } from 'react-router-dom';
 import { AuthBox } from '../auth/AuthBox';
-import { EmptyState } from '../components/EmptyState';
+import { BundoLoadingScreen } from '../components/BundoLoadingScreen';
 import { buildAppPath } from '../lib/appPaths';
 import { nextHelpOpenState } from '../lib/helpNavigation';
 import { nigeriaStates } from '../lib/geo';
@@ -42,6 +42,10 @@ export function MainLayout() {
     closeMobileNav();
     navigate();
   };
+
+  if (ctx.isAppBootstrapping) {
+    return <BundoLoadingScreen />;
+  }
 
   return (
     <>
@@ -221,7 +225,10 @@ export function MainLayout() {
                 ctx.setMe(nextUser);
                 ctx.loadPrivateData(nextToken, nextUser).catch(() => undefined);
                 if (nextUser.role === 'ADMIN') {
-                  ctx.navigate('/admin/overview');
+                  const onAdminRoute = ctx.location.pathname.startsWith('/admin');
+                  if (!onAdminRoute) {
+                    ctx.navigate('/admin/overview');
+                  }
                 } else if (nextUser.role === 'CUSTOMER') {
                   ctx.navigate('/');
                 }
@@ -268,42 +275,34 @@ export function MainLayout() {
         />
       )}
 
-      {ctx.isRestoringAuthedRoute ? (
-        <main className="page route-loading">
-          <EmptyState title="Loading your workspace" body="Restoring the right page for your account." />
-        </main>
-      ) : (
-        <>
-          {ctx.usesArtisanWorkspaceHeader && (
-            <ArtisanAppHeader
-              displayName={userDisplayName(ctx.firebaseUser, ctx.me)}
-              active={ctx.artisanHeaderActive}
-              onDashboard={() => {
-                ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'overview' }));
-              }}
-              onJobs={() => {
-                ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'bookings' }));
-              }}
-              onMessages={() => {
-                ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'messages' }));
-              }}
-              onReviews={() => {
-                ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'reviews' }));
-              }}
-              onProfile={() => {
-                ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'profile' }));
-              }}
-              onSignOut={() => {
-                ctx.setNotice('Signed out');
-                if (auth) {
-                  void signOut(auth);
-                }
-              }}
-            />
-          )}
-          <Outlet />
-        </>
+      {ctx.usesArtisanWorkspaceHeader && (
+        <ArtisanAppHeader
+          displayName={userDisplayName(ctx.firebaseUser, ctx.me)}
+          active={ctx.artisanHeaderActive}
+          onDashboard={() => {
+            ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'overview' }));
+          }}
+          onJobs={() => {
+            ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'bookings' }));
+          }}
+          onMessages={() => {
+            ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'messages' }));
+          }}
+          onReviews={() => {
+            ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'reviews' }));
+          }}
+          onProfile={() => {
+            ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'profile' }));
+          }}
+          onSignOut={() => {
+            ctx.setNotice('Signed out');
+            if (auth) {
+              void signOut(auth);
+            }
+          }}
+        />
       )}
+      <Outlet />
     </>
   );
 }

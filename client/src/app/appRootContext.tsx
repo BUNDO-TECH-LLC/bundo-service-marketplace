@@ -69,7 +69,7 @@ export type AppRootValue = {
   setBookingSuccess: (value: BookingSuccessState | null) => void;
   busy: boolean;
   isAuthed: boolean;
-  isRestoringAuthedRoute: boolean;
+  isAppBootstrapping: boolean;
   usesArtisanSetupHeader: boolean;
   usesArtisanWorkspaceHeader: boolean;
   hideGlobalHeader: boolean;

@@ -69,6 +69,7 @@ function App() {
   const [workspaceSection, setWorkspaceSection] = useState<WorkspaceSection>('overview');
   const [adminSection, setAdminSection] = useState<AdminSection>('overview');
   const [routeHydrated, setRouteHydrated] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [activeHelpTopicId, setActiveHelpTopicId] = useState<string | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [token, setToken] = useState('');
@@ -102,6 +103,7 @@ function App() {
   const [pushToken, setPushToken] = useState('');
   const currentTokenRef = useRef('');
   const currentUserRef = useRef<ApiUser | null>(null);
+  const authBootstrapCompletedRef = useRef(false);
 
   const isAuthed = Boolean(firebaseUser && token);
 
@@ -122,7 +124,12 @@ function App() {
 
     const firebaseProvisional = Boolean(auth?.currentUser);
 
-    if ((parsed.view === 'workspace' || parsed.view === 'admin') && !firebaseProvisional && !token) {
+    if (
+      authChecked &&
+      (parsed.view === 'workspace' || parsed.view === 'admin') &&
+      !firebaseProvisional &&
+      !token
+    ) {
       navigate('/', { replace: true });
       return;
     }
@@ -141,7 +148,7 @@ function App() {
     setWorkspaceSection(parsed.workspaceSection);
     setAdminSection(parsed.adminSection);
     setActiveHelpTopicId(parsed.helpTopicId);
-  }, [firebaseUser, location.pathname, me, navigate, token]);
+  }, [authChecked, firebaseUser, location.pathname, me, navigate, token]);
 
   async function withNotice(action: () => Promise<void>, done = 'Done') {
     setBusy(true);
@@ -343,7 +350,12 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!auth) return;
+    if (!auth) {
+      setAuthChecked(true);
+      setRouteHydrated(true);
+      return;
+    }
+
     return onAuthStateChanged(auth, async (user) => {
       setFirebaseUser(user);
       if (!user) {
@@ -371,9 +383,11 @@ function App() {
         setSelectedArtisan(null);
         setSelectedArtisanReviews([]);
         clearStoredRoute();
+        authBootstrapCompletedRef.current = false;
         if (hadSession) {
           navigate({ pathname: '/', search: '' }, { replace: true });
         }
+        setAuthChecked(true);
         return;
       }
 
@@ -398,7 +412,29 @@ function App() {
         setSelectedArtisan(null);
         setSelectedArtisanReviews([]);
         clearStoredRoute();
+        authBootstrapCompletedRef.current = false;
         navigate({ pathname: '/', search: '' }, { replace: true });
+        setAuthChecked(true);
+        return;
+      }
+
+      const finishAuthBootstrap = () => {
+        setRouteHydrated(true);
+        setAuthChecked(true);
+        authBootstrapCompletedRef.current = true;
+      };
+
+      if (authBootstrapCompletedRef.current) {
+        try {
+          const session = await resolveApiSession(user);
+          setToken(session.token);
+          setMe(session.user);
+          if (session.user.role) {
+            await loadPrivateData(session.token, session.user);
+          }
+        } catch {
+          // Keep the current route if a background token refresh fails.
+        }
         return;
       }
 
@@ -408,7 +444,7 @@ function App() {
         setMe(session.user);
 
         if (!session.user.role) {
-          setRouteHydrated(true);
+          finishAuthBootstrap();
           setNotice('Choose client or artisan to finish setting up your Bundo account before booking.');
           navigate({ pathname: '/', search: '' }, { replace: true });
           return;
@@ -440,25 +476,36 @@ function App() {
           } finally {
             navigate({ pathname: '/workspace/bookings', search: '' }, { replace: true });
           }
-          setRouteHydrated(true);
+          finishAuthBootstrap();
           return;
         }
 
         if (preservePublicRoute) {
-          setRouteHydrated(true);
+          finishAuthBootstrap();
           return;
         }
 
         if (session.user.role === 'ADMIN') {
-          setRouteHydrated(true);
-          navigate({ pathname: '/admin/overview', search: '' }, { replace: true });
+          const adminPath = parseAppPath(path);
+          if (adminPath?.view === 'admin') {
+            finishAuthBootstrap();
+            return;
+          }
+
+          const storedAdminRoute = readStoredRoute(session.user.role);
+          if (storedAdminRoute?.view === 'admin') {
+            navigate({ pathname: storedRouteToPath(storedAdminRoute), search: '' }, { replace: true });
+          } else {
+            navigate({ pathname: '/admin/overview', search: '' }, { replace: true });
+          }
+          finishAuthBootstrap();
           return;
         }
 
         const legacyTarget = legacyQueryToAppPath(window.location.search);
         if (legacyTarget) {
           navigate({ pathname: legacyTarget, search: '' }, { replace: true });
-          setRouteHydrated(true);
+          finishAuthBootstrap();
           return;
         }
 
@@ -468,7 +515,7 @@ function App() {
         } else if (session.user.role === 'ARTISAN') {
           navigate('/workspace/overview', { replace: true });
         }
-        setRouteHydrated(true);
+        finishAuthBootstrap();
       } catch {
         setToken('');
         setMe(null);
@@ -486,6 +533,7 @@ function App() {
         setRouteHydrated(false);
         setNotice('We could not finish account sync. Please make sure the backend is running, then sign in again.');
         navigate({ pathname: '/', search: '' }, { replace: true });
+        setAuthChecked(true);
       }
     });
   }, [navigate]);
@@ -588,6 +636,7 @@ function App() {
     [categories]
   );
   const isRestoringAuthedRoute = isAuthed && Boolean(me?.role) && !routeHydrated;
+  const isAppBootstrapping = !authChecked || isRestoringAuthedRoute;
   const usesArtisanSetupHeader = isAuthed && me?.role === 'ARTISAN' && view === 'home';
   const usesArtisanWorkspaceHeader = isAuthed && me?.role === 'ARTISAN' && view === 'workspace';
   const hideGlobalHeader = isAuthed && (me?.role === 'ADMIN' || usesArtisanSetupHeader || usesArtisanWorkspaceHeader);
@@ -644,7 +693,7 @@ function App() {
     setBookingSuccess,
     busy,
     isAuthed,
-    isRestoringAuthedRoute,
+    isAppBootstrapping,
     usesArtisanSetupHeader,
     usesArtisanWorkspaceHeader,
     hideGlobalHeader,

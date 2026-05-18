@@ -1,6 +1,6 @@
 import type { Role } from '../types';
 import type { AdminSection, View, WorkspaceSection } from '../appTypes';
-import { buildAppPath } from './appPaths';
+import { buildAppPath, VALID_ADMIN_SECTIONS } from './appPaths';
 
 export const routeStorageKey = 'bundo:last-route';
 
@@ -50,7 +50,10 @@ export function readStoredRoute(role: Role | null) {
         parsed.workspaceSection && validStoredWorkspaceSections.includes(parsed.workspaceSection)
           ? parsed.workspaceSection
           : 'overview',
-      adminSection: parsed.adminSection || 'overview',
+      adminSection:
+        parsed.adminSection && VALID_ADMIN_SECTIONS.includes(parsed.adminSection)
+          ? parsed.adminSection
+          : 'overview',
     };
   } catch {
     return null;
