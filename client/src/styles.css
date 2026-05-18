@@ -77,9 +77,94 @@ canvas {
 }
 
 .signed-in-topbar {
-  grid-template-columns: auto auto minmax(280px, 1fr) auto;
   color: var(--ink);
   background: #fff;
+}
+
+.topbar-collapse {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 28px;
+  min-width: 0;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.topbar-menu-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 8px;
+  color: inherit;
+  background: rgb(255 255 255 / 8%);
+}
+
+.topbar-menu-toggle-bars,
+.topbar-menu-toggle-bars::before,
+.topbar-menu-toggle-bars::after {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentcolor;
+  content: '';
+}
+
+.topbar-menu-toggle-bars {
+  position: relative;
+}
+
+.topbar-menu-toggle-bars::before,
+.topbar-menu-toggle-bars::after {
+  position: absolute;
+  left: 0;
+}
+
+.topbar-menu-toggle-bars::before {
+  top: -6px;
+}
+
+.topbar-menu-toggle-bars::after {
+  top: 6px;
+}
+
+.topbar--nav-open .topbar-menu-toggle-bars {
+  background: transparent;
+}
+
+.topbar--nav-open .topbar-menu-toggle-bars::before {
+  top: 0;
+  transform: rotate(45deg);
+}
+
+.topbar--nav-open .topbar-menu-toggle-bars::after {
+  top: 0;
+  transform: rotate(-45deg);
+}
+
+.signed-in-topbar .topbar-menu-toggle {
+  border-color: var(--line);
+  background: #fff;
+}
+
+.signed-in-topbar .auth-summary .account-chip {
+  border-color: var(--line);
+  color: var(--ink);
+  background: #f6f4f1;
+}
+
+.topbar-mobile-backdrop {
+  display: none;
 }
 
 .brand,
@@ -4765,14 +4850,11 @@ footer h4 {
   line-height: 1.6;
 }
 
-@media (max-width: 1180px) {
-  .topbar {
-    grid-template-columns: 1fr;
-    align-items: start;
-  }
-
-  .signed-in-topbar {
-    grid-template-columns: 1fr;
+@media (max-width: 1180px) and (min-width: 769px) {
+  .topbar-collapse {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 18px;
   }
 
   .topbar nav {
@@ -4780,12 +4862,120 @@ footer h4 {
   }
 
   .topbar-search {
-    justify-self: stretch;
     width: 100%;
+    max-width: 100%;
   }
 
   .auth-form {
     width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .topbar,
+  .signed-in-topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .topbar-menu-toggle {
+    display: inline-flex;
+  }
+
+  .topbar-collapse {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    z-index: 25;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    max-height: min(78vh, calc(100dvh - 72px));
+    overflow: auto;
+    border-top: 1px solid rgb(255 255 255 / 12%);
+    padding: 8px 16px 20px;
+    background: #050505;
+    box-shadow: 0 18px 40px rgb(0 0 0 / 28%);
+  }
+
+  .signed-in-topbar .topbar-collapse {
+    border-top-color: var(--line);
+    background: #fff;
+    box-shadow: 0 18px 40px rgb(18 18 18 / 10%);
+  }
+
+  .topbar--nav-open .topbar-collapse {
+    display: flex;
+  }
+
+  .topbar nav {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+
+  .topbar nav button {
+    width: 100%;
+    padding: 14px 4px;
+    text-align: left;
+    font-size: 15px;
+    font-weight: 700;
+    border-bottom: 1px solid rgb(255 255 255 / 10%);
+    border-radius: 0;
+  }
+
+  .signed-in-topbar nav button {
+    border-bottom-color: var(--line);
+  }
+
+  .signed-in-topbar nav button.active {
+    border-bottom: 1px solid var(--line);
+    color: var(--accent);
+  }
+
+  .topbar nav button:last-child {
+    border-bottom: 0;
+  }
+
+  .topbar-search {
+    width: 100%;
+    margin-top: 12px;
+    grid-template-columns: 1fr;
+  }
+
+  .topbar-search label + label {
+    border-top: 1px solid rgb(255 255 255 / 12%);
+    border-left: 0;
+  }
+
+  .signed-in-topbar .topbar-search label + label {
+    border-top-color: var(--line);
+  }
+
+  .auth-entry {
+    gap: 8px;
+  }
+
+  .auth-entry > button,
+  .auth-entry .signup-link {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  .topbar-mobile-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 15;
+    display: block;
+    padding: 0;
+    border: 0;
+    background: rgb(8 8 8 / 45%);
+    cursor: pointer;
   }
 }
 
@@ -5090,10 +5280,6 @@ footer h4 {
   .topbar-search label + label {
     border-top: 1px solid var(--line);
     border-left: 0;
-  }
-
-  .topbar nav {
-    gap: 14px;
   }
 
   .logged-home {
