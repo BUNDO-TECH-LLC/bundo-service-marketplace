@@ -8,6 +8,7 @@ import type {
   AdminSection,
   AdminUserRecord,
   BookingSuccessState,
+  PaymentSuccessState,
   MarketplaceSort,
   PushStatus,
   View,
@@ -67,6 +68,8 @@ export type AppRootValue = {
   setNotice: (value: string) => void;
   bookingSuccess: BookingSuccessState | null;
   setBookingSuccess: (value: BookingSuccessState | null) => void;
+  paymentSuccess: PaymentSuccessState | null;
+  setPaymentSuccess: (value: PaymentSuccessState | null) => void;
   busy: boolean;
   isAuthed: boolean;
   isAppBootstrapping: boolean;

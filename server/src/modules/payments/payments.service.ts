@@ -183,6 +183,17 @@ export const getPaymentForBooking = async (input: {
   return { status: 'found' as const, payment: booking.payment };
 };
 
+async function paymentBookingSummary(bookingId: string) {
+  return db.booking.findUnique({
+    where: { id: bookingId },
+    select: {
+      id: true,
+      offering: { select: { title: true } },
+      artisan: { select: { displayName: true } },
+    },
+  });
+}
+
 export const verifyPaymentReferenceForUser = async (input: {
   reference: string;
   firebaseUid: string;
@@ -224,10 +235,11 @@ export const verifyPaymentReferenceForUser = async (input: {
   }
 
   if (result.status === 'already_processed' || result.status === 'processed') {
-    return { status: 'verified' as const, payment: result.payment };
+    const booking = await paymentBookingSummary(result.payment.bookingId);
+    return { status: 'verified' as const, payment: result.payment, booking };
   }
 
-  return { status: 'verified' as const, payment };
+  return result;
 };
 
 export const markPaymentReferencePaid = async (reference: string) => {

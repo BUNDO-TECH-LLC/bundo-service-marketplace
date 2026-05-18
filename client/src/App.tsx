@@ -9,12 +9,14 @@ import type {
   AdminSection,
   AdminUserRecord,
   BookingSuccessState,
+  PaymentSuccessState,
   MarketplaceSort,
   PushStatus,
   View,
   WorkspaceSection,
 } from './appTypes';
-import { legacyQueryToAppPath, parseAppPath } from './lib/appPaths';
+import { buildAppPath, legacyQueryToAppPath, parseAppPath } from './lib/appPaths';
+import { paymentSuccessFromVerify, type VerifyPaymentResponse } from './lib/paymentReturn';
 import { api, ApiError } from './lib/api';
 import { needsEmailVerification } from './lib/authSignupStorage';
 import { auth, firebaseReady } from './lib/firebase';
@@ -98,12 +100,14 @@ function App() {
   const [marketplaceSort, setMarketplaceSort] = useState<MarketplaceSort>('rating');
   const [notice, setNotice] = useState('');
   const [bookingSuccess, setBookingSuccess] = useState<BookingSuccessState | null>(null);
+  const [paymentSuccess, setPaymentSuccess] = useState<PaymentSuccessState | null>(null);
   const [busy, setBusy] = useState(false);
   const [pushStatus, setPushStatus] = useState<PushStatus>(hasPushConfig() ? 'idle' : 'missing-config');
   const [pushToken, setPushToken] = useState('');
   const currentTokenRef = useRef('');
   const currentUserRef = useRef<ApiUser | null>(null);
   const authBootstrapCompletedRef = useRef(false);
+  const processedPaymentReferenceRef = useRef<string | null>(null);
 
   const isAuthed = Boolean(firebaseUser && token);
 
@@ -306,6 +310,17 @@ function App() {
     }
   }
 
+  async function completePaymentReturn(reference: string, authToken: string, user: ApiUser) {
+    const response = await api<VerifyPaymentResponse>('/payments/verify-reference', {
+      method: 'POST',
+      token: authToken,
+      body: JSON.stringify({ reference }),
+    });
+    await loadPrivateData(authToken, user);
+    setPaymentSuccess(paymentSuccessFromVerify(response));
+    setNotice('Payment confirmed. Your booking is now secured.');
+  }
+
   async function openArtisanProfile(artisanId: string) {
     navigate(`/artisans/${artisanId}`);
   }
@@ -348,6 +363,45 @@ function App() {
   useEffect(() => {
     loadPublicData().catch(() => setNotice('Could not load marketplace data'));
   }, []);
+
+  useEffect(() => {
+    if (!authChecked || !token || !me) {
+      return;
+    }
+
+    const params = new URLSearchParams(location.search);
+    const reference = params.get('reference') || params.get('trxref');
+    if (!reference || processedPaymentReferenceRef.current === reference) {
+      return;
+    }
+
+    processedPaymentReferenceRef.current = reference;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        await completePaymentReturn(reference, token, me);
+      } catch (error) {
+        if (!cancelled) {
+          setNotice(
+            error instanceof ApiError
+              ? error.message
+              : 'Payment could not be confirmed yet. Open Bookings to check status or try again.'
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          navigate(buildAppPath({ view: 'workspace', workspaceSection: 'bookings' }), {
+            replace: true,
+          });
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authChecked, location.search, me, navigate, token]);
 
   useEffect(() => {
     if (!auth) {
@@ -459,22 +513,19 @@ function App() {
         const reference = params.get('reference') || params.get('trxref');
 
         if (reference) {
+          processedPaymentReferenceRef.current = reference;
           try {
-            await api('/payments/verify-reference', {
-              method: 'POST',
-              token: session.token,
-              body: JSON.stringify({ reference }),
-            });
-            await loadPrivateData(session.token, session.user);
-            setNotice('Payment confirmed and your booking has been updated');
+            await completePaymentReturn(reference, session.token, session.user);
           } catch (error) {
             setNotice(
               error instanceof ApiError
                 ? error.message
-                : 'Payment callback received, but verification is still pending'
+                : 'Payment could not be confirmed yet. Open Bookings to check status or try again.'
             );
           } finally {
-            navigate({ pathname: '/workspace/bookings', search: '' }, { replace: true });
+            navigate(buildAppPath({ view: 'workspace', workspaceSection: 'bookings' }), {
+              replace: true,
+            });
           }
           finishAuthBootstrap();
           return;
@@ -691,6 +742,8 @@ function App() {
     setNotice,
     bookingSuccess,
     setBookingSuccess,
+    paymentSuccess,
+    setPaymentSuccess,
     busy,
     isAuthed,
     isAppBootstrapping,

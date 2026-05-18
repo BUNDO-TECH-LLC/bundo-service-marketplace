@@ -12,6 +12,13 @@ export type BookingSuccessState = {
   serviceTitle: string;
   artisanName: string;
 };
+
+export type PaymentSuccessState = {
+  bookingId: string;
+  serviceTitle: string;
+  artisanName: string;
+  amount: number;
+};
 export type AdminUserRecord = ApiUser & {
   artisanProfile?: {
     id: string;

@@ -3212,6 +3212,11 @@ footer h4 {
   background: var(--accent);
 }
 
+.payment-success-dialog .success-mark {
+  background: var(--success-soft, #e8f7ee);
+  color: #1a7a3a;
+}
+
 .booking-success-actions .secondary-button {
   color: #fff;
   background: var(--ink);

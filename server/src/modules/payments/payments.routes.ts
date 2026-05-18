@@ -149,9 +149,14 @@ router.post(
       ),
     });
 
+    if (result.status !== 'verified') {
+      throw new Error('Unexpected payment verification result');
+    }
+
     res.json({
       message: 'Payment verified',
       payment: result.payment,
+      booking: result.booking,
     });
   })
 );

@@ -9,6 +9,7 @@ import { nigeriaStates } from '../lib/geo';
 import { userDisplayName } from '../lib/userDisplayName';
 import bundoLogo from '../assets/bundo-logo.png';
 import { auth } from '../lib/firebase';
+import { PaymentSuccessDialog } from '../components/PaymentSuccessDialog';
 import {
   ArtisanAppHeader,
   BookingSuccessDialog,
@@ -271,6 +272,16 @@ export function MainLayout() {
           onGoToMessages={() => {
             ctx.setBookingSuccess(null);
             ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'messages' }));
+          }}
+        />
+      )}
+      {ctx.paymentSuccess && (
+        <PaymentSuccessDialog
+          payment={ctx.paymentSuccess}
+          onClose={() => ctx.setPaymentSuccess(null)}
+          onViewBookings={() => {
+            ctx.setPaymentSuccess(null);
+            ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'bookings' }));
           }}
         />
       )}
