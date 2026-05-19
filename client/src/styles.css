@@ -6101,6 +6101,11 @@ footer h4 {
     display: inline-flex;
   }
 
+  .topbar-actions {
+    position: relative;
+    z-index: 30;
+  }
+
   .topbar-collapse {
     position: absolute;
     top: 100%;

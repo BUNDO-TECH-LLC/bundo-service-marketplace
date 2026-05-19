@@ -171,6 +171,13 @@ export function AuthPage({ mode }: AuthPageProps) {
         )
       }
     >
+      {!firebaseReady && (
+        <p className={errorClassName}>
+          Sign-in is not configured. Set the VITE_FIREBASE_* variables in your client environment, then
+          reload.
+        </p>
+      )}
+
       <div className="grid gap-4">
         <button
           className="inline-flex min-h-14 items-center justify-center gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-white)] text-base font-bold text-[var(--color-ink-soft)] hover:bg-[var(--color-soft)] disabled:cursor-not-allowed disabled:opacity-55"

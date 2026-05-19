@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { User } from 'firebase/auth';
 import {
   createUserWithEmailAndPassword,
@@ -45,6 +46,7 @@ export function AuthBox({
   onWorkspaceSection: (section: WorkspaceSection) => void;
   onNotice: (message: string) => void;
 }) {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
@@ -68,11 +70,8 @@ export function AuthBox({
       return;
     }
 
-    setPreferredRole('ARTISAN');
-    setMode('signup');
-    setAuthStep('account');
-    setDrawerOpen(true);
-  }, [authPromptSignal]);
+    navigate('/signup?role=artisan');
+  }, [authPromptSignal, navigate]);
 
   async function finishAuth(
     firebaseAuthUser: User,
@@ -310,23 +309,13 @@ export function AuthBox({
   }
 
   function openLogin() {
-    setPreferredRole(null);
-    setConfirmPassword('');
-    setPendingAuthUser(null);
-    setPendingEmailVerificationUser(null);
-    setMode('login');
-    setAuthStep('account');
-    setDrawerOpen(true);
+    setDrawerOpen(false);
+    navigate('/login');
   }
 
   function openSignup(role: SignupRole | null = null) {
-    setPreferredRole(role);
-    setConfirmPassword('');
-    setPendingAuthUser(null);
-    setPendingEmailVerificationUser(null);
-    setMode('signup');
-    setAuthStep(role ? 'account' : 'role');
-    setDrawerOpen(true);
+    setDrawerOpen(false);
+    navigate(role === 'ARTISAN' ? '/signup?role=artisan' : '/signup');
   }
 
   function openResetPassword() {
@@ -676,7 +665,7 @@ export function AuthBox({
                       />
                     </label>
                   )}
-              <button disabled={!firebaseReady || submitting}>
+              <button type="submit" disabled={!firebaseReady || submitting}>
                     {submitting
                       ? 'Please wait'
                       : mode === 'reset'
