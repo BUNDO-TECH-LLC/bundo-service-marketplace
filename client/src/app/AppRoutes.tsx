@@ -18,6 +18,7 @@ const EmailVerificationPage = lazy(() =>
   }))
 );
 const LoadingPage = lazy(() => import('../pages/LoadingPage'));
+const ForgotPasswordPage = lazy(() => import('../pages/auth/ForgotPassword'));
 
 function PageFallback() {
   return <BundoLoadingScreen />;
@@ -30,7 +31,7 @@ export function AppRoutes() {
         <Route path="/login" element={<AuthPage mode="login" />} />
         <Route path="/signup" element={<AuthPage mode="signup" />} />
         <Route path="/create-account" element={<Navigate to="/signup" replace />} />
-        <Route path="/forgot-password" element={<Navigate to="/login" replace />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/verify-email" element={<EmailVerificationPage />} />
         <Route path="/loading" element={<LoadingPage />} />
 

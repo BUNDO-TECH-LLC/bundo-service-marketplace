@@ -23,10 +23,11 @@ main.tsx
 | `/help`, `/help/:topicId` | `HelpPage` | `MainLayout` |
 | `/artisans/:id` | `ArtisanProfileRoute` | `MainLayout` |
 | `/login`, `/signup` | `AuthPage` | self-contained `AuthLayout` |
+| `/forgot-password` | `ForgotPassword` | `AuthLayout` |
 | `/verify-email` | `EmailVerificationPage` | `AuthLayout` |
 | `/loading` | `LoadingPage` | none |
 
-Legacy redirects: `/create-account` → `/signup`, `/forgot-password` → `/login`.
+Legacy redirect: `/create-account` → `/signup`.
 
 ## Folder layout
 

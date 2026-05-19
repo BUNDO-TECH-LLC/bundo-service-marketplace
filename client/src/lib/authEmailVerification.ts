@@ -1,5 +1,6 @@
 import type { ActionCodeSettings } from 'firebase/auth';
-import { sendEmailVerification, type User } from 'firebase/auth';
+import { sendEmailVerification, sendPasswordResetEmail, type User } from 'firebase/auth';
+import { auth } from './firebase';
 
 function verificationContinueUrl() {
   if (typeof window === 'undefined') {
@@ -26,4 +27,27 @@ export async function sendBundoEmailVerification(user: User) {
   }
 
   await sendEmailVerification(user);
+}
+
+/** Where users land after completing the reset link from their email. */
+export function passwordResetActionCodeSettings(): ActionCodeSettings | undefined {
+  if (typeof window === 'undefined') {
+    return undefined;
+  }
+
+  return { url: `${window.location.origin}/login` };
+}
+
+export async function sendBundoPasswordResetEmail(email: string) {
+  if (!auth) {
+    throw new Error('Firebase is not configured for this environment.');
+  }
+
+  const settings = passwordResetActionCodeSettings();
+  if (settings) {
+    await sendPasswordResetEmail(auth, email.trim(), settings);
+    return;
+  }
+
+  await sendPasswordResetEmail(auth, email.trim());
 }

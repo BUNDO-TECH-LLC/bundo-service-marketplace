@@ -1,10 +1,5 @@
 import { FormEvent, useState } from 'react';
-import {
-  createUserWithEmailAndPassword,
-  sendPasswordResetEmail,
-  signInWithEmailAndPassword,
-  updateProfile,
-} from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthLayout } from '../../layouts/AuthLayout';
 import { api } from '../../lib/api';
@@ -59,27 +54,6 @@ export function AuthPage({ mode }: AuthPageProps) {
     setTimeout(() => {
       navigate(route);
     }, 3200);
-  }
-
-  async function sendPasswordReset() {
-    if (!auth) return;
-
-    if (!email.trim()) {
-      setError('Enter your email first, then use forgot password.');
-      return;
-    }
-
-    setError('');
-    setSubmitting(true);
-
-    try {
-      await sendPasswordResetEmail(auth, email.trim());
-      setError('Password reset email sent. Check your inbox and spam folder.');
-    } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : 'Could not send password reset email.');
-    } finally {
-      setSubmitting(false);
-    }
   }
 
   async function ensureRole(token: string, role: AccountKind) {
@@ -258,13 +232,12 @@ export function AuthPage({ mode }: AuthPageProps) {
         </label>
 
         {mode === 'login' && (
-          <button
-            className="min-h-auto w-max justify-self-end bg-transparent p-0 text-sm leading-tight font-bold text-[var(--color-accent-link)] hover:bg-transparent hover:text-[var(--color-accent-dark)]"
-            type="button"
-            onClick={sendPasswordReset}
+          <Link
+            className="min-h-auto w-max justify-self-end bg-transparent p-0 text-sm leading-tight font-bold text-[var(--color-accent-link)] no-underline hover:text-[var(--color-accent-dark)]"
+            to={email.trim() ? `/forgot-password?email=${encodeURIComponent(email.trim())}` : '/forgot-password'}
           >
             Forgot password?
-          </button>
+          </Link>
         )}
 
         {mode === 'signup' && (
