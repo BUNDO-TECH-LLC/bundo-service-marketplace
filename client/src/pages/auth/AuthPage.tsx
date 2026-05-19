@@ -1,13 +1,13 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useAppRoot } from '../../app/appRootContext';
 import { AuthLayout } from '../../layouts/AuthLayout';
 import { api } from '../../lib/api';
-import { resolveApiSession } from '../../lib/authSession';
 import { sendBundoEmailVerification } from '../../lib/authEmailVerification';
 import { finalizeAuthSession, signInWithGooglePopup } from '../../lib/authSessionFlow';
 import { auth, firebaseReady } from '../../lib/firebase';
-import type { Role } from '../../types';
+import type { ApiUser, Role } from '../../types';
 import googleLogo from '../../assets/icons/material-icon-theme_google.svg';
 import { PasswordInput } from '../../components/PasswordInput';
 
@@ -26,9 +26,16 @@ const inputClassName =
 const errorClassName =
   'm-0 rounded-md bg-[var(--color-danger-wash)] p-3 text-sm leading-[1.45] font-extrabold text-[var(--color-danger-dark)]';
 
+function destinationForRole(role: ApiUser['role']) {
+  if (role === 'ARTISAN') return '/';
+  if (role === 'ADMIN') return '/admin/overview';
+  return '/workspace/overview';
+}
+
 export function AuthPage({ mode }: AuthPageProps) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { isAuthed, me } = useAppRoot();
 
   const initialRole = searchParams.get('role') === 'artisan' ? 'ARTISAN' : 'CUSTOMER';
 
@@ -40,13 +47,34 @@ export function AuthPage({ mode }: AuthPageProps) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [pendingRedirect, setPendingRedirect] = useState(false);
 
   const title = mode === 'login' ? 'Welcome back!' : 'Create an account';
   const action = mode === 'login' ? 'Log in' : 'Get Started';
 
-  function navigateAfterAuth(route: string) {
-    navigate(route, { replace: true });
-  }
+  useEffect(() => {
+    if (!pendingRedirect || !isAuthed || !me?.role) {
+      return;
+    }
+
+    navigate(destinationForRole(me.role), { replace: true });
+    setPendingRedirect(false);
+    setSubmitting(false);
+  }, [isAuthed, me?.role, me, navigate, pendingRedirect]);
+
+  useEffect(() => {
+    if (!pendingRedirect) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setPendingRedirect(false);
+      setSubmitting(false);
+      setError('Sign-in is taking too long. Make sure the API is running, then try again.');
+    }, 15_000);
+
+    return () => window.clearTimeout(timer);
+  }, [pendingRedirect]);
 
   async function continueWithGoogle() {
     if (!auth) return;
@@ -56,15 +84,14 @@ export function AuthPage({ mode }: AuthPageProps) {
 
     try {
       const credential = await signInWithGooglePopup();
-      const { destination } = await finalizeAuthSession(credential.user, {
+      await finalizeAuthSession(credential.user, {
         mode,
         intendedRole: mode === 'signup' ? accountKind : undefined,
         phone: mode === 'signup' ? phone : undefined,
       });
-      navigateAfterAuth(destination);
+      setPendingRedirect(true);
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'Could not continue with Google.');
-    } finally {
       setSubmitting(false);
     }
   }
@@ -93,18 +120,8 @@ export function AuthPage({ mode }: AuthPageProps) {
 
     try {
       if (mode === 'login') {
-        const credential = await signInWithEmailAndPassword(auth, email, password);
-
-        const session = await resolveApiSession(credential.user);
-
-        const destination =
-          session.user.role === 'ARTISAN'
-            ? '/'
-            : session.user.role === 'ADMIN'
-              ? '/admin/overview'
-              : '/workspace/overview';
-
-        navigateAfterAuth(destination);
+        await signInWithEmailAndPassword(auth, email, password);
+        setPendingRedirect(true);
         return;
       }
 
@@ -116,7 +133,11 @@ export function AuthPage({ mode }: AuthPageProps) {
 
       await sendBundoEmailVerification(credential.user);
 
-      const session = await resolveApiSession(credential.user);
+      const { session } = await finalizeAuthSession(credential.user, {
+        mode: 'signup',
+        intendedRole: accountKind,
+        phone,
+      });
       await ensureRole(session.token, accountKind);
 
       if (phone.trim()) {
@@ -127,6 +148,7 @@ export function AuthPage({ mode }: AuthPageProps) {
         });
       }
 
+      setSubmitting(false);
       navigate('/verify-email', {
         state: {
           email,
@@ -135,10 +157,17 @@ export function AuthPage({ mode }: AuthPageProps) {
       });
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'Authentication failed.');
-    } finally {
       setSubmitting(false);
     }
   }
+
+  useEffect(() => {
+    if (!isAuthed || !me?.role || mode !== 'login' || pendingRedirect || submitting) {
+      return;
+    }
+
+    navigate(destinationForRole(me.role), { replace: true });
+  }, [isAuthed, me?.role, mode, navigate, pendingRedirect, submitting]);
 
   return (
     <AuthLayout

@@ -99,9 +99,15 @@ export function useAppData(filters: MarketplaceFilterState) {
 
     if (user.role === 'CUSTOMER') {
       const [bookingRes, conversationRes, notificationRes] = await Promise.all([
-        api<{ bookings: Booking[] }>('/bookings/customer?page=1&limit=10', { token: authToken }),
-        api<{ conversations: Conversation[] }>('/conversations', { token: authToken }),
-        api<{ notifications: Notification[] }>('/notifications', { token: authToken }),
+        api<{ bookings: Booking[] }>('/bookings/customer?page=1&limit=10', { token: authToken }).catch(() => ({
+          bookings: [],
+        })),
+        api<{ conversations: Conversation[] }>('/conversations', { token: authToken }).catch(() => ({
+          conversations: [],
+        })),
+        api<{ notifications: Notification[] }>('/notifications', { token: authToken }).catch(() => ({
+          notifications: [],
+        })),
       ]);
       setBookings(bookingRes.bookings);
       setConversations(conversationRes.conversations);
@@ -115,8 +121,12 @@ export function useAppData(filters: MarketplaceFilterState) {
           bookings: [],
         })),
         api<{ offerings: Offering[] }>('/offerings/me', { token: authToken }).catch(() => ({ offerings: [] })),
-        api<{ conversations: Conversation[] }>('/conversations', { token: authToken }),
-        api<{ notifications: Notification[] }>('/notifications', { token: authToken }),
+        api<{ conversations: Conversation[] }>('/conversations', { token: authToken }).catch(() => ({
+          conversations: [],
+        })),
+        api<{ notifications: Notification[] }>('/notifications', { token: authToken }).catch(() => ({
+          notifications: [],
+        })),
       ]);
       setBookings(bookingRes.bookings);
       setMyOfferings(offeringRes.offerings);

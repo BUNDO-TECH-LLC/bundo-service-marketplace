@@ -76,7 +76,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const onAuthScreen = isAuthPathname(location.pathname);
   const isRestoringAuthedRoute =
     isAuthed && Boolean(auth.me?.role) && !auth.routeHydrated && !onAuthScreen;
-  const isAppBootstrapping = !auth.authChecked || isRestoringAuthedRoute;
+  // Only block the shell while restoring a signed-in session — not on the initial Firebase check.
+  const isAppBootstrapping = isRestoringAuthedRoute;
   const usesArtisanSetupHeader = isAuthed && auth.me?.role === 'ARTISAN' && routeSync.view === 'home';
   const usesArtisanWorkspaceHeader = isAuthed && auth.me?.role === 'ARTISAN' && routeSync.view === 'workspace';
   const hideGlobalHeader =
