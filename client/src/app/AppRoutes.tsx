@@ -1,6 +1,9 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { BundoLoadingScreen } from '../components/BundoLoadingScreen';
+import { AuthPage } from '../pages/auth/AuthPage';
+import { EmailVerificationPage } from '../pages/auth/EmailVerificationPage';
+import ForgotPasswordPage from '../pages/auth/ForgotPassword';
 import { MainLayout } from './MainLayout';
 
 const HomePage = lazy(() => import('../pages/HomePage'));
@@ -9,16 +12,7 @@ const WorkspacePage = lazy(() => import('../pages/WorkspacePage'));
 const AdminPage = lazy(() => import('../pages/AdminPage'));
 const HelpPage = lazy(() => import('../pages/HelpPage'));
 const ArtisanProfileRoute = lazy(() => import('../pages/ArtisanProfileRoute'));
-const AuthPage = lazy(() =>
-  import('../pages/auth/AuthPage').then((module) => ({ default: module.AuthPage }))
-);
-const EmailVerificationPage = lazy(() =>
-  import('../pages/auth/EmailVerificationPage').then((module) => ({
-    default: module.EmailVerificationPage,
-  }))
-);
 const LoadingPage = lazy(() => import('../pages/LoadingPage'));
-const ForgotPasswordPage = lazy(() => import('../pages/auth/ForgotPassword'));
 
 function PageFallback() {
   return <BundoLoadingScreen />;

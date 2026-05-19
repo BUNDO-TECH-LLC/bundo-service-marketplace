@@ -1,5 +1,10 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  updateProfile,
+} from 'firebase/auth';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppRoot } from '../../app/appRootContext';
 import { AuthLayout } from '../../layouts/AuthLayout';
@@ -161,13 +166,7 @@ export function AuthPage({ mode }: AuthPageProps) {
     }
   }
 
-  useEffect(() => {
-    if (!isAuthed || !me?.role || mode !== 'login' || pendingRedirect || submitting) {
-      return;
-    }
-
-    navigate(destinationForRole(me.role), { replace: true });
-  }, [isAuthed, me?.role, mode, navigate, pendingRedirect, submitting]);
+  const alreadySignedIn = isAuthed && Boolean(me?.role);
 
   return (
     <AuthLayout
@@ -197,7 +196,36 @@ export function AuthPage({ mode }: AuthPageProps) {
         </p>
       )}
 
-      <div className="grid gap-4">
+      {alreadySignedIn && me?.role && (
+        <div className="grid gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-soft)] p-4 text-sm">
+          <p className="m-0 text-[var(--color-ink-soft)]">
+            You are already signed in as <strong>{me.email}</strong>. Continue to your dashboard or sign out to use
+            another account.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              className="min-h-11 rounded-xl bg-[var(--color-accent-button)] px-4 py-2 font-bold text-[var(--color-white)]"
+              onClick={() => navigate(destinationForRole(me.role), { replace: true })}
+            >
+              Continue to dashboard
+            </button>
+            <button
+              type="button"
+              className="min-h-11 rounded-xl border border-[var(--color-border)] bg-[var(--color-white)] px-4 py-2 font-bold text-[var(--color-ink)]"
+              onClick={() => {
+                if (auth) {
+                  void signOut(auth);
+                }
+              }}
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className={`grid gap-4 ${alreadySignedIn ? 'pointer-events-none opacity-45' : ''}`}>
         <button
           className="inline-flex min-h-14 items-center justify-center gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-white)] text-base font-bold text-[var(--color-ink-soft)] hover:bg-[var(--color-soft)] disabled:cursor-not-allowed disabled:opacity-55"
           type="button"
