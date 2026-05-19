@@ -233,6 +233,9 @@ export function MainLayout() {
           onProfile={() => {
             ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'profile' }));
           }}
+          onSettings={() => {
+            ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'settings' }));
+          }}
           onSignOut={() => {
             ctx.setNotice('Signed out');
             if (auth) {

@@ -26,7 +26,8 @@ export type ArtisanHeaderActive =
   | 'Reviews'
   | 'Offers'
   | 'Notifications'
-  | 'Profile';
+  | 'Profile'
+  | 'Settings';
 export type AdminSection =
   | 'overview'
   | 'profiles'

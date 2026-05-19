@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ArtisanHeaderActive } from '../../appTypes';
 import bundoLogo from '../../assets/bundo-logo.png';
+import { ArtisanTopbarNav } from './ArtisanTopbarNav';
 
 export function ArtisanAppHeader({
   displayName,
@@ -13,6 +14,7 @@ export function ArtisanAppHeader({
   onOffers,
   onNotifications,
   onProfile,
+  onSettings,
   onSignOut,
 }: {
   displayName: string;
@@ -25,21 +27,12 @@ export function ArtisanAppHeader({
   onOffers: () => void;
   onNotifications: () => void;
   onProfile: () => void;
+  onSettings: () => void;
   onSignOut?: () => void;
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const firstName = displayName.split(' ')[0];
   const initial = displayName.slice(0, 1).toUpperCase();
-
-  const navItems: { label: ArtisanHeaderActive; action: () => void; badge?: number }[] = [
-    { label: 'Dashboard', action: onDashboard },
-    { label: 'Jobs', action: onJobs },
-    { label: 'Messages', action: onMessages },
-    { label: 'Reviews', action: onReviews },
-    { label: 'Offers', action: onOffers },
-    { label: 'Notifications', action: onNotifications, badge: notificationUnreadCount },
-    { label: 'Profile', action: onProfile },
-  ];
 
   const closeMobileNav = () => setMobileNavOpen(false);
 
@@ -63,7 +56,7 @@ export function ArtisanAppHeader({
 
   return (
     <header
-      className={`artisan-app-header ${mobileNavOpen ? 'artisan-app-header--nav-open' : ''}`}
+      className={`artisan-app-header signed-in-topbar ${mobileNavOpen ? 'artisan-app-header--nav-open' : ''}`}
     >
       <button type="button" className="brand" onClick={() => runNav(onDashboard)}>
         <img className="brand-logo" src={bundoLogo} alt="Bundo logo" />
@@ -71,23 +64,19 @@ export function ArtisanAppHeader({
       </button>
 
       <div className="artisan-header-collapse" id="artisan-header-mobile-panel">
-        <nav aria-label="Artisan navigation">
-          {navItems.map(({ label, action, badge }) => (
-            <button
-              key={label}
-              type="button"
-              className={active === label ? 'active' : ''}
-              onClick={() => runNav(action)}
-            >
-              <span>{label}</span>
-              {badge != null && badge > 0 && (
-                <span className="artisan-nav-badge" aria-label={`${badge} unread`}>
-                  {badge > 99 ? '99+' : badge}
-                </span>
-              )}
-            </button>
-          ))}
-        </nav>
+        <ArtisanTopbarNav
+          active={active}
+          notificationUnreadCount={notificationUnreadCount}
+          onDashboard={onDashboard}
+          onJobs={onJobs}
+          onMessages={onMessages}
+          onReviews={onReviews}
+          onOffers={onOffers}
+          onNotifications={onNotifications}
+          onProfile={onProfile}
+          onSettings={onSettings}
+          onNavigate={runNav}
+        />
         {onSignOut && (
           <div className="artisan-header-mobile-actions">
             <button
@@ -144,4 +133,3 @@ export function ArtisanAppHeader({
     </header>
   );
 }
-

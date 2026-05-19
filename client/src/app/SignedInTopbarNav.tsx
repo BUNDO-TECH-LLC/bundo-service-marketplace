@@ -6,7 +6,10 @@ import {
   IconDashboard,
   IconMessages,
   IconNotifications,
+  IconOffers,
+  IconProfile,
   IconReviews,
+  IconSettings,
   TopbarNavButton,
 } from '../components/TopbarNavIcons';
 import type { View, WorkspaceSection } from '../appTypes';
@@ -64,12 +67,32 @@ export function SignedInTopbarNav({
         onClick={() => onNavigate(buildAppPath({ view: 'workspace', workspaceSection: 'notifications' }))}
       />
       {role === 'ARTISAN' && (
-        <TopbarNavButton
-          label="Reviews"
-          active={view === 'workspace' && workspaceSection === 'reviews'}
-          icon={<IconReviews />}
-          onClick={() => onNavigate(buildAppPath({ view: 'workspace', workspaceSection: 'reviews' }))}
-        />
+        <>
+          <TopbarNavButton
+            label="Reviews"
+            active={view === 'workspace' && workspaceSection === 'reviews'}
+            icon={<IconReviews />}
+            onClick={() => onNavigate(buildAppPath({ view: 'workspace', workspaceSection: 'reviews' }))}
+          />
+          <TopbarNavButton
+            label="Offers"
+            active={view === 'workspace' && workspaceSection === 'offers'}
+            icon={<IconOffers />}
+            onClick={() => onNavigate(buildAppPath({ view: 'workspace', workspaceSection: 'offers' }))}
+          />
+          <TopbarNavButton
+            label="Profile"
+            active={view === 'workspace' && workspaceSection === 'profile'}
+            icon={<IconProfile />}
+            onClick={() => onNavigate(buildAppPath({ view: 'workspace', workspaceSection: 'profile' }))}
+          />
+          <TopbarNavButton
+            label="Settings"
+            active={view === 'workspace' && workspaceSection === 'settings'}
+            icon={<IconSettings />}
+            onClick={() => onNavigate(buildAppPath({ view: 'workspace', workspaceSection: 'settings' }))}
+          />
+        </>
       )}
       {role === 'ADMIN' && (
         <TopbarNavButton

@@ -48,6 +48,28 @@ const SETTINGS_NAV_SHORT: Record<AccountSettingsSection, string> = {
   delete: 'Delete',
 };
 
+const ARTISAN_SETTINGS_ORDER: AccountSettingsSection[] = [
+  'business',
+  'personal',
+  'phone',
+  'email',
+  'language',
+  'notifications',
+  'password',
+  'delete',
+];
+
+const ARTISAN_SETTINGS_LABELS: Record<AccountSettingsSection, string> = {
+  personal: 'Personal details',
+  business: 'Business & verification',
+  phone: 'Contact phone',
+  email: 'Login email',
+  language: 'Language',
+  notifications: 'Job & message alerts',
+  password: 'Password',
+  delete: 'Delete account',
+};
+
 export function AccountSettingsHub({
   token,
   me,
@@ -67,7 +89,8 @@ export function AccountSettingsHub({
   onNavigate: (path: string) => void;
   onNotice: (message: string) => void;
 }) {
-  const [activeSection, setActiveSection] = useState<AccountSettingsSection>('personal');
+  const isArtisan = me.role === 'ARTISAN';
+  const [activeSection, setActiveSection] = useState<AccountSettingsSection>(isArtisan ? 'business' : 'personal');
   const [fullName, setFullName] = useState(userDisplayName(firebaseUser, me));
   const [phone, setPhone] = useState(me.phone || '');
   const [newEmail, setNewEmail] = useState('');
@@ -76,15 +99,24 @@ export function AccountSettingsHub({
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [artisanProfile, setArtisanProfile] = useState<Artisan | null>(null);
 
-  const navItems = useMemo(
-    () =>
-      SETTINGS_NAV.filter((item) => {
-        if (item.artisanOnly && me.role !== 'ARTISAN') return false;
-        if (item.adminHidden && me.role === 'ADMIN') return false;
-        return true;
-      }),
-    [me.role]
-  );
+  const navItems = useMemo(() => {
+    const filtered = SETTINGS_NAV.filter((item) => {
+      if (item.artisanOnly && me.role !== 'ARTISAN') return false;
+      if (item.adminHidden && me.role === 'ADMIN') return false;
+      return true;
+    });
+
+    if (me.role !== 'ARTISAN') {
+      return filtered;
+    }
+
+    return ARTISAN_SETTINGS_ORDER.map((id) => filtered.find((item) => item.id === id))
+      .filter((item): item is (typeof filtered)[number] => Boolean(item))
+      .map((item) => ({
+        ...item,
+        label: ARTISAN_SETTINGS_LABELS[item.id],
+      }));
+  }, [me.role]);
 
   const activeNavLabel = navItems.find((item) => item.id === activeSection)?.label ?? 'Settings';
 
@@ -102,7 +134,7 @@ export function AccountSettingsHub({
   }, [firebaseUser, me]);
 
   useEffect(() => {
-    if (me.role !== 'ARTISAN' || activeSection !== 'business') {
+    if (me.role !== 'ARTISAN') {
       return;
     }
 
@@ -122,7 +154,7 @@ export function AccountSettingsHub({
     return () => {
       cancelled = true;
     };
-  }, [activeSection, me.role, token]);
+  }, [me.role, token]);
 
   function selectSection(section: AccountSettingsSection) {
     setActiveSection(section);
@@ -224,17 +256,27 @@ export function AccountSettingsHub({
   }
 
   return (
-    <section className="account-settings-page">
+    <section className={`account-settings-page${isArtisan ? ' account-settings-page--artisan' : ''}`}>
       <header className="account-settings-hero">
         <div>
-          <p className="eyebrow">Account</p>
+          <p className="eyebrow">{isArtisan ? 'Artisan account' : 'Account'}</p>
           <h1>Settings</h1>
-          <p className="muted">Manage your personal information, security, and notification preferences.</p>
+          <p className="muted">
+            {isArtisan
+              ? 'Manage your business identity on Bundo, how customers reach you, security, and alerts for new jobs.'
+              : 'Manage your personal information, security, and notification preferences.'}
+          </p>
+          {isArtisan && artisanProfile && (
+            <p className="account-settings-artisan-identity">
+              <strong>{artisanProfile.displayName}</strong>
+              <span className="account-settings-artisan-status">{artisanProfile.verifyStatus.toLowerCase()}</span>
+            </p>
+          )}
         </div>
       </header>
 
       <div className="account-settings-layout">
-        <nav className="account-settings-nav" aria-label="Settings sections">
+        <nav className="account-settings-nav" aria-label={isArtisan ? 'Artisan account settings' : 'Settings sections'}>
           {navItems.map((item) => (
             <button
               key={item.id}
@@ -256,7 +298,11 @@ export function AccountSettingsHub({
         <div className="account-settings-panels">
           <article id="account-settings-personal" className={`panel-card form-card ${panelClass('personal')}`}>
             <h2>Personal details</h2>
-            <p className="muted">Your name appears on bookings, messages, and your account menu.</p>
+            <p className="muted">
+              {isArtisan
+                ? 'Your name appears on job updates, customer chats, and your Bundo artisan account.'
+                : 'Your name appears on bookings, messages, and your account menu.'}
+            </p>
             <form className="account-settings-form" onSubmit={(event) => void runAction(() => savePersonalDetails(event), 'Personal details saved')}>
               <label>
                 Full name
@@ -283,9 +329,10 @@ export function AccountSettingsHub({
 
           {me.role === 'ARTISAN' && (
             <article id="account-settings-business" className={`panel-card ${panelClass('business')}`}>
-              <h2>Business details</h2>
+              <h2>Business & verification</h2>
               <p className="muted">
-                Your public artisan profile, service area, verification, and payout details live in profile settings.
+                Your public listing, service area, portfolio photos, KYC, and payout bank account are managed in profile
+                settings. Use this section for a quick summary.
               </p>
               {artisanProfile ? (
                 <div className="account-settings-summary">
@@ -318,8 +365,12 @@ export function AccountSettingsHub({
           )}
 
           <article id="account-settings-phone" className={`panel-card form-card ${panelClass('phone')}`}>
-            <h2>Change phone number</h2>
-            <p className="muted">Used for booking updates and support. Include country code (e.g. +234…).</p>
+            <h2>{isArtisan ? 'Contact phone' : 'Change phone number'}</h2>
+            <p className="muted">
+              {isArtisan
+                ? 'Customers and Bundo support use this number for your jobs. Include country code (e.g. +234…).'
+                : 'Used for booking updates and support. Include country code (e.g. +234…).'}
+            </p>
             <label>
               Phone number
               <input
@@ -378,15 +429,23 @@ export function AccountSettingsHub({
           </article>
 
           <article id="account-settings-notifications" className={`panel-card ${panelClass('notifications')}`}>
-            <h2>Manage notifications</h2>
-            <p className="muted">Control which events generate in-app and email alerts.</p>
+            <h2>{isArtisan ? 'Job & message alerts' : 'Manage notifications'}</h2>
+            <p className="muted">
+              {isArtisan
+                ? 'Choose which job and account events send in-app and email alerts to you.'
+                : 'Control which events generate in-app and email alerts.'}
+            </p>
             <label className="terms-row">
               <input
                 type="checkbox"
                 checked={prefs.bookings}
                 onChange={(event) => setPrefs((current) => ({ ...current, bookings: event.target.checked }))}
               />
-              <span>Booking updates (requests, acceptances, completions)</span>
+              <span>
+                {isArtisan
+                  ? 'Job updates (new requests, acceptances, service start, completion, payouts)'
+                  : 'Booking updates (requests, acceptances, completions)'}
+              </span>
             </label>
             <label className="terms-row">
               <input
@@ -394,7 +453,7 @@ export function AccountSettingsHub({
                 checked={prefs.messages}
                 onChange={(event) => setPrefs((current) => ({ ...current, messages: event.target.checked }))}
               />
-              <span>New messages</span>
+              <span>{isArtisan ? 'Customer messages on your jobs' : 'New messages'}</span>
             </label>
             <label className="terms-row">
               <input
@@ -402,7 +461,11 @@ export function AccountSettingsHub({
                 checked={prefs.marketing}
                 onChange={(event) => setPrefs((current) => ({ ...current, marketing: event.target.checked }))}
               />
-              <span>Product tips and marketplace highlights</span>
+              <span>
+                {isArtisan
+                  ? 'Tips for growing your Bundo business and marketplace updates'
+                  : 'Product tips and marketplace highlights'}
+              </span>
             </label>
             <button type="button" disabled={busy} onClick={() => void runAction(savePreferences, 'Notification preferences saved')}>
               Save notification preferences
@@ -423,8 +486,9 @@ export function AccountSettingsHub({
           <article id="account-settings-delete" className={`panel-card account-settings-danger ${panelClass('delete')}`}>
             <h2>Delete my account permanently</h2>
             <p className="muted">
-              This removes your Bundo account and signs you out. Bookings and messages may be retained where required
-              for legal or dispute records.
+              {isArtisan
+                ? 'This removes your artisan account and signs you out. Your public listing will be withdrawn. Jobs, payouts, and messages may be retained where required for legal or dispute records.'
+                : 'This removes your Bundo account and signs you out. Bookings and messages may be retained where required for legal or dispute records.'}
             </p>
             <label>
               Type <strong>DELETE</strong> to confirm

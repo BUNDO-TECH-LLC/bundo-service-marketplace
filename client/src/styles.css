@@ -346,7 +346,6 @@ canvas {
 }
 
 .artisan-app-header .brand,
-.artisan-app-header nav button,
 .artisan-header-actions button,
 .artisan-header-mobile-actions button {
   color: var(--ink);
@@ -361,45 +360,22 @@ canvas {
   min-width: 0;
 }
 
-.artisan-app-header nav {
-  display: flex;
-  flex-wrap: wrap;
+.artisan-app-header .artisan-topbar-nav {
   justify-content: center;
-  gap: 22px;
 }
 
-.artisan-app-header nav button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border-radius: 0;
-  padding: 10px 0;
-  font-size: 15px;
-  font-weight: 700;
-  white-space: nowrap;
+.artisan-app-header .topbar-nav-icon-btn {
+  color: var(--ink);
 }
 
-.artisan-nav-badge {
-  min-width: 18px;
-  padding: 2px 6px;
-  border-radius: 999px;
-  color: #fff;
-  background: var(--accent);
-  font-size: 11px;
-  font-weight: 800;
-  line-height: 1.2;
+.artisan-app-header .topbar-nav-icon-btn.active {
+  border-bottom: 0;
 }
 
 .artisan-header-signout {
   display: none;
   padding: 8px 12px;
   font-size: 14px;
-}
-
-.artisan-app-header nav button.active,
-.artisan-app-header nav button:hover {
-  border-bottom: 2px solid var(--accent);
-  color: var(--accent);
 }
 
 .artisan-header-end {
@@ -491,7 +467,7 @@ canvas {
     padding-inline: 16px;
   }
 
-  .artisan-app-header nav {
+  .artisan-app-header .artisan-topbar-nav {
     flex-wrap: nowrap;
     justify-content: flex-start;
     overflow-x: auto;
@@ -499,12 +475,8 @@ canvas {
     scrollbar-width: none;
   }
 
-  .artisan-app-header nav::-webkit-scrollbar {
+  .artisan-app-header .artisan-topbar-nav::-webkit-scrollbar {
     display: none;
-  }
-
-  .artisan-app-header nav button {
-    font-size: 13px;
   }
 }
 
@@ -3726,6 +3698,29 @@ footer h4 {
   margin: 8px 0 10px;
   font-size: clamp(28px, 4vw, 36px);
   font-weight: 500;
+}
+
+.account-settings-page--artisan .account-settings-hero .eyebrow {
+  color: var(--accent);
+}
+
+.account-settings-artisan-identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 0;
+  font-size: 15px;
+}
+
+.account-settings-artisan-status {
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: capitalize;
 }
 
 .account-settings-layout {
@@ -7453,25 +7448,10 @@ footer h4 {
     display: flex;
   }
 
-  .artisan-app-header nav {
+  .artisan-app-header .artisan-topbar-nav {
     flex-direction: column;
     align-items: stretch;
     gap: 0;
-  }
-
-  .artisan-app-header nav button {
-    width: 100%;
-    padding: 14px 4px;
-    text-align: left;
-    font-size: 15px;
-    border-bottom: 1px solid var(--line);
-    border-radius: 0;
-  }
-
-  .artisan-app-header nav button.active {
-    border-bottom: 1px solid var(--line);
-    color: var(--accent);
-    background: #fff8f3;
   }
 
   .artisan-header-mobile-actions {
@@ -7914,20 +7894,41 @@ footer h4 {
   }
 }
 
+.bundo-loading-screen,
+.bundo-loading-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  background: var(--accent-wash, var(--color-accent-wash, #fff9f4));
+}
+
 .bundo-loading-screen {
   position: fixed;
   inset: 0;
   z-index: 100;
-  display: grid;
-  place-items: center;
-  background: var(--accent-wash, #fff9f4);
 }
 
-.bundo-loading-screen-inner {
+.bundo-loading-mark {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+}
+
+.bundo-loading-mark-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bundo-loading-mark--progress .bundo-loading-logo {
+  width: 50px;
+  height: 50px;
+}
+
+.bundo-loading-mark--progress .bundo-loading-wordmark {
+  font-size: 36px;
+  line-height: 1;
 }
 
 .bundo-loading-logo {
@@ -7946,10 +7947,17 @@ footer h4 {
 .bundo-loading-bar {
   width: 200px;
   height: 4px;
-  margin-top: 6px;
+  margin-top: 2px;
   overflow: hidden;
   border-radius: 999px;
   background: var(--accent-soft);
+}
+
+.bundo-loading-bar--progress {
+  width: 178px;
+  height: 9px;
+  border: 1px solid var(--accent, var(--color-primary, #ef812d));
+  background: transparent;
 }
 
 .bundo-loading-bar-fill {
@@ -7957,8 +7965,19 @@ footer h4 {
   width: 42%;
   height: 100%;
   border-radius: inherit;
-  background: var(--accent-button, #ef812d);
+  background: var(--accent-button, var(--color-primary, #ef812d));
   animation: bundo-loading-slide 1.15s ease-in-out infinite;
+}
+
+.bundo-loading-bar-fill--progress {
+  width: 0;
+  border-radius: 6px;
+  transition: width 100ms ease-out;
+  animation: none;
+}
+
+.artisan-setup-topline-actions .topbar-nav-icon-btn {
+  color: var(--ink);
 }
 
 @keyframes bundo-loading-slide {

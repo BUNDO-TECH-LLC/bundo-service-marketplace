@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { BundoLoadingScreen } from '../components/BundoLoadingScreen';
 import { EmptyState } from '../components/EmptyState';
 import { AccountSettingsHub } from '../features/account/AccountSettingsHub';
 import { ArtisanOffersPanel, ArtisanProfileSettings, ArtisanReviewsPanel } from '../features/artisan';
@@ -66,11 +67,7 @@ export default function WorkspacePage() {
   }, [ctx, me?.role, ctx.token]);
 
   if (me?.role === 'ARTISAN' && artisanGate === 'checking') {
-    return (
-      <main className="page workspace-page artisan-workspace-page">
-        <EmptyState title="Checking verification" body="Loading your artisan workspace access." />
-      </main>
-    );
+    return <BundoLoadingScreen />;
   }
 
   if (me?.role === 'ARTISAN' && artisanGate === 'blocked') {

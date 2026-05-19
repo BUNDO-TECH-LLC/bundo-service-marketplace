@@ -96,7 +96,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
               ? 'Notifications'
               : routeSync.workspaceSection === 'profile'
                 ? 'Profile'
-                : 'Dashboard';
+                : routeSync.workspaceSection === 'settings'
+                  ? 'Settings'
+                  : 'Dashboard';
 
   const categoryOptions = useMemo(
     (): ReactNode[] =>

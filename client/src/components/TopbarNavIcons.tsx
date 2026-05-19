@@ -74,6 +74,24 @@ export function IconReviews(props: IconProps) {
   );
 }
 
+export function IconOffers(props: IconProps) {
+  return (
+    <NavSvg {...props}>
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+      <path d="M7 7h.01" />
+    </NavSvg>
+  );
+}
+
+export function IconProfile(props: IconProps) {
+  return (
+    <NavSvg {...props}>
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </NavSvg>
+  );
+}
+
 export function IconAdmin(props: IconProps) {
   return (
     <NavSvg {...props}>

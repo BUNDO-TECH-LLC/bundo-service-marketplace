@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { signOut } from 'firebase/auth';
 import bundoLogo from '../assets/bundo-logo.png';
+import { IconHelp, TopbarNavButton } from '../components/TopbarNavIcons';
 import { auth } from '../lib/firebase';
 import { buildAppPath } from '../lib/appPaths';
 import { useAppRoot } from '../app/appRootContext';
@@ -27,13 +28,11 @@ export function ArtisanSetupShell({
         </button>
 
         <div className="artisan-setup-topline-actions">
-          <button
-            type="button"
-            className="secondary-button"
+          <TopbarNavButton
+            label="Help"
+            icon={<IconHelp />}
             onClick={() => ctx.navigate(buildAppPath({ view: 'help' }))}
-          >
-            Help
-          </button>
+          />
 
           <div className="artisan-setup-account">
             <button
