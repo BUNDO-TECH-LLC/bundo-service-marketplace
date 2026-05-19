@@ -95,6 +95,7 @@ model User {
   role               Role?
   status             UserStatus     @default(ACTIVE)
   fcmToken           String?        @map("fcm_token")
+  notificationPreferences Json?     @map("notification_preferences")
   createdAt          DateTime       @default(now()) @map("created_at")
   updatedAt          DateTime       @updatedAt @map("updated_at")
 

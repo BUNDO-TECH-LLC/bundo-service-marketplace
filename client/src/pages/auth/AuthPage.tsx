@@ -5,10 +5,10 @@ import { AuthLayout } from '../../layouts/AuthLayout';
 import { api } from '../../lib/api';
 import { resolveApiSession } from '../../lib/authSession';
 import { sendBundoEmailVerification } from '../../lib/authEmailVerification';
+import { finalizeAuthSession, signInWithGooglePopup } from '../../lib/authSessionFlow';
 import { auth, firebaseReady } from '../../lib/firebase';
 import type { Role } from '../../types';
 import googleLogo from '../../assets/icons/material-icon-theme_google.svg';
-import appleLogo from '../../assets/icons/Vector.svg';
 import LoadingPage from '../LoadingPage';
 import { PasswordInput } from '../../components/PasswordInput';
 
@@ -54,6 +54,27 @@ export function AuthPage({ mode }: AuthPageProps) {
     setTimeout(() => {
       navigate(route);
     }, 3200);
+  }
+
+  async function continueWithGoogle() {
+    if (!auth) return;
+
+    setError('');
+    setSubmitting(true);
+
+    try {
+      const credential = await signInWithGooglePopup();
+      const { destination } = await finalizeAuthSession(credential.user, {
+        mode,
+        intendedRole: mode === 'signup' ? accountKind : undefined,
+        phone: mode === 'signup' ? phone : undefined,
+      });
+      showLoadingThenNavigate(destination);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : 'Could not continue with Google.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function ensureRole(token: string, role: AccountKind) {
@@ -104,6 +125,14 @@ export function AuthPage({ mode }: AuthPageProps) {
       const session = await resolveApiSession(credential.user);
       await ensureRole(session.token, accountKind);
 
+      if (phone.trim()) {
+        await api('/users/phone', {
+          method: 'PATCH',
+          token: session.token,
+          body: JSON.stringify({ phone: phone.trim() }),
+        });
+      }
+
       navigate('/verify-email', {
         state: {
           email,
@@ -144,21 +173,13 @@ export function AuthPage({ mode }: AuthPageProps) {
     >
       <div className="grid gap-4">
         <button
-          className="inline-flex min-h-14 items-center justify-center gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-white)] text-base font-bold text-[var(--color-ink-soft)] hover:bg-[var(--color-soft)]"
+          className="inline-flex min-h-14 items-center justify-center gap-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-white)] text-base font-bold text-[var(--color-ink-soft)] hover:bg-[var(--color-soft)] disabled:cursor-not-allowed disabled:opacity-55"
           type="button"
-          onClick={() => setError('Google sign-in is not connected yet.')}
+          disabled={!firebaseReady || submitting}
+          onClick={() => void continueWithGoogle()}
         >
           <img className="h-[20px] w-[20px]" src={googleLogo} alt="Google logo" />
           Continue with Google
-        </button>
-
-        <button
-          className="inline-flex min-h-14 items-center justify-center gap-3 rounded-2xl border border-[var(--color-apple-black)] bg-[var(--color-apple-black)] text-base font-bold text-[var(--color-white)] hover:bg-[var(--color-black)]"
-          type="button"
-          onClick={() => setError('Apple sign-in is not connected yet.')}
-        >
-          <img className="h-[20px] w-[20px]" src={appleLogo} alt="Apple logo" />
-          Continue with Apple
         </button>
       </div>
 

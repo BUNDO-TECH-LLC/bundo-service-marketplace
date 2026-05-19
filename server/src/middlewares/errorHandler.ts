@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { AppError } from '../utils/errors';
+import { captureException } from '../observability';
 import logger from '../utils/logger';
 
 export type AsyncRouteHandler = (
@@ -35,6 +36,7 @@ export function appErrorHandler(
   }
 
   logger.error({ error, requestId }, 'Unhandled request error');
+  captureException(error, { requestId, path: req.path, method: req.method });
 
   return res.status(500).json({
     message: 'Internal server error',

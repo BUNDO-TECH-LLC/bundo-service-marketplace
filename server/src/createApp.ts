@@ -15,6 +15,7 @@ import offeringRoutes from './modules/offerings/offerings.routes';
 import paymentRoutes from './modules/payments/payments.routes';
 import reviewRoutes from './modules/reviews/reviews.routes';
 import userRoutes from './modules/users/users.routes';
+import { serializeUser } from './modules/users/users.service';
 import logger from './utils/logger';
 import db from './db/client';
 import { appErrorHandler } from './middlewares/errorHandler';
@@ -180,7 +181,7 @@ export function createApp() {
   app.get('/me', verifyFirebaseToken, (req, res) => {
     res.json({
       message: 'User fetched',
-      user: (req as any).user,
+      user: serializeUser((req as any).user),
     });
   });
 

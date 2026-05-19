@@ -26,6 +26,8 @@ type MarketplaceFilterState = {
   priceMin: string;
   priceMax: string;
   marketplaceSort: MarketplaceSort;
+  searchLat: number | null;
+  searchLng: number | null;
 };
 
 export function useAppData(filters: MarketplaceFilterState) {
@@ -70,6 +72,14 @@ export function useAppData(filters: MarketplaceFilterState) {
       if (nextMinPrice.trim()) params.set('minPrice', nextMinPrice.trim());
       if (nextMaxPrice.trim()) params.set('maxPrice', nextMaxPrice.trim());
       if (nextSort) params.set('sort', nextSort);
+      if (
+        nextSort === 'distance' &&
+        filters.searchLat != null &&
+        filters.searchLng != null
+      ) {
+        params.set('lat', String(filters.searchLat));
+        params.set('lng', String(filters.searchLng));
+      }
 
       const query = `?${params.toString()}`;
       const [categoryRes, artisanRes, offeringRes] = await Promise.all([

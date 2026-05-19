@@ -21,7 +21,13 @@ export type AdminSection =
   | 'finance';
 export type ActionRunner = (action: () => Promise<void>, done?: string) => Promise<void>;
 export type PushStatus = 'idle' | 'unsupported' | 'missing-config' | 'unavailable' | 'enabled' | 'denied';
-export type MarketplaceSort = 'newest' | 'rating' | 'price_low' | 'price_high';
+export type MarketplaceSort = 'newest' | 'rating' | 'price_low' | 'price_high' | 'distance';
+
+export type NotificationPreferences = {
+  bookings: boolean;
+  messages: boolean;
+  marketing: boolean;
+};
 export type SignupRole = Extract<Role, 'CUSTOMER' | 'ARTISAN'>;
 export type BookingSuccessState = {
   bookingId?: string;

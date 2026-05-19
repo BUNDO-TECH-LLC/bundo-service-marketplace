@@ -8,6 +8,13 @@ export function useMarketplaceFilters() {
   const [priceMin, setPriceMin] = useState('');
   const [priceMax, setPriceMax] = useState('');
   const [marketplaceSort, setMarketplaceSort] = useState<MarketplaceSort>('rating');
+  const [searchLat, setSearchLat] = useState<number | null>(null);
+  const [searchLng, setSearchLng] = useState<number | null>(null);
+
+  function setSearchCoordinates(lat: number | null, lng: number | null) {
+    setSearchLat(lat);
+    setSearchLng(lng);
+  }
 
   return {
     selectedState,
@@ -22,5 +29,8 @@ export function useMarketplaceFilters() {
     setPriceMax,
     marketplaceSort,
     setMarketplaceSort,
+    searchLat,
+    searchLng,
+    setSearchCoordinates,
   };
 }

@@ -66,6 +66,9 @@ export type AppRootValue = {
   setPriceMax: (value: string) => void;
   marketplaceSort: MarketplaceSort;
   setMarketplaceSort: (value: MarketplaceSort) => void;
+  searchLat: number | null;
+  searchLng: number | null;
+  setSearchCoordinates: (lat: number | null, lng: number | null) => void;
   notice: string;
   setNotice: (value: string) => void;
   bookingSuccess: BookingSuccessState | null;

@@ -1,10 +1,60 @@
 import { EmptyState } from '../components/EmptyState';
 import { MarketplaceFilters, OfferingGrid } from '../features/marketplace';
+import { coordinatesForState } from '../lib/nigeriaStateCoordinates';
 import { nigeriaStates } from '../lib/geo';
 import { useAppRoot } from '../app/appRootContext';
 
 export default function MarketplacePage() {
   const ctx = useAppRoot();
+
+  function resolveSearchCoordinates() {
+    if (ctx.searchLat != null && ctx.searchLng != null) {
+      return { lat: ctx.searchLat, lng: ctx.searchLng };
+    }
+
+    if (ctx.selectedState) {
+      return coordinatesForState(ctx.selectedState);
+    }
+
+    return null;
+  }
+
+  function useMyLocation() {
+    if (!navigator.geolocation) {
+      ctx.setNotice('Location is not available in this browser.');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        ctx.setSearchCoordinates(position.coords.latitude, position.coords.longitude);
+        ctx.setMarketplaceSort('distance');
+        ctx.setNotice('Using your current location for nearest results.');
+      },
+      () => {
+        ctx.setNotice('Could not read your location. Pick a state or allow location access.');
+      },
+      { enableHighAccuracy: false, timeout: 12_000 }
+    );
+  }
+
+  async function applyFilters() {
+    const coords = resolveSearchCoordinates();
+    if (ctx.marketplaceSort === 'distance') {
+      if (!coords) {
+        ctx.setNotice('Choose a state or use your location before sorting by nearest.');
+        return;
+      }
+      ctx.setSearchCoordinates(coords.lat, coords.lng);
+    }
+
+    await ctx.withNotice(
+      async () => {
+        await ctx.loadPublicData(ctx.selectedState, ctx.searchTerm);
+      },
+      'Marketplace filters updated'
+    );
+  }
 
   return (
     <main className="page">
@@ -26,6 +76,9 @@ export default function MarketplacePage() {
             Category: {ctx.categories.find((category) => category.id === ctx.selectedCategoryId)?.name || 'Selected'}
           </span>
         )}
+        {ctx.marketplaceSort === 'distance' && ctx.searchLat != null && (
+          <span>Sort: nearest</span>
+        )}
         <span>{ctx.publicOfferings.length} services</span>
         <span>{ctx.artisans.length} artisans</span>
         <span>{ctx.categories.length} categories</span>
@@ -40,20 +93,22 @@ export default function MarketplacePage() {
         priceMin={ctx.priceMin}
         priceMax={ctx.priceMax}
         sort={ctx.marketplaceSort}
-        onSelectedStateChange={ctx.setSelectedState}
+        onSelectedStateChange={(state) => {
+          ctx.setSelectedState(state);
+          if (state) {
+            const coords = coordinatesForState(state);
+            ctx.setSearchCoordinates(coords.lat, coords.lng);
+          }
+        }}
         onSearchTermChange={ctx.setSearchTerm}
         onCategoryChange={ctx.setSelectedCategoryId}
         onPriceMinChange={ctx.setPriceMin}
         onPriceMaxChange={ctx.setPriceMax}
         onSortChange={ctx.setMarketplaceSort}
-        onApply={() =>
-          ctx.withNotice(
-            async () => {
-              await ctx.loadPublicData(ctx.selectedState, ctx.searchTerm);
-            },
-            'Marketplace filters updated'
-          )
-        }
+        onUseMyLocation={() => {
+          useMyLocation();
+        }}
+        onApply={applyFilters}
         onClear={async () => {
           ctx.setSelectedState('');
           ctx.setSearchTerm('');
@@ -61,6 +116,7 @@ export default function MarketplacePage() {
           ctx.setPriceMin('');
           ctx.setPriceMax('');
           ctx.setMarketplaceSort('rating');
+          ctx.setSearchCoordinates(null, null);
           await ctx.withNotice(
             async () => {
               await ctx.loadPublicData('', '', {
@@ -78,7 +134,7 @@ export default function MarketplacePage() {
       <OfferingGrid
         offerings={ctx.publicOfferings}
         isAuthed={ctx.isAuthed}
-        role={ctx.me?.role || null}
+        role={ctx.me?.role ?? null}
         token={ctx.token}
         busy={ctx.busy}
         runAction={ctx.withNotice}
@@ -87,34 +143,12 @@ export default function MarketplacePage() {
         onBookingSuccess={ctx.setBookingSuccess}
       />
 
-      <section className="section-head compact">
-        <h2>Approved artisans</h2>
-        <p>Public profiles now respond to category, price, location, and sort signals to make discovery sharper.</p>
-      </section>
-      <div className="grid three">
-        {ctx.artisans.length === 0 && (
-          <EmptyState title="No artisans yet" body="Approve artisan profiles from admin to make them visible here." />
-        )}
-        {ctx.artisans.map((artisan) => (
-          <article className="artisan-card" key={artisan.id}>
-            <div className="avatar">{artisan.displayName.slice(0, 1).toUpperCase()}</div>
-            <div>
-              <h3>{artisan.displayName}</h3>
-              <p>{artisan.bio || 'Trusted professional'}</p>
-              <p className="muted">
-                {artisan.city}
-                {artisan.area ? `, ${artisan.area}` : ''}
-              </p>
-              <p className="rating">
-                Rating {artisan.avgRating || 0} · {artisan.ratingCount} reviews
-              </p>
-              <button type="button" className="text-button" onClick={() => ctx.openArtisanProfile(artisan.id)}>
-                View profile
-              </button>
-            </div>
-          </article>
-        ))}
-      </div>
+      {ctx.publicOfferings.length === 0 && (
+        <EmptyState
+          title="No matching services"
+          body="Try clearing filters, choosing another state, or browsing without distance sorting."
+        />
+      )}
     </main>
   );
 }

@@ -94,12 +94,13 @@ A **two-sided marketplace** for home and personal services in Nigeria: customers
 | Area | Status |
 |------|--------|
 | Paystack production E2E | Code + webhooks exist; **not fully verified** with live money and dashboard webhook URL |
-| CI smoke e2e | Migrate step fixed; **e2e test may still fail intermittently** on GitHub — passes locally with real DB |
-| Google/Apple on `/login` | **Stub buttons** on `AuthPage`; Google works in header **`AuthBox`** modal only |
-| Search ranking | Filters/sort only — no geo distance ranking |
-| Observability | Health/ready only — no Sentry/Datadog/alerting |
-| Profile phone | Read-only from Firebase |
-| Notification prefs | No user-facing preferences UI |
+| CI smoke e2e | Hardened (longer timeouts, single fork, `ALLOW_PAYMENT_SIMULATION` in smoke job); verify green on `main` |
+| Google on `/login` | **Done** — shared `authSessionFlow` on `AuthPage` (same as header modal) |
+| Apple Sign In | **Not implemented** — requires Apple Developer + Firebase provider setup |
+| Search ranking | **Distance sort** via `sort=distance` + `lat`/`lng` (GPS or state centroid); not full geocoding |
+| Observability | **Optional Sentry** when `SENTRY_DSN` / `VITE_SENTRY_DSN` are set; health/ready unchanged |
+| Profile phone | **Editable** — `PATCH /users/phone` in Account settings + artisan profile form |
+| Notification prefs | **Done** — `PATCH /users/notification-preferences`; enforced when creating notifications |
 | Auth email deliverability | Firebase default sender; custom domain not configured |
 
 ### Maturity assessment
@@ -1230,7 +1231,7 @@ Use this before calling the product **publicly launched**. Items marked **Blocke
 ### High priority (strongly recommended)
 
 - [ ] **Stabilize CI smoke** — Green `smoke` job on every `main` push (investigate GitHub-only e2e failures if migrate passes)
-- [ ] **Google sign-in on `/login`** — Wire `AuthPage` to same flow as `AuthBox` or remove stub buttons until ready
+- [x] **Google sign-in on `/login`** — `lib/authSessionFlow.ts` + `AuthPage` (May 2026)
 - [ ] **Legal / trust pages** — Terms, Privacy linked from signup and footer (content + routes if not already live)
 - [ ] **Support contact** — Monitored email or channel linked from Help and dispute flows
 - [ ] **Firebase email domain** — Custom domain + templates for verification and reset (reduce spam folder)
@@ -1239,9 +1240,9 @@ Use this before calling the product **publicly launched**. Items marked **Blocke
 
 ### Medium priority (post-launch or parallel)
 
-- [ ] Search ranking by distance / rating / relevance
-- [ ] Notification preferences UI
-- [ ] Editable phone on artisan profile (beyond Firebase login phone)
+- [x] Search ranking by distance (`sort=distance` + lat/lng)
+- [x] Notification preferences UI (Account settings + server enforcement)
+- [x] Editable phone (`PATCH /users/phone`)
 - [ ] E2E payment smoke in CI (Paystack test mode or mocked)
 - [ ] Remove deprecated `appShellComponents.tsx` barrel when no imports remain
 - [ ] Client Vitest for critical routes (login, marketplace, workspace guards)

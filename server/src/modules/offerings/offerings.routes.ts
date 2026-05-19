@@ -131,7 +131,7 @@ router.get(
 router.get(
   '/',
   asyncHandler(async (req, res) => {
-    const { artisanId, categoryId, city, state, q, minPrice, maxPrice, sort } = req.query;
+    const { artisanId, categoryId, city, state, q, minPrice, maxPrice, sort, lat, lng } = req.query;
     const pagination = getPagination(req);
     const location =
       typeof state === 'string' ? state : typeof city === 'string' ? city : undefined;
@@ -143,16 +143,24 @@ router.get(
       ...(typeof minPrice === 'string' ? { minPrice: Number(minPrice) } : {}),
       ...(typeof maxPrice === 'string' ? { maxPrice: Number(maxPrice) } : {}),
       ...(typeof sort === 'string' &&
-      ['newest', 'price_low', 'price_high', 'rating'].includes(sort)
-        ? { sort: sort as 'newest' | 'price_low' | 'price_high' | 'rating' }
+      ['newest', 'price_low', 'price_high', 'rating', 'distance'].includes(sort)
+        ? { sort: sort as 'newest' | 'price_low' | 'price_high' | 'rating' | 'distance' }
         : {}),
+      ...(typeof lat === 'string' && lat.trim() ? { lat: Number(lat) } : {}),
+      ...(typeof lng === 'string' && lng.trim() ? { lng: Number(lng) } : {}),
     };
 
     if (
       (filters.minPrice !== undefined && Number.isNaN(filters.minPrice)) ||
-      (filters.maxPrice !== undefined && Number.isNaN(filters.maxPrice))
+      (filters.maxPrice !== undefined && Number.isNaN(filters.maxPrice)) ||
+      (filters.lat !== undefined && Number.isNaN(filters.lat)) ||
+      (filters.lng !== undefined && Number.isNaN(filters.lng))
     ) {
-      throw new ValidationError('minPrice and maxPrice must be numbers');
+      throw new ValidationError('minPrice, maxPrice, lat, and lng must be numbers');
+    }
+
+    if (filters.sort === 'distance' && (filters.lat === undefined || filters.lng === undefined)) {
+      throw new ValidationError('lat and lng are required when sort=distance');
     }
 
     const [offerings, total] = await Promise.all([

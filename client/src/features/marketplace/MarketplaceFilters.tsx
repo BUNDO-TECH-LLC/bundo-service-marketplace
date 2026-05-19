@@ -16,6 +16,7 @@ export function MarketplaceFilters({
   onPriceMinChange,
   onPriceMaxChange,
   onSortChange,
+  onUseMyLocation,
   onApply,
   onClear,
 }: {
@@ -33,6 +34,7 @@ export function MarketplaceFilters({
   onPriceMinChange: (value: string) => void;
   onPriceMaxChange: (value: string) => void;
   onSortChange: (value: MarketplaceSort) => void;
+  onUseMyLocation?: () => void;
   onApply: () => Promise<void>;
   onClear: () => Promise<void>;
 }) {
@@ -91,9 +93,18 @@ export function MarketplaceFilters({
             <option value="newest">Newest</option>
             <option value="price_low">Lowest price</option>
             <option value="price_high">Highest price</option>
+            <option value="distance">Nearest to you</option>
           </select>
         </label>
       </div>
+      {sort === 'distance' && onUseMyLocation ? (
+        <p className="muted">
+          <button type="button" className="text-button" onClick={onUseMyLocation}>
+            Use my current location
+          </button>{' '}
+          for distance ranking, or pick a state above to use that region as your reference point.
+        </p>
+      ) : null}
       <div className="marketplace-filter-actions">
         <button onClick={() => void onApply()}>Apply filters</button>
         <button className="secondary-button" onClick={() => void onClear()}>

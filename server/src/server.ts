@@ -1,6 +1,9 @@
 import { env } from './config/env';
+import { initObservability } from './observability';
 import logger from './utils/logger';
 import { createApp } from './createApp';
+
+initObservability();
 
 const app = createApp();
 const PORT = env.PORT;

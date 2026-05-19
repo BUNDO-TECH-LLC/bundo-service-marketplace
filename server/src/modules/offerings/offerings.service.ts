@@ -1,6 +1,7 @@
 import { Prisma, VerifyStatus } from '@prisma/client';
 import db from '../../db/client';
 import { Pagination, paginationArgs } from '../../utils/pagination';
+import { distanceKm } from '../../lib/geoDistance';
 import {
   getArtisanProfileByUserId,
   getCategoryById,
@@ -30,7 +31,9 @@ type OfferingFilters = {
   q?: string;
   minPrice?: number;
   maxPrice?: number;
-  sort?: 'newest' | 'price_low' | 'price_high' | 'rating';
+  sort?: 'newest' | 'price_low' | 'price_high' | 'rating' | 'distance';
+  lat?: number;
+  lng?: number;
 };
 
 function buildOfferingWhere(filters: OfferingFilters = {}): Prisma.OfferingWhereInput {
@@ -99,10 +102,40 @@ function offeringOrderBy(
         { artisan: { ratingCount: 'desc' } },
         { createdAt: 'desc' },
       ];
+    case 'distance':
+      return { createdAt: 'desc' };
     case 'newest':
     default:
       return { createdAt: 'desc' };
   }
+}
+
+type OfferingWithArtisanCoords = Awaited<ReturnType<typeof db.offering.findMany>>[number] & {
+  artisan: { lat?: number; lng?: number };
+};
+
+function sortOfferingsByDistance(
+  offerings: OfferingWithArtisanCoords[],
+  lat: number,
+  lng: number
+) {
+  return [...offerings].sort((left, right) => {
+    const leftLat = left.artisan?.lat;
+    const leftLng = left.artisan?.lng;
+    const rightLat = right.artisan?.lat;
+    const rightLng = right.artisan?.lng;
+
+    const leftDistance =
+      leftLat != null && leftLng != null ? distanceKm(lat, lng, leftLat, leftLng) : Number.POSITIVE_INFINITY;
+    const rightDistance =
+      rightLat != null && rightLng != null ? distanceKm(lat, lng, rightLat, rightLng) : Number.POSITIVE_INFINITY;
+
+    if (leftDistance !== rightDistance) {
+      return leftDistance - rightDistance;
+    }
+
+    return right.createdAt.getTime() - left.createdAt.getTime();
+  });
 }
 
 export const createOfferingForArtisan = async (input: CreateOfferingInput) => {
@@ -146,30 +179,53 @@ export const createOfferingForArtisan = async (input: CreateOfferingInput) => {
   return { status: 'created' as const, offering };
 };
 
+const artisanPublicSelect = {
+  id: true,
+  displayName: true,
+  city: true,
+  area: true,
+  lat: true,
+  lng: true,
+  avgRating: true,
+  ratingCount: true,
+  verifyStatus: true,
+} as const;
+
 export const getOfferings = async (
   filters: OfferingFilters = {},
   pagination?: Pagination
 ) => {
   const where = buildOfferingWhere(filters);
+  const useDistanceSort =
+    filters.sort === 'distance' &&
+    filters.lat !== undefined &&
+    filters.lng !== undefined &&
+    !Number.isNaN(filters.lat) &&
+    !Number.isNaN(filters.lng);
+
+  const include = {
+    category: true,
+    artisan: { select: artisanPublicSelect },
+  };
+
+  if (useDistanceSort) {
+    const rows = await db.offering.findMany({
+      where,
+      include,
+    });
+    const sorted = sortOfferingsByDistance(rows as OfferingWithArtisanCoords[], filters.lat!, filters.lng!);
+    if (!pagination) {
+      return sorted;
+    }
+    const skip = (pagination.page - 1) * pagination.limit;
+    return sorted.slice(skip, skip + pagination.limit);
+  }
 
   return db.offering.findMany({
     where,
     orderBy: offeringOrderBy(filters.sort),
     ...paginationArgs(pagination),
-    include: {
-      category: true,
-      artisan: {
-        select: {
-          id: true,
-          displayName: true,
-          city: true,
-          area: true,
-          avgRating: true,
-          ratingCount: true,
-          verifyStatus: true,
-        },
-      },
-    },
+    include,
   });
 };
 

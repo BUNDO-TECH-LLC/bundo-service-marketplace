@@ -99,6 +99,15 @@ export function ArtisanProfileSettings({
         lng: profile?.lng ?? 3.3792,
       }),
     });
+    const phone = String(form.get('phone') || '').trim();
+    if (phone) {
+      await api('/users/phone', {
+        method: 'PATCH',
+        token,
+        body: JSON.stringify({ phone }),
+      });
+    }
+
     const response = await api<{ profile: Artisan }>('/artisans/me', { token });
     setProfile(response.profile);
     await refresh();
@@ -237,11 +246,12 @@ export function ArtisanProfileSettings({
           <label>
             Phone number
             <input
+              name="phone"
               defaultValue={firebaseUser?.phoneNumber || ''}
-              disabled
-              title="Phone is synced from your sign-in account"
+              placeholder="+2348012345678"
+              title="Saved to your Bundo account"
             />
-            <small className="muted">Managed through your login provider (Firebase).</small>
+            <small className="muted">Update your contact number for booking and payout alerts.</small>
           </label>
           <label>Location<input name="city" defaultValue={profile?.city || 'Lagos'} required /></label>
           <label>Area<input name="area" defaultValue={profile?.area || ''} /></label>

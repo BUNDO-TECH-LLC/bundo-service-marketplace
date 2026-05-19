@@ -4,7 +4,12 @@ import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
 import { asyncHandler } from '../../middlewares/errorHandler';
 import { ConflictError, NotFoundError, ValidationError } from '../../utils/errors';
 import { throwOnServiceStatus } from '../../utils/resultErrors';
-import { updateUserFcmToken, updateUserRole } from './users.service';
+import {
+  updateUserFcmToken,
+  updateUserNotificationPreferences,
+  updateUserPhone,
+  updateUserRole,
+} from './users.service';
 
 const router = Router();
 
@@ -63,6 +68,62 @@ router.delete(
     res.json({
       message: 'FCM token removed',
       user,
+    });
+  })
+);
+
+router.patch(
+  '/phone',
+  verifyFirebaseToken,
+  asyncHandler(async (req, res) => {
+    const { phone } = req.body;
+
+    if (typeof phone !== 'string') {
+      throw new ValidationError('phone is required');
+    }
+
+    const user = await updateUserPhone((req as any).user.firebaseUid, phone);
+
+    res.json({
+      message: 'Phone updated',
+      user,
+    });
+  })
+);
+
+router.patch(
+  '/notification-preferences',
+  verifyFirebaseToken,
+  asyncHandler(async (req, res) => {
+    const { bookings, messages, marketing } = req.body;
+    const patch: Record<string, boolean> = {};
+
+    if (bookings !== undefined) {
+      if (typeof bookings !== 'boolean') throw new ValidationError('bookings must be a boolean');
+      patch.bookings = bookings;
+    }
+    if (messages !== undefined) {
+      if (typeof messages !== 'boolean') throw new ValidationError('messages must be a boolean');
+      patch.messages = messages;
+    }
+    if (marketing !== undefined) {
+      if (typeof marketing !== 'boolean') throw new ValidationError('marketing must be a boolean');
+      patch.marketing = marketing;
+    }
+
+    if (!Object.keys(patch).length) {
+      throw new ValidationError('Provide at least one preference to update');
+    }
+
+    const result = await updateUserNotificationPreferences((req as any).user.firebaseUid, patch);
+
+    throwOnServiceStatus(result.status, {
+      missing_user: new NotFoundError('User'),
+    });
+
+    res.json({
+      message: 'Notification preferences updated',
+      preferences: result.preferences,
     });
   })
 );

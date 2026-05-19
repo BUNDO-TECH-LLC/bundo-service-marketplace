@@ -31,12 +31,19 @@ export type NotificationType =
   | 'REVIEW'
   | 'ADMIN';
 
+export type NotificationPreferences = {
+  bookings: boolean;
+  messages: boolean;
+  marketing: boolean;
+};
+
 export type ApiUser = {
   firebaseUid: string;
   email: string | null;
   phone: string | null;
   role: Role | null;
   status: 'ACTIVE' | 'BANNED';
+  notificationPreferences?: NotificationPreferences;
 };
 
 export type Category = {

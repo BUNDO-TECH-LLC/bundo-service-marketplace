@@ -1,6 +1,11 @@
 import { Prisma, Role } from '@prisma/client';
 import db from '../../db/client';
-import { ConflictError } from '../../utils/errors';
+import {
+  defaultNotificationPreferences,
+  parseNotificationPreferences,
+  type NotificationPreferences,
+} from '../../lib/notificationPreferences';
+import { ConflictError, ValidationError } from '../../utils/errors';
 
 function normalizeEmail(email?: string | null) {
   const trimmed = email?.trim();
@@ -164,3 +169,88 @@ export const updateUserFcmToken = async (
     data: { fcmToken },
   });
 };
+
+function normalizePhoneInput(phone: string) {
+  const trimmed = phone.trim();
+  if (!trimmed) {
+    throw new ValidationError('Phone number is required');
+  }
+
+  const digits = trimmed.replace(/[^\d+]/g, '');
+  if (digits.length < 10 || digits.length > 15) {
+    throw new ValidationError('Enter a valid phone number (10–15 digits).');
+  }
+
+  return digits.startsWith('+') ? digits : `+${digits.replace(/^\+/, '')}`;
+}
+
+export const updateUserPhone = async (firebaseUid: string, phone: string) => {
+  const normalizedPhone = normalizePhoneInput(phone);
+
+  try {
+    return await db.user.update({
+      where: { firebaseUid },
+      data: { phone: normalizedPhone },
+    });
+  } catch (error) {
+    if (isUniqueConstraintError(error)) {
+      throw new ConflictError(
+        'This phone number is already linked to another Bundo account.',
+        'PHONE_IN_USE'
+      );
+    }
+
+    throw error;
+  }
+};
+
+export const getUserNotificationPreferences = (user: {
+  notificationPreferences?: unknown | null;
+}): NotificationPreferences =>
+  parseNotificationPreferences(user.notificationPreferences);
+
+export const updateUserNotificationPreferences = async (
+  firebaseUid: string,
+  prefs: Partial<NotificationPreferences>
+) => {
+  const user = await db.user.findUnique({ where: { firebaseUid } });
+
+  if (!user) {
+    return { status: 'missing_user' as const };
+  }
+
+  const current = getUserNotificationPreferences(user);
+  const next = {
+    ...current,
+    ...prefs,
+  };
+
+  const updated = await db.user.update({
+    where: { firebaseUid },
+    data: { notificationPreferences: next },
+  });
+
+  return {
+    status: 'updated' as const,
+    user: updated,
+    preferences: getUserNotificationPreferences(updated),
+  };
+};
+
+export function serializeUser(user: {
+  firebaseUid: string;
+  email: string | null;
+  phone: string | null;
+  role: Role | null;
+  status: string;
+  notificationPreferences?: unknown | null;
+}) {
+  return {
+    firebaseUid: user.firebaseUid,
+    email: user.email,
+    phone: user.phone,
+    role: user.role,
+    status: user.status,
+    notificationPreferences: getUserNotificationPreferences(user),
+  };
+}
