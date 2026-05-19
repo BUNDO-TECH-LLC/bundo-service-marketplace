@@ -290,6 +290,7 @@ export function MainLayout() {
         <ArtisanAppHeader
           displayName={userDisplayName(ctx.firebaseUser, ctx.me)}
           active={ctx.artisanHeaderActive}
+          notificationUnreadCount={ctx.notifications.filter((notification) => !notification.readAt).length}
           onDashboard={() => {
             ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'overview' }));
           }}
@@ -301,6 +302,12 @@ export function MainLayout() {
           }}
           onReviews={() => {
             ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'reviews' }));
+          }}
+          onOffers={() => {
+            ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'offers' }));
+          }}
+          onNotifications={() => {
+            ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'notifications' }));
           }}
           onProfile={() => {
             ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'profile' }));

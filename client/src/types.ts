@@ -82,11 +82,13 @@ export type Booking = {
   customerId?: string;
   artisanId?: string;
   offeringId?: string;
+  moderatorId?: string | null;
   status: 'REQUESTED' | 'ACCEPTED' | 'ONGOING' | 'DECLINED' | 'CANCELLED' | 'COMPLETED';
   conversationId?: string | null;
   note: string | null;
   scheduledAt: string | null;
   customerUser?: Pick<ApiUser, 'firebaseUid' | 'email' | 'phone'>;
+  moderator?: Pick<ApiUser, 'firebaseUid' | 'email' | 'phone'> | null;
   offering?: Offering;
   artisan?: Artisan;
   payment?: Payment | null;

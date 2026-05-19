@@ -11,6 +11,7 @@ import type {
   PaymentSuccessState,
   MarketplaceSort,
   PushStatus,
+  ArtisanHeaderActive,
   View,
   WorkspaceSection,
 } from '../appTypes';
@@ -48,6 +49,7 @@ export type AppRootValue = {
   adminConversations: Conversation[];
   adminStats: Record<string, number> | null;
   adminBookings: Booking[];
+  adminBookingsTotal: number;
   adminKycSubmissions: ArtisanKycSubmission[];
   adminUsers: AdminUserRecord[];
   adminArtisans: AdminArtisanRecord[];
@@ -76,7 +78,7 @@ export type AppRootValue = {
   usesArtisanSetupHeader: boolean;
   usesArtisanWorkspaceHeader: boolean;
   hideGlobalHeader: boolean;
-  artisanHeaderActive: 'Dashboard' | 'Jobs' | 'Messages' | 'Reviews';
+  artisanHeaderActive: ArtisanHeaderActive;
   categoryOptions: ReactNode[];
   withNotice: ActionRunner;
   loadPublicData: (

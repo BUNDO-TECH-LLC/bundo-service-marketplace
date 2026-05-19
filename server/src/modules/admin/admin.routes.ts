@@ -25,6 +25,7 @@ import {
   getAdminArtisanById,
   getAdminArtisans,
   getAdminBookingById,
+  assignBookingModerator,
   getAdminBookings,
   updateAdminBookingStatus,
   getAdminCategories,
@@ -60,7 +61,7 @@ router.get(
 );
 
 router.get('/users', asyncHandler(async (req, res) => {
-  const pagination = getPagination(req);
+  const pagination = getPagination(req, 50, 100);
   const [users, total] = await Promise.all([
     getUsers(pagination),
     countUsers(),
@@ -396,7 +397,7 @@ router.delete('/categories/:id', asyncHandler(async (req, res) => {
 }));
 
 router.get('/bookings', asyncHandler(async (req, res) => {
-  const pagination = getPagination(req);
+  const pagination = getPagination(req, 100, 200);
   const stageParam = typeof req.query.stage === 'string' ? req.query.stage : undefined;
   const allowedStages = ['requests', 'appointments', 'ongoing', 'completed'] as const;
   const stage = allowedStages.includes(stageParam as (typeof allowedStages)[number])
@@ -462,6 +463,39 @@ router.patch('/bookings/:id/status', asyncHandler(async (req, res) => {
 
   res.json({
     message: 'Booking status updated',
+    booking: result.booking,
+  });
+}));
+
+router.patch('/bookings/:id/moderator', asyncHandler(async (req, res) => {
+  const moderatorId =
+    req.body.moderatorId === null || req.body.moderatorId === ''
+      ? null
+      : String(req.body.moderatorId);
+
+  if (
+    req.body.moderatorId !== null &&
+    req.body.moderatorId !== '' &&
+    typeof req.body.moderatorId !== 'string'
+  ) {
+    throw httpError(400, 'moderatorId must be a string or null');
+  }
+
+  const result = await assignBookingModerator({
+    bookingId: String(req.params.id),
+    moderatorId,
+  });
+
+  if (result.status === 'missing_booking') {
+    throw httpError(404, 'Booking not found');
+  }
+
+  if (result.status === 'invalid_moderator') {
+    throw httpError(400, 'moderatorId must reference an active admin user');
+  }
+
+  res.json({
+    message: moderatorId ? 'Job moderator assigned' : 'Job moderator cleared',
     booking: result.booking,
   });
 }));

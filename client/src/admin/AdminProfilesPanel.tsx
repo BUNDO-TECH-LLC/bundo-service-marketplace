@@ -63,32 +63,32 @@ export function AdminProfilesPanel({
               <h3>All users</h3>
             </div>
           </div>
-          <div className="admin-record-list">
+          <div className="admin-inline-table" role="list">
             {users.map((user) => (
-              <article className="admin-record-card" key={user.firebaseUid}>
-                <div className="admin-record-head">
-                  <div>
-                    <h4>{user.email || user.phone || user.firebaseUid}</h4>
-                    <p>{user.firebaseUid}</p>
+              <article className="admin-row admin-row--profile" key={user.firebaseUid} role="listitem">
+                <div className="admin-row-grid admin-row-grid--profile">
+                  <div className="admin-row-primary">
+                    <strong className="admin-row-title">{user.email || user.phone || user.firebaseUid}</strong>
+                    <p className="admin-row-sub">{user.firebaseUid}</p>
+                    <div className="admin-row-chips">
+                      <span className={`booking-status ${user.status.toLowerCase() === 'active' ? 'accepted' : 'cancelled'}`}>
+                        {user.status.toLowerCase()}
+                      </span>
+                      <span className="booking-status">{(user.role || 'UNASSIGNED').toLowerCase()}</span>
+                    </div>
                   </div>
-                  <div className="admin-pill-row">
-                    <span className={`booking-status ${user.status.toLowerCase() === 'active' ? 'accepted' : 'cancelled'}`}>
-                      {user.status.toLowerCase()}
-                    </span>
-                    <span className="booking-status">{(user.role || 'UNASSIGNED').toLowerCase()}</span>
-                  </div>
+                  <dl className="admin-row-fields admin-row-fields--compact">
+                    <div>
+                      <dt>Phone</dt>
+                      <dd>{user.phone || '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>Artisan</dt>
+                      <dd>{user.artisanProfile?.displayName || '—'}</dd>
+                    </div>
+                  </dl>
                 </div>
-                <dl className="admin-inline-list">
-                  <div>
-                    <dt>Phone</dt>
-                    <dd>{user.phone || 'Not provided'}</dd>
-                  </div>
-                  <div>
-                    <dt>Artisan profile</dt>
-                    <dd>{user.artisanProfile?.displayName || 'None yet'}</dd>
-                  </div>
-                </dl>
-                <div className="admin-action-row">
+                <div className="admin-row-actions admin-row-actions--inline">
                   <button
                     className="secondary-button"
                     disabled={busy}
@@ -99,7 +99,7 @@ export function AdminProfilesPanel({
                       )
                     }
                   >
-                    {user.status === 'ACTIVE' ? 'Ban user' : 'Restore user'}
+                    {user.status === 'ACTIVE' ? 'Ban' : 'Restore'}
                   </button>
                   {(['CUSTOMER', 'ARTISAN', 'ADMIN'] as Role[]).map((role) => (
                     <button
@@ -124,47 +124,47 @@ export function AdminProfilesPanel({
               <h3>Artisan profiles</h3>
             </div>
           </div>
-          <div className="admin-record-list">
+          <div className="admin-inline-table" role="list">
             {artisans.map((artisan) => (
-              <article className="admin-record-card" key={artisan.id}>
-                <div className="admin-record-head">
-                  <div>
-                    <h4>{artisan.displayName}</h4>
-                    <p>{artisan.user?.email || artisan.city}</p>
+              <article className="admin-row admin-row--profile" key={artisan.id} role="listitem">
+                <div className="admin-row-grid admin-row-grid--profile">
+                  <div className="admin-row-primary">
+                    <strong className="admin-row-title">{artisan.displayName}</strong>
+                    <p className="admin-row-sub">{artisan.user?.email || artisan.city}</p>
+                    <div className="admin-row-chips">
+                      <span className={`booking-status ${artisan.verifyStatus.toLowerCase()}`}>
+                        {artisan.verifyStatus.toLowerCase()}
+                      </span>
+                      <span className="booking-status">
+                        {artisan.avgRating.toFixed(1)} ({artisan.ratingCount})
+                      </span>
+                    </div>
                   </div>
-                  <div className="admin-pill-row">
-                    <span className={`booking-status ${artisan.verifyStatus.toLowerCase()}`}>
-                      {artisan.verifyStatus.toLowerCase()}
-                    </span>
-                    <span className="booking-status">
-                      {artisan.avgRating.toFixed(1)} ({artisan.ratingCount})
-                    </span>
-                  </div>
+                  <dl className="admin-row-fields admin-row-fields--compact">
+                    <div>
+                      <dt>Location</dt>
+                      <dd>{[artisan.area, artisan.city].filter(Boolean).join(', ') || '—'}</dd>
+                    </div>
+                    <div>
+                      <dt>Photos</dt>
+                      <dd>
+                        {artisan._count?.portfolioImages ?? artisan.portfolioImages?.length ?? 0}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Activity</dt>
+                      <dd>
+                        {artisan._count?.offerings || 0} offers · {artisan._count?.bookingsReceived || 0} jobs
+                      </dd>
+                    </div>
+                  </dl>
                 </div>
-                <dl className="admin-inline-list">
-                  <div>
-                    <dt>Location</dt>
-                    <dd>{[artisan.area, artisan.city].filter(Boolean).join(', ')}</dd>
-                  </div>
-                  <div>
-                    <dt>Photos</dt>
-                    <dd>
-                      {artisan._count?.portfolioImages ?? artisan.portfolioImages?.length ?? 0} uploaded
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Activity</dt>
-                    <dd>
-                      {artisan._count?.offerings || 0} offers, {artisan._count?.bookingsReceived || 0} jobs
-                    </dd>
-                  </div>
-                </dl>
                 {(artisan.portfolioImages?.length ?? 0) > 0 && (
-                  <div className="admin-review-photos">
+                  <div className="admin-review-photos admin-review-photos--inline">
                     <AdminPortfolioGallery images={artisan.portfolioImages ?? []} artisanName={artisan.displayName} />
                   </div>
                 )}
-                <div className="admin-action-row">
+                <div className="admin-row-actions admin-row-actions--inline">
                   {(['PENDING', 'APPROVED', 'REJECTED'] as Artisan['verifyStatus'][]).map((status) => (
                     <button
                       key={status}

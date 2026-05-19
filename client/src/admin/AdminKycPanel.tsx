@@ -43,14 +43,14 @@ export function AdminKycPanel({
   }
 
   return (
-    <section className="admin-bookings">
-      <div className="section-head compact">
+    <section className="admin-panel admin-kyc-panel">
+      <header className="admin-panel-head">
         <div>
           <p className="eyebrow">Compliance</p>
           <h2>Artisan KYC review</h2>
           <p>Review submitted identity details before scaling artisan approvals and payouts.</p>
         </div>
-      </div>
+      </header>
 
       {submissions.length === 0 && (
         <EmptyState
@@ -59,62 +59,62 @@ export function AdminKycPanel({
         />
       )}
 
-      <div className="booking-list">
+      <div className="admin-inline-table" role="list">
         {submissions.map((submission) => (
-          <article className="booking-detail-card" key={submission.id}>
-            <header className="booking-detail-head">
-              <div className="booking-person">
-                <span>{(submission.legalName || 'K').slice(0, 1).toUpperCase()}</span>
+          <article className="admin-row admin-row--kyc" key={submission.id} role="listitem">
+            <div className="admin-row-grid admin-row-grid--kyc">
+              <div className="admin-row-primary">
+                <strong className="admin-row-title">{submission.legalName}</strong>
+                <p className="admin-row-sub">
+                  {submission.artisan?.displayName || submission.artisan?.user?.email || 'Artisan submission'}
+                </p>
+                <span className={`booking-status ${submission.status.toLowerCase().replace(/_/g, '-')}`}>
+                  {submission.status.toLowerCase().replace(/_/g, ' ')}
+                </span>
+              </div>
+              <dl className="admin-row-fields admin-row-fields--compact">
                 <div>
-                  <h3>{submission.legalName}</h3>
-                  <p>{submission.artisan?.displayName || submission.artisan?.user?.email || 'Artisan submission'}</p>
+                  <dt>Document</dt>
+                  <dd>{submission.documentType}</dd>
                 </div>
-              </div>
-              <span className={`booking-status ${submission.status.toLowerCase().replace(/_/g, '-')}`}>
-                {submission.status.toLowerCase().replace(/_/g, ' ')}
-              </span>
-            </header>
+                <div>
+                  <dt>Number</dt>
+                  <dd>{submission.documentNumber}</dd>
+                </div>
+                <div>
+                  <dt>City</dt>
+                  <dd>{submission.city}</dd>
+                </div>
+                <div>
+                  <dt>Submitted</dt>
+                  <dd>{bookingDate(submission.submittedAt)}</dd>
+                </div>
+                <div className="admin-row-fields-wide">
+                  <dt>Address</dt>
+                  <dd>{submission.address}</dd>
+                </div>
+                <div>
+                  <dt>Document</dt>
+                  <dd>
+                    <a href={submission.documentImageUrl} target="_blank" rel="noreferrer">
+                      Open file
+                    </a>
+                  </dd>
+                </div>
+              </dl>
+            </div>
 
-            <dl className="booking-detail-list">
-              <div>
-                <dt>Document</dt>
-                <dd>{submission.documentType}</dd>
-              </div>
-              <div>
-                <dt>Number</dt>
-                <dd>{submission.documentNumber}</dd>
-              </div>
-              <div>
-                <dt>City</dt>
-                <dd>{submission.city}</dd>
-              </div>
-              <div>
-                <dt>Address</dt>
-                <dd>{submission.address}</dd>
-              </div>
-              <div>
-                <dt>Submitted</dt>
-                <dd>{bookingDate(submission.submittedAt)}</dd>
-              </div>
-              <div>
-                <dt>Document URL</dt>
-                <dd>
-                  <a href={submission.documentImageUrl} target="_blank" rel="noreferrer">
-                    Open document
-                  </a>
-                </dd>
-              </div>
-            </dl>
-
-            <div className="admin-review-photos">
-              <h4>Portfolio photos ({submission.artisan?.portfolioImages?.length ?? 0})</h4>
+            <div className="admin-review-photos admin-review-photos--inline">
+              <p className="admin-row-photo-label">
+                Portfolio ({submission.artisan?.portfolioImages?.length ?? 0})
+              </p>
               <AdminPortfolioGallery
                 images={submission.artisan?.portfolioImages ?? []}
                 artisanName={submission.artisan?.displayName}
               />
             </div>
 
-            <div className="booking-card-actions">
+            <div className="admin-row-actions admin-row-actions--inline">
               <button
                 className="primary-action"
                 disabled={busy || submission.status === 'APPROVED'}

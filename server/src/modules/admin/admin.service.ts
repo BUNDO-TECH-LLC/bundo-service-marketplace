@@ -409,6 +409,46 @@ export type AdminBookingStage =
   | 'ongoing'
   | 'completed';
 
+const bookingAdminInclude = {
+  customerUser: {
+    select: {
+      firebaseUid: true,
+      email: true,
+      phone: true,
+      status: true,
+    },
+  },
+  moderator: {
+    select: {
+      firebaseUid: true,
+      email: true,
+      phone: true,
+    },
+  },
+  artisan: {
+    select: {
+      id: true,
+      userId: true,
+      displayName: true,
+      city: true,
+      area: true,
+      verifyStatus: true,
+    },
+  },
+  offering: {
+    select: {
+      id: true,
+      title: true,
+      priceFrom: true,
+      priceTo: true,
+      category: true,
+    },
+  },
+  payment: true,
+  payouts: true,
+  disputes: true,
+} satisfies Prisma.BookingInclude;
+
 function adminBookingStageWhere(stage?: AdminBookingStage) {
   switch (stage) {
     case 'requests':
@@ -432,38 +472,8 @@ export const getAdminBookings = async (
   const bookings = await db.booking.findMany({
     ...(stageWhere ? { where: stageWhere } : {}),
     orderBy: { createdAt: 'desc' },
-    ...paginationArgs(pagination, 50),
-    include: {
-      customerUser: {
-        select: {
-          firebaseUid: true,
-          email: true,
-          phone: true,
-          status: true,
-        },
-      },
-      artisan: {
-        select: {
-          id: true,
-          displayName: true,
-          city: true,
-          area: true,
-          verifyStatus: true,
-        },
-      },
-      offering: {
-        select: {
-          id: true,
-          title: true,
-          priceFrom: true,
-          priceTo: true,
-          category: true,
-        },
-      },
-      payment: true,
-      payouts: true,
-      disputes: true,
-    },
+    ...paginationArgs(pagination, 100),
+    include: bookingAdminInclude,
   });
 
   return attachConversationIdsToBookings(bookings);
@@ -511,38 +521,7 @@ export const updateAdminBookingStatus = async (input: {
   const updated = await db.booking.update({
     where: { id: input.bookingId },
     data: { status: input.status },
-    include: {
-      customerUser: {
-        select: {
-          firebaseUid: true,
-          email: true,
-          phone: true,
-          status: true,
-        },
-      },
-      artisan: {
-        select: {
-          id: true,
-          userId: true,
-          displayName: true,
-          city: true,
-          area: true,
-          verifyStatus: true,
-        },
-      },
-      offering: {
-        select: {
-          id: true,
-          title: true,
-          priceFrom: true,
-          priceTo: true,
-          category: true,
-        },
-      },
-      payment: true,
-      payouts: true,
-      disputes: true,
-    },
+    include: bookingAdminInclude,
   });
 
   const [withConversation] = await attachConversationIdsToBookings([updated]);
@@ -593,11 +572,55 @@ export const countAdminBookings = async (options?: { stage?: AdminBookingStage }
   });
 };
 
+export const assignBookingModerator = async (input: {
+  bookingId: string;
+  moderatorId: string | null;
+}) => {
+  if (input.moderatorId) {
+    const moderator = await db.user.findFirst({
+      where: {
+        firebaseUid: input.moderatorId,
+        role: Role.ADMIN,
+        status: UserStatus.ACTIVE,
+      },
+    });
+
+    if (!moderator) {
+      return { status: 'invalid_moderator' as const };
+    }
+  }
+
+  const booking = await db.booking.findUnique({
+    where: { id: input.bookingId },
+    select: { id: true },
+  });
+
+  if (!booking) {
+    return { status: 'missing_booking' as const };
+  }
+
+  const updated = await db.booking.update({
+    where: { id: input.bookingId },
+    data: { moderatorId: input.moderatorId },
+    include: bookingAdminInclude,
+  });
+
+  const [withConversation] = await attachConversationIdsToBookings([updated]);
+  return { status: 'updated' as const, booking: withConversation };
+};
+
 export const getAdminBookingById = async (id: string) => {
   const booking = await db.booking.findUnique({
     where: { id },
     include: {
       customerUser: true,
+      moderator: {
+        select: {
+          firebaseUid: true,
+          email: true,
+          phone: true,
+        },
+      },
       artisan: true,
       offering: {
         include: { category: true },

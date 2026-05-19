@@ -16,6 +16,7 @@ export default function AdminPage() {
         users={ctx.adminUsers}
         artisans={ctx.adminArtisans}
         bookings={ctx.adminBookings}
+        bookingsTotal={ctx.adminBookingsTotal}
         conversations={ctx.adminConversations}
         submissions={ctx.adminKycSubmissions}
         categories={ctx.adminCategories}

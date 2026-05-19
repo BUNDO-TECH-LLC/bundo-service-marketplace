@@ -2,6 +2,14 @@ import type { ApiUser, Artisan, ArtisanKycSubmission, Category, Offering, Portfo
 
 export type View = 'home' | 'marketplace' | 'workspace' | 'admin' | 'help' | 'artisan-profile';
 export type WorkspaceSection = 'overview' | 'bookings' | 'messages' | 'offers' | 'notifications' | 'reviews' | 'profile';
+export type ArtisanHeaderActive =
+  | 'Dashboard'
+  | 'Jobs'
+  | 'Messages'
+  | 'Reviews'
+  | 'Offers'
+  | 'Notifications'
+  | 'Profile';
 export type AdminSection = 'overview' | 'profiles' | 'jobs' | 'messages' | 'verification' | 'catalog';
 export type ActionRunner = (action: () => Promise<void>, done?: string) => Promise<void>;
 export type PushStatus = 'idle' | 'unsupported' | 'missing-config' | 'unavailable' | 'enabled' | 'denied';

@@ -88,6 +88,7 @@ function App() {
   const [adminConversations, setAdminConversations] = useState<Conversation[]>([]);
   const [adminStats, setAdminStats] = useState<Record<string, number> | null>(null);
   const [adminBookings, setAdminBookings] = useState<Booking[]>([]);
+  const [adminBookingsTotal, setAdminBookingsTotal] = useState(0);
   const [adminKycSubmissions, setAdminKycSubmissions] = useState<ArtisanKycSubmission[]>([]);
   const [adminUsers, setAdminUsers] = useState<AdminUserRecord[]>([]);
   const [adminArtisans, setAdminArtisans] = useState<AdminArtisanRecord[]>([]);
@@ -297,16 +298,20 @@ function App() {
       ] = await Promise.all([
         api<{ stats: Record<string, number> }>('/admin/stats', { token: authToken }),
         api<{ conversations: Conversation[] }>('/admin/conversations?page=1&limit=20', { token: authToken }),
-        api<{ bookings: Booking[] }>('/admin/bookings?page=1&limit=50', { token: authToken }),
+        api<{ bookings: Booking[]; meta: { total: number } }>(
+          '/admin/bookings?page=1&limit=200',
+          { token: authToken }
+        ),
         api<{ notifications: Notification[] }>('/notifications', { token: authToken }),
         api<{ submissions: ArtisanKycSubmission[] }>('/admin/kyc-submissions?page=1&limit=12', { token: authToken }),
-        api<{ users: AdminUserRecord[] }>('/admin/users?page=1&limit=24', { token: authToken }),
+        api<{ users: AdminUserRecord[] }>('/admin/users?page=1&limit=100', { token: authToken }),
         api<{ artisans: AdminArtisanRecord[] }>('/admin/artisans?page=1&limit=24', { token: authToken }),
         api<{ categories: AdminCategoryRecord[] }>('/admin/categories?page=1&limit=24', { token: authToken }),
       ]);
       setAdminStats(stats.stats);
       setAdminConversations(conversationRes.conversations);
       setAdminBookings(bookingRes.bookings);
+      setAdminBookingsTotal(bookingRes.meta?.total ?? bookingRes.bookings.length);
       setNotifications(notificationRes.notifications);
       setAdminKycSubmissions(kycRes.submissions);
       setAdminUsers(userRes.users);
@@ -428,6 +433,7 @@ function App() {
         setConversations([]);
         setAdminConversations([]);
         setAdminBookings([]);
+        setAdminBookingsTotal(0);
         setAdminKycSubmissions([]);
         setAdminUsers([]);
         setAdminArtisans([]);
@@ -457,6 +463,7 @@ function App() {
         setConversations([]);
         setAdminConversations([]);
         setAdminBookings([]);
+        setAdminBookingsTotal(0);
         setAdminKycSubmissions([]);
         setAdminUsers([]);
         setAdminArtisans([]);
@@ -579,6 +586,7 @@ function App() {
         setConversations([]);
         setAdminConversations([]);
         setAdminBookings([]);
+        setAdminBookingsTotal(0);
         setAdminKycSubmissions([]);
         setAdminUsers([]);
         setAdminArtisans([]);
@@ -703,7 +711,13 @@ function App() {
         ? 'Messages'
         : workspaceSection === 'reviews'
           ? 'Reviews'
-          : 'Dashboard';
+          : workspaceSection === 'offers'
+            ? 'Offers'
+            : workspaceSection === 'notifications'
+              ? 'Notifications'
+              : workspaceSection === 'profile'
+                ? 'Profile'
+                : 'Dashboard';
 
   const rootValue: AppRootValue = {
     navigate,
@@ -727,6 +741,7 @@ function App() {
     adminConversations,
     adminStats,
     adminBookings,
+    adminBookingsTotal,
     adminKycSubmissions,
     adminUsers,
     adminArtisans,

@@ -105,6 +105,7 @@ model User {
   messagesSent       Message[]      @relation("SentMessages")
   adminNotes         AdminNote[]    @relation("AdminNotes")
   notifications      Notification[]
+  moderatedBookings  Booking[]      @relation("ModeratedBookings")
 
   @@map("users")
 }
@@ -199,6 +200,7 @@ model Booking {
   customerId   String         @map("customer_id")
   artisanId    String         @map("artisan_id")
   offeringId   String         @map("offering_id")
+  moderatorId  String?        @map("moderator_id")
   status       BookingStatus  @default(REQUESTED)
   scheduledAt  DateTime?      @map("scheduled_at")
   note         String?
@@ -206,6 +208,7 @@ model Booking {
   updatedAt    DateTime       @updatedAt @map("updated_at")
 
   customerUser User           @relation("CustomerBookings", fields: [customerId], references: [firebaseUid])
+  moderator    User?          @relation("ModeratedBookings", fields: [moderatorId], references: [firebaseUid], onDelete: SetNull)
   artisan      ArtisanProfile @relation("ArtisanBookings", fields: [artisanId], references: [id])
   offering     Offering       @relation(fields: [offeringId], references: [id])
   review       Review?

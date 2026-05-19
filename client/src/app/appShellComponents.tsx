@@ -1,9 +1,10 @@
 import { FormEvent, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { signOut, User } from 'firebase/auth';
-import type { ActionRunner, BookingSuccessState, MarketplaceSort } from '../appTypes';
+import { Navigate } from 'react-router-dom';
+import type { ActionRunner, ArtisanHeaderActive, BookingSuccessState, MarketplaceSort } from '../appTypes';
+import { buildAppPath } from '../lib/appPaths';
 import { EmptyState } from '../components/EmptyState';
-import { StatCard } from '../components/StatCard';
 import { api } from '../lib/api';
 import { uploadPortfolioImage } from '../lib/portfolioUpload';
 import { useArtisanPortfolio } from '../lib/useArtisanPortfolio';
@@ -37,19 +38,25 @@ import { ArtisanSetupShell } from '../views/ArtisanSetupShell';
 export function ArtisanAppHeader({
   displayName,
   active,
+  notificationUnreadCount = 0,
   onDashboard,
   onJobs,
   onMessages,
   onReviews,
+  onOffers,
+  onNotifications,
   onProfile,
   onSignOut,
 }: {
   displayName: string;
-  active: 'Dashboard' | 'Jobs' | 'Messages' | 'Reviews';
+  active: ArtisanHeaderActive;
+  notificationUnreadCount?: number;
   onDashboard: () => void;
   onJobs: () => void;
   onMessages: () => void;
   onReviews: () => void;
+  onOffers: () => void;
+  onNotifications: () => void;
   onProfile: () => void;
   onSignOut?: () => void;
 }) {
@@ -57,12 +64,15 @@ export function ArtisanAppHeader({
   const firstName = displayName.split(' ')[0];
   const initial = displayName.slice(0, 1).toUpperCase();
 
-  const navItems = [
-    ['Dashboard', onDashboard],
-    ['Jobs', onJobs],
-    ['Messages', onMessages],
-    ['Reviews', onReviews],
-  ] as const;
+  const navItems: { label: ArtisanHeaderActive; action: () => void; badge?: number }[] = [
+    { label: 'Dashboard', action: onDashboard },
+    { label: 'Jobs', action: onJobs },
+    { label: 'Messages', action: onMessages },
+    { label: 'Reviews', action: onReviews },
+    { label: 'Offers', action: onOffers },
+    { label: 'Notifications', action: onNotifications, badge: notificationUnreadCount },
+    { label: 'Profile', action: onProfile },
+  ];
 
   const closeMobileNav = () => setMobileNavOpen(false);
 
@@ -95,22 +105,24 @@ export function ArtisanAppHeader({
 
       <div className="artisan-header-collapse" id="artisan-header-mobile-panel">
         <nav aria-label="Artisan navigation">
-          {navItems.map(([label, action]) => (
+          {navItems.map(({ label, action, badge }) => (
             <button
               key={label}
               type="button"
               className={active === label ? 'active' : ''}
               onClick={() => runNav(action)}
             >
-              {label}
+              <span>{label}</span>
+              {badge != null && badge > 0 && (
+                <span className="artisan-nav-badge" aria-label={`${badge} unread`}>
+                  {badge > 99 ? '99+' : badge}
+                </span>
+              )}
             </button>
           ))}
         </nav>
-        <div className="artisan-header-mobile-actions">
-          <button type="button" className="secondary-button" onClick={() => runNav(onProfile)}>
-            Profile
-          </button>
-          {onSignOut && (
+        {onSignOut && (
+          <div className="artisan-header-mobile-actions">
             <button
               type="button"
               className="text-button"
@@ -121,8 +133,8 @@ export function ArtisanAppHeader({
             >
               Log out
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <div className="artisan-header-end">
@@ -136,16 +148,11 @@ export function ArtisanAppHeader({
         >
           <span className="artisan-header-menu-toggle-bars" aria-hidden="true" />
         </button>
-        <div className="artisan-header-actions artisan-header-actions--desktop">
-          <button type="button" className="secondary-button" onClick={onProfile}>
-            Profile
+        {onSignOut && (
+          <button type="button" className="text-button artisan-header-signout" onClick={onSignOut}>
+            Log out
           </button>
-          {onSignOut && (
-            <button type="button" className="text-button" onClick={onSignOut}>
-              Log out
-            </button>
-          )}
-        </div>
+        )}
         <button
           type="button"
           className="artisan-user-chip"
@@ -575,97 +582,14 @@ export function ArtisanLanding({
   }
 
   if (phase === 'approved') {
-    const requestedBookings = bookings.filter((booking) => booking.status === 'REQUESTED');
-    const activeBookings = bookings.filter((booking) =>
-      ['ACCEPTED', 'ONGOING', 'COMPLETED'].includes(booking.status)
-    );
-
     return (
-      <>
-      <ArtisanAppHeader
-        displayName={displayName}
-        active="Dashboard"
-        onDashboard={() => undefined}
-        onJobs={openBookings}
-        onMessages={openMessages}
-        onReviews={openReviews}
-        onProfile={openProfile}
-        onSignOut={() => {
-          if (auth) {
-            void signOut(auth);
-          }
-        }}
+      <Navigate
+        to={buildAppPath({ view: 'workspace', workspaceSection: 'overview' })}
+        replace
       />
-      <main className="artisan-dashboard-page">
-        <section className="artisan-dashboard-hero">
-          <h1>Good morning, {displayName.split(' ')[0]}</h1>
-          <div className="artisan-stat-grid">
-            <StatCard label="Total bookings" value={bookings.length} hint="All time" />
-            <StatCard label="Ratings" value={`${profile?.avgRating || 0}/5.0`} hint={`${profile?.ratingCount || 0} reviews`} />
-            <StatCard label="Active jobs" value={activeBookings.length} hint="This week" />
-            <StatCard label="New requests" value={requestedBookings.length} hint="Needs your response" />
-          </div>
-        </section>
-
-        <section className="artisan-dashboard-grid">
-          <div className="artisan-request-stack">
-            <div className="logged-section-head">
-              <h2>New Requests</h2>
-              <button type="button" onClick={openBookings}>view all</button>
-            </div>
-            {requestedBookings.length === 0 && <EmptyState title="No new requests" body="New booking requests will appear here." />}
-            {requestedBookings.slice(0, 2).map((booking) => (
-              <article className="artisan-request-card" key={booking.id}>
-                <span className="recommended-avatar">{(booking.customerUser?.email || 'C').slice(0, 1).toUpperCase()}</span>
-                <div>
-                  <h3>{booking.customerUser?.email?.split('@')[0] || 'Customer'}</h3>
-                  <small>{booking.offering?.title || 'Service request'}</small>
-                  <p>{bookingDate(booking.scheduledAt)} · {booking.artisan?.area || profile?.area || 'Lagos'}</p>
-                  <div className="actions">
-                    <button className="secondary-button" disabled={busy}>Decline</button>
-                    <button disabled={busy}>Accept</button>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-          <aside className="artisan-side-stack">
-            <article className="artisan-soft-card">
-              <div className="logged-section-head">
-                <h2>Availability</h2>
-                <button type="button" onClick={() => setStep(4)}>Edit</button>
-              </div>
-              <div className="availability-dots">
-                {dayLabels.slice(1).concat(dayLabels[0]).map((day, index) => {
-                  const dayIndex = index === 6 ? 0 : index + 1;
-                  return (
-                    <span key={day} className={availabilitySlots.some((slot) => slot.dayOfWeek === dayIndex) ? 'active' : ''}>
-                      {day.slice(0, 1)}
-                    </span>
-                  );
-                })}
-              </div>
-            </article>
-            <article className="artisan-soft-card">
-              <h2>This week</h2>
-              <dl className="summary-list">
-                <div><dt>Jobs Completed</dt><dd>{bookings.filter((booking) => booking.status === 'COMPLETED').length}</dd></div>
-                <div><dt>Jobs Upcoming</dt><dd>{activeBookings.length}</dd></div>
-                <div><dt>Earnings</dt><dd>{money(0)}</dd></div>
-              </dl>
-            </article>
-            <article className="artisan-soft-card quick-links">
-              <h2>Quick links</h2>
-              <button onClick={() => setStep(4)}>Update availability</button>
-              <button onClick={() => setStep(2)}>Edit pricing</button>
-              <button onClick={openBookings}>View jobs</button>
-            </article>
-          </aside>
-        </section>
-      </main>
-      </>
     );
   }
+
 
   return (
     <ArtisanSetupShell displayName={displayName} email={accountEmail}>
@@ -1663,6 +1587,8 @@ export function ArtisanReviewsPanel({ token }: { token: string }) {
   );
 }
 
+type ProfileSettingsSection = 'profile' | 'photos' | 'kyc' | 'bank';
+
 export function ArtisanProfileSettings({
   token,
   firebaseUser,
@@ -1676,6 +1602,7 @@ export function ArtisanProfileSettings({
   runAction: ActionRunner;
   refresh: () => Promise<void>;
 }) {
+  const [activeSection, setActiveSection] = useState<ProfileSettingsSection>('profile');
   const [profile, setProfile] = useState<Artisan | null>(null);
   const [payoutAccount, setPayoutAccount] = useState<ProviderPayoutAccount | null>(null);
   const [banks, setBanks] = useState<PayoutBank[]>([]);
@@ -1785,25 +1712,70 @@ export function ArtisanProfileSettings({
     await hydrateSettings();
   }
 
+  const settingsSections: { id: ProfileSettingsSection; label: string }[] = [
+    { id: 'profile', label: 'Profile' },
+    { id: 'photos', label: 'Photos' },
+    { id: 'kyc', label: 'KYC' },
+    { id: 'bank', label: 'Bank' },
+  ];
+
+  function goToSection(section: ProfileSettingsSection) {
+    setActiveSection(section);
+    document.getElementById(`settings-${section}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function panelClass(section: ProfileSettingsSection) {
+    return `artisan-settings-panel${activeSection === section ? ' is-active' : ''}`;
+  }
+
   return (
     <section className="artisan-profile-settings-page">
-      <aside className="artisan-settings-sidebar">
-        <span className="recommended-avatar large">{(profile?.displayName || 'A').slice(0, 1).toUpperCase()}</span>
-        <h2>{profile?.displayName || 'Your profile'}</h2>
-        <p>@{(firebaseUser?.email || 'artisan').split('@')[0]}</p>
-        <span className={`booking-status ${approved ? 'completed' : 'pending'}`}>
-          {approved ? 'Approved' : kycStatus.toLowerCase().replace(/_/g, ' ')}
-        </span>
-        <button>Edit Profile</button>
-        {['Your Profile', 'Photos', 'KYC verification', 'Bank information'].map((item, index) => (
-          <span className={index === 0 ? 'active' : ''} key={item}>{item}</span>
+      <header className="artisan-settings-hero">
+        <div className="artisan-settings-hero-main">
+          {portfolioImages[0] ? (
+            <img className="profile-picture-preview" src={portfolioImages[0].url} alt="" />
+          ) : (
+            <span className="recommended-avatar large">{(profile?.displayName || 'A').slice(0, 1).toUpperCase()}</span>
+          )}
+          <div>
+            <p className="eyebrow">Profile settings</p>
+            <h1>{profile?.displayName || 'Your profile'}</h1>
+            <p className="muted">{firebaseUser?.email || 'Artisan account'}</p>
+            <span className={`booking-status ${approved ? 'completed' : 'pending'}`}>
+              {approved ? 'Approved' : kycStatus.toLowerCase().replace(/_/g, ' ')}
+            </span>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="text-button artisan-settings-signout"
+          onClick={() => {
+            if (auth) {
+              void signOut(auth);
+            }
+          }}
+        >
+          Log out
+        </button>
+      </header>
+
+      <nav className="artisan-settings-subnav" aria-label="Profile sections">
+        {settingsSections.map((section) => (
+          <button
+            key={section.id}
+            type="button"
+            className={activeSection === section.id ? 'active' : ''}
+            onClick={() => goToSection(section.id)}
+          >
+            {section.label}
+          </button>
         ))}
-        <button className="danger-outline">Log out</button>
-      </aside>
+      </nav>
 
       <div className="artisan-settings-stack">
         <form
-          className="artisan-settings-card"
+          id="settings-profile"
+          className={`artisan-settings-card ${panelClass('profile')}`}
           onSubmit={(event) => {
             event.preventDefault();
             const form = event.currentTarget;
@@ -1834,6 +1806,7 @@ export function ArtisanProfileSettings({
           </div>
         </form>
 
+        <div id="settings-photos" className={panelClass('photos')}>
         <ArtisanPortfolioManager
           variant="settings"
           portfolioImages={portfolioImages}
@@ -1844,9 +1817,11 @@ export function ArtisanProfileSettings({
           uploadPortfolioFiles={uploadPortfolioFiles}
           removePortfolioImage={removePortfolioImage}
         />
+        </div>
 
         <form
-          className="artisan-settings-card"
+          id="settings-kyc"
+          className={`artisan-settings-card ${panelClass('kyc')}`}
           onSubmit={(event) => {
             event.preventDefault();
             const form = event.currentTarget;
@@ -1879,7 +1854,8 @@ export function ArtisanProfileSettings({
         </form>
 
         <form
-          className="artisan-settings-card"
+          id="settings-bank"
+          className={`artisan-settings-card ${panelClass('bank')}`}
           onSubmit={(event) => {
             event.preventDefault();
             const form = event.currentTarget;

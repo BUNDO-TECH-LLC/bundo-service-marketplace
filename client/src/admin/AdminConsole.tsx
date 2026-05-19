@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AdminChatPanel } from '../panels/AdminChatPanel';
 import type { ActionRunner, AdminArtisanRecord, AdminCategoryRecord, AdminSection, AdminUserRecord } from '../appTypes';
 import type { ArtisanKycSubmission, Booking, Conversation } from '../types';
@@ -15,6 +15,7 @@ export function AdminConsole({
   users,
   artisans,
   bookings,
+  bookingsTotal,
   conversations,
   submissions,
   categories,
@@ -31,6 +32,7 @@ export function AdminConsole({
   users: AdminUserRecord[];
   artisans: AdminArtisanRecord[];
   bookings: Booking[];
+  bookingsTotal?: number;
   conversations: Conversation[];
   submissions: ArtisanKycSubmission[];
   categories: AdminCategoryRecord[];
@@ -42,6 +44,7 @@ export function AdminConsole({
   onSignOut: () => void;
 }) {
   const [messagesFocusConversationId, setMessagesFocusConversationId] = useState<string | null>(null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const sections: Array<{
     id: AdminSection;
@@ -51,15 +54,65 @@ export function AdminConsole({
   }> = [
     { id: 'overview', label: 'Overview', description: 'Signals and open work' },
     { id: 'profiles', label: 'Profiles', description: 'Users and artisans', count: users.length + artisans.length },
-    { id: 'jobs', label: 'Jobs', description: 'Lifecycle, chat, payouts', count: bookings.length },
+    { id: 'jobs', label: 'Jobs', description: 'Lifecycle, chat, payouts', count: bookingsTotal ?? bookings.length },
     { id: 'messages', label: 'Messages', description: 'Threads and notes', count: conversations.length },
     { id: 'verification', label: 'Verification', description: 'KYC and approvals', count: submissions.length },
     { id: 'catalog', label: 'Catalog', description: 'Service categories', count: categories.length },
   ];
 
+  const activeSection = sections.find((item) => item.id === section) ?? sections[0];
+
+  const closeMobileNav = () => setMobileNavOpen(false);
+
+  const goToSection = (next: AdminSection) => {
+    closeMobileNav();
+    setSection(next);
+  };
+
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeMobileNav();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [mobileNavOpen]);
+
   return (
-    <section className="admin-shell">
-      <aside className="admin-sidebar">
+    <section className={`admin-shell ${mobileNavOpen ? 'admin-shell--nav-open' : ''}`}>
+      <header className="admin-mobile-bar">
+        <button
+          type="button"
+          className="admin-mobile-menu-toggle"
+          aria-label={mobileNavOpen ? 'Close admin menu' : 'Open admin menu'}
+          aria-expanded={mobileNavOpen}
+          onClick={() => setMobileNavOpen((open) => !open)}
+        >
+          <span className="artisan-header-menu-toggle-bars" aria-hidden="true" />
+        </button>
+        <div className="admin-mobile-bar-copy">
+          <p className="eyebrow">Admin</p>
+          <strong>{activeSection.label}</strong>
+        </div>
+        <button type="button" className="text-button" onClick={onSignOut}>
+          Log out
+        </button>
+      </header>
+
+      {mobileNavOpen && (
+        <button
+          type="button"
+          className="admin-mobile-backdrop"
+          aria-label="Close menu"
+          onClick={closeMobileNav}
+        />
+      )}
+
+      <aside className="admin-sidebar" aria-label="Admin navigation">
         <div className="admin-sidebar-head">
           <p className="eyebrow">Admin console</p>
           <h1>Bundo operations</h1>
@@ -68,7 +121,9 @@ export function AdminConsole({
         <div className="admin-operator-card">
           <span>Signed in as</span>
           <strong>{adminLabel}</strong>
-          <button type="button" onClick={onSignOut}>Log out</button>
+          <button type="button" className="admin-sidebar-signout" onClick={onSignOut}>
+            Log out
+          </button>
         </div>
         <nav className="admin-nav" aria-label="Admin sections">
           {sections.map((item) => (
@@ -76,7 +131,7 @@ export function AdminConsole({
               key={item.id}
               className={section === item.id ? 'active' : ''}
               type="button"
-              onClick={() => setSection(item.id)}
+              onClick={() => goToSection(item.id)}
             >
               <span>{item.label}</span>
               <small>{item.description}</small>
@@ -112,6 +167,8 @@ export function AdminConsole({
           <AdminBookingsPanel
             token={token}
             bookings={bookings}
+            bookingsTotal={bookingsTotal}
+            adminUsers={users}
             busy={busy}
             runAction={runAction}
             refresh={refresh}

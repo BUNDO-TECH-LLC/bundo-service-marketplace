@@ -11,23 +11,29 @@ import {
   type AdminBooking,
   type AdminJobFilter,
 } from '../lib/adminJobStages';
-import type { ActionRunner, AdminSection } from '../appTypes';
+import type { ActionRunner, AdminSection, AdminUserRecord } from '../appTypes';
 import type { Booking } from '../types';
 import { EmptyState } from '../components/EmptyState';
 import { AdminJobChat } from './AdminJobChat';
 
 const filters: Array<{ id: AdminJobFilter; label: string }> = [
-  { id: 'all', label: 'All jobs' },
-  { id: 'requests', label: 'New requests' },
+  { id: 'all', label: 'All' },
+  { id: 'requests', label: 'Requests' },
   { id: 'appointments', label: 'Appointments' },
   { id: 'ongoing', label: 'In progress' },
   { id: 'completed', label: 'Completed' },
   { id: 'payouts', label: 'Payouts' },
 ];
 
+function moderatorLabel(user: AdminUserRecord) {
+  return user.email || user.phone || user.firebaseUid.slice(0, 8);
+}
+
 export function AdminBookingsPanel({
   token,
   bookings,
+  bookingsTotal,
+  adminUsers,
   busy,
   runAction,
   refresh,
@@ -36,6 +42,8 @@ export function AdminBookingsPanel({
 }: {
   token: string;
   bookings: Booking[];
+  bookingsTotal?: number;
+  adminUsers: AdminUserRecord[];
   busy: boolean;
   runAction: ActionRunner;
   refresh: () => Promise<void>;
@@ -44,13 +52,20 @@ export function AdminBookingsPanel({
 }) {
   const [filter, setFilter] = useState<AdminJobFilter>('all');
   const [expandedChatId, setExpandedChatId] = useState<string | null>(null);
+  const [expandedActionsId, setExpandedActionsId] = useState<string | null>(null);
 
   const jobBookings = bookings as AdminBooking[];
+  const adminModerators = useMemo(
+    () => adminUsers.filter((user) => user.role === 'ADMIN' && user.status === 'ACTIVE'),
+    [adminUsers]
+  );
   const counts = useMemo(() => adminJobFilterCounts(jobBookings), [jobBookings]);
   const visibleJobs = useMemo(
     () => filterAdminJobs(jobBookings, filter),
     [filter, jobBookings]
   );
+  const loadedCount = jobBookings.length;
+  const totalCount = bookingsTotal ?? loadedCount;
 
   async function updateStatus(bookingId: string, status: Booking['status']) {
     await api(`/admin/bookings/${bookingId}/status`, {
@@ -69,6 +84,15 @@ export function AdminBookingsPanel({
     await api(`/admin/bookings/${bookingId}/release-payment`, {
       method: 'POST',
       token,
+    });
+    await refresh();
+  }
+
+  async function assignModerator(bookingId: string, moderatorId: string | null) {
+    await api(`/admin/bookings/${bookingId}/moderator`, {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify({ moderatorId }),
     });
     await refresh();
   }
@@ -113,7 +137,7 @@ export function AdminBookingsPanel({
           <p className="eyebrow">Jobs</p>
           <h2>Booking lifecycle and support</h2>
           <p>
-            Track requests, appointments, active work, payouts, and jump into the client–artisan chat from any entry.
+            Showing {loadedCount} of {totalCount} jobs. Assign a moderator, update status, chat, and resolve payouts from each row.
           </p>
         </div>
       </header>
@@ -132,6 +156,12 @@ export function AdminBookingsPanel({
         ))}
       </div>
 
+      {totalCount > loadedCount && (
+        <p className="admin-list-hint" role="status">
+          {totalCount - loadedCount} older jobs are not loaded. Increase the limit or add pagination to load more.
+        </p>
+      )}
+
       {visibleJobs.length === 0 && (
         <EmptyState
           title="No jobs in this queue"
@@ -139,7 +169,7 @@ export function AdminBookingsPanel({
         />
       )}
 
-      <div className="admin-job-entries">
+      <div className="admin-inline-table" role="list">
         {visibleJobs.map((booking) => {
           const paymentStatus = booking.payment?.status;
           const openDispute = booking.disputes?.find(
@@ -153,125 +183,171 @@ export function AdminBookingsPanel({
             !openDispute;
           const isAppointment = booking.status === 'ACCEPTED';
           const chatOpen = expandedChatId === booking.id;
+          const actionsOpen = expandedActionsId === booking.id;
           const conversationId = booking.conversationId;
+          const title =
+            booking.offering?.title || booking.offering?.category?.name || 'Service booking';
 
           return (
-            <article className="admin-job-entry" key={booking.id}>
+            <article className="admin-row admin-row--job" key={booking.id} role="listitem">
               {isAppointment && (
-                <div className="appointment-notice" role="status">
-                  <strong>New appointment</strong>
-                  <span>Client and artisan are connected — coordinate in chat and mark progress when work starts.</span>
-                </div>
+                <p className="admin-row-banner" role="status">
+                  <strong>New appointment</strong> — coordinate in chat when ready.
+                </p>
               )}
 
-              <div className="admin-job-entry-head">
-                <div className="admin-job-entry-title">
-                  <p className="eyebrow">Job #{booking.id.slice(0, 8)}</p>
-                  <h3>{booking.offering?.title || booking.offering?.category?.name || 'Service booking'}</h3>
-                  <p>{booking.artisan?.displayName || 'Artisan'} · {bookingDate(booking.scheduledAt)}</p>
-                </div>
-                <div className="admin-status-stack">
-                  <span className={`booking-status ${jobStageClass(booking.status)}`}>
-                    {jobStageLabel(booking.status)}
-                  </span>
-                  <span className={`payment-chip ${(paymentStatus || 'UNPAID').toLowerCase()}`}>
-                    {paymentLabel(paymentStatus)}
-                  </span>
-                </div>
-              </div>
-
-              <dl className="admin-job-meta">
-                <div>
-                  <dt>Customer</dt>
-                  <dd>{booking.customerUser?.email || 'Unknown customer'}</dd>
-                </div>
-                <div>
-                  <dt>Artisan</dt>
-                  <dd>{booking.artisan?.displayName || 'Unknown artisan'}</dd>
-                </div>
-                <div>
-                  <dt>Location</dt>
-                  <dd>{booking.artisan?.city || 'Unknown city'}</dd>
-                </div>
-                <div>
-                  <dt>Amount</dt>
-                  <dd>{booking.payment ? money(booking.payment.amount) : money(booking.offering?.priceFrom || 0)}</dd>
-                </div>
-                <div>
-                  <dt>Note</dt>
-                  <dd>{booking.note?.trim() || 'No customer note'}</dd>
-                </div>
-                <div>
-                  <dt>Disputes</dt>
-                  <dd>
-                    {openDispute
-                      ? openDispute.status.toLowerCase().replace(/_/g, ' ')
-                      : booking.disputes?.length || 0}
-                  </dd>
-                </div>
-              </dl>
-
-              <div className="admin-job-actions">
-                {booking.status === 'REQUESTED' && (
-                  <button
-                    type="button"
-                    className="primary-action"
-                    disabled={busy}
-                    onClick={() =>
-                      runAction(
-                        () => confirmAppointment(booking.id),
-                        'Appointment confirmed'
-                      )
-                    }
-                  >
-                    Confirm appointment
-                  </button>
-                )}
-                {!paymentSecured && ['ACCEPTED', 'ONGOING'].includes(booking.status) && (
-                  <p className="booking-payment-notice" role="status">
-                    Customer payment is not secured yet — cannot start or complete this job.
+              <div className="admin-row-grid">
+                <div className="admin-row-primary">
+                  <div className="admin-row-title-line">
+                    <span className="admin-row-id">#{booking.id.slice(0, 8)}</span>
+                    <strong className="admin-row-title">{title}</strong>
+                  </div>
+                  <p className="admin-row-sub">
+                    {booking.artisan?.displayName || 'Artisan'} · {bookingDate(booking.scheduledAt)}
                   </p>
-                )}
-                {booking.status === 'ACCEPTED' && (
-                  <button
-                    type="button"
-                    className="primary-action"
-                    disabled={busy || !paymentSecured}
-                    onClick={() =>
+                  <div className="admin-row-chips">
+                    <span className={`booking-status ${jobStageClass(booking.status)}`}>
+                      {jobStageLabel(booking.status)}
+                    </span>
+                    <span className={`payment-chip ${(paymentStatus || 'UNPAID').toLowerCase()}`}>
+                      {paymentLabel(paymentStatus)}
+                    </span>
+                    {openDispute && (
+                      <span className="booking-status cancelled">Dispute open</span>
+                    )}
+                  </div>
+                </div>
+
+                <dl className="admin-row-fields">
+                  <div>
+                    <dt>Customer</dt>
+                    <dd title={booking.customerUser?.email || undefined}>
+                      {booking.customerUser?.email || booking.customerUser?.phone || 'Unknown'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Artisan</dt>
+                    <dd title={booking.artisan?.displayName || undefined}>
+                      {booking.artisan?.displayName || 'Unknown'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Location</dt>
+                    <dd>{booking.artisan?.city || '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Amount</dt>
+                    <dd>
+                      {booking.payment
+                        ? money(booking.payment.amount)
+                        : money(booking.offering?.priceFrom || 0)}
+                    </dd>
+                  </div>
+                  <div className="admin-row-fields-note">
+                    <dt>Note</dt>
+                    <dd title={booking.note?.trim() || undefined}>
+                      {booking.note?.trim() || '—'}
+                    </dd>
+                  </div>
+                </dl>
+
+                <label className="admin-row-moderator">
+                  <span>Moderator</span>
+                  <select
+                    value={booking.moderatorId || ''}
+                    disabled={busy}
+                    onChange={(event) => {
+                      const value = event.target.value;
                       runAction(
-                        () => updateStatus(booking.id, 'ONGOING'),
-                        'Job marked in progress'
-                      )
-                    }
+                        () => assignModerator(booking.id, value || null),
+                        value ? 'Moderator assigned' : 'Moderator cleared'
+                      );
+                    }}
                   >
-                    Mark in progress
-                  </button>
-                )}
-                {(booking.status === 'ACCEPTED' || booking.status === 'ONGOING') && (
+                    <option value="">Unassigned</option>
+                    {adminModerators.map((admin) => (
+                      <option key={admin.firebaseUid} value={admin.firebaseUid}>
+                        {moderatorLabel(admin)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="admin-row-toolbar">
                   <button
                     type="button"
                     className="secondary-button"
-                    disabled={busy || !paymentSecured}
                     onClick={() =>
-                      runAction(
-                        () => updateStatus(booking.id, 'COMPLETED'),
-                        'Job marked completed'
-                      )
+                      setExpandedActionsId(actionsOpen ? null : booking.id)
                     }
                   >
-                    Mark completed
+                    {actionsOpen ? 'Hide actions' : 'Actions'}
                   </button>
-                )}
+                  {conversationId && (
+                    <button
+                      type="button"
+                      className="text-button"
+                      onClick={() => setExpandedChatId(chatOpen ? null : booking.id)}
+                    >
+                      {chatOpen ? 'Hide chat' : 'Chat'}
+                    </button>
+                  )}
+                </div>
+              </div>
 
-                {conversationId ? (
-                  <>
+              {actionsOpen && (
+                <div className="admin-row-actions">
+                  {booking.status === 'REQUESTED' && (
+                    <button
+                      type="button"
+                      className="primary-action"
+                      disabled={busy}
+                      onClick={() =>
+                        runAction(
+                          () => confirmAppointment(booking.id),
+                          'Appointment confirmed'
+                        )
+                      }
+                    >
+                      Confirm
+                    </button>
+                  )}
+                  {!paymentSecured && ['ACCEPTED', 'ONGOING'].includes(booking.status) && (
+                    <p className="booking-payment-notice" role="status">
+                      Payment not secured — cannot progress this job.
+                    </p>
+                  )}
+                  {booking.status === 'ACCEPTED' && (
+                    <button
+                      type="button"
+                      className="primary-action"
+                      disabled={busy || !paymentSecured}
+                      onClick={() =>
+                        runAction(
+                          () => updateStatus(booking.id, 'ONGOING'),
+                          'Job marked in progress'
+                        )
+                      }
+                    >
+                      Start
+                    </button>
+                  )}
+                  {(booking.status === 'ACCEPTED' || booking.status === 'ONGOING') && (
                     <button
                       type="button"
                       className="secondary-button"
-                      onClick={() => setExpandedChatId(chatOpen ? null : booking.id)}
+                      disabled={busy || !paymentSecured}
+                      onClick={() =>
+                        runAction(
+                          () => updateStatus(booking.id, 'COMPLETED'),
+                          'Job marked completed'
+                        )
+                      }
                     >
-                      {chatOpen ? 'Hide chat' : 'Open chat'}
+                      Complete
                     </button>
+                  )}
+                  {conversationId && (
                     <button
                       type="button"
                       className="text-button"
@@ -282,57 +358,51 @@ export function AdminBookingsPanel({
                     >
                       Full support view
                     </button>
-                  </>
-                ) : (
-                  <button type="button" className="secondary-button" disabled>
-                    Chat unavailable
-                  </button>
-                )}
-
-                {openDispute && (
-                  <>
+                  )}
+                  {openDispute && (
+                    <>
+                      <button
+                        type="button"
+                        className="primary-action"
+                        disabled={busy}
+                        onClick={() =>
+                          runAction(
+                            () => resolveDispute(openDispute.id, 'RELEASE'),
+                            'Dispute resolved with release'
+                          )
+                        }
+                      >
+                        Resolve & release
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        disabled={busy}
+                        onClick={() =>
+                          runAction(
+                            () => resolveDispute(openDispute.id, 'REFUND_FULL'),
+                            'Full refund issued'
+                          )
+                        }
+                      >
+                        Full refund
+                      </button>
+                    </>
+                  )}
+                  {canRelease && (
                     <button
                       type="button"
                       className="primary-action"
                       disabled={busy}
                       onClick={() =>
-                        runAction(
-                          () => resolveDispute(openDispute.id, 'RELEASE'),
-                          'Dispute resolved with artisan release'
-                        )
+                        runAction(() => releasePayment(booking.id), 'Payout released')
                       }
                     >
-                      Resolve and release
+                      Release payout
                     </button>
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      disabled={busy}
-                      onClick={() =>
-                        runAction(
-                          () => resolveDispute(openDispute.id, 'REFUND_FULL'),
-                          'Dispute resolved with full refund'
-                        )
-                      }
-                    >
-                      Full refund
-                    </button>
-                  </>
-                )}
-
-                {canRelease && (
-                  <button
-                    type="button"
-                    className="primary-action"
-                    disabled={busy}
-                    onClick={() =>
-                      runAction(() => releasePayment(booking.id), 'Payout released to artisan')
-                    }
-                  >
-                    Release payout
-                  </button>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
 
               {chatOpen && conversationId && (
                 <AdminJobChat
