@@ -10,10 +10,8 @@ import { userDisplayName } from '../lib/userDisplayName';
 import bundoLogo from '../assets/bundo-logo.png';
 import { auth } from '../lib/firebase';
 import { PaymentSuccessDialog } from '../components/PaymentSuccessDialog';
-import {
-  ArtisanAppHeader,
-  BookingSuccessDialog,
-} from './appShellComponents';
+import { ArtisanAppHeader } from '../features/artisan/ArtisanAppHeader';
+import { BookingSuccessDialog } from '../features/booking/BookingSuccessDialog';
 import { useAppRoot } from './appRootContext';
 
 export function MainLayout() {

@@ -1,5 +1,5 @@
 import { EmptyState } from '../components/EmptyState';
-import { MarketplaceFilters, OfferingGrid } from '../app/appShellComponents';
+import { MarketplaceFilters, OfferingGrid } from '../features/marketplace';
 import { nigeriaStates } from '../lib/geo';
 import { useAppRoot } from '../app/appRootContext';
 

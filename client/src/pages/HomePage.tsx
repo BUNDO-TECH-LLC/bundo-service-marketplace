@@ -1,12 +1,6 @@
-import {
-  AppPromo,
-  ArtisanLanding,
-  Footer,
-  Hero,
-  MarketplacePreview,
-  ServicesSection,
-  WhySection,
-} from '../app/appShellComponents';
+import { AppPromo, Footer, Hero, ServicesSection, WhySection } from '../features/marketing';
+import { MarketplacePreview } from '../features/marketplace';
+import { ArtisanLanding } from '../features/artisan/ArtisanLanding';
 import { buildAppPath } from '../lib/appPaths';
 import { nigeriaStates } from '../lib/geo';
 import { LoggedInHome } from '../views/LoggedInHome';

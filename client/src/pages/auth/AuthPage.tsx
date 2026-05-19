@@ -113,7 +113,7 @@ export function AuthPage({ mode }: AuthPageProps) {
         const destination =
           session.user.role === 'ARTISAN' || session.user.role === 'ADMIN'
             ? '/?view=workspace'
-            : '/customer/dashboard';
+            : '/workspace/overview';
 
         showLoadingThenNavigate(destination);
         return;
@@ -154,7 +154,7 @@ export function AuthPage({ mode }: AuthPageProps) {
         mode === 'login' ? (
           <>
             Do not have an account?{' '}
-            <Link className="font-medium text-[var(--color-accent-link)] no-underline" to="/create-account">
+            <Link className="font-medium text-[var(--color-accent-link)] no-underline" to="/signup">
               Create account
             </Link>
           </>

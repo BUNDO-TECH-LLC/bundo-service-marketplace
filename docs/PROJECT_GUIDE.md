@@ -304,9 +304,16 @@ Supporting client files:
   [client/src/lib/useArtisanPortfolio.ts](/Users/macbook/bundo/client/src/lib/useArtisanPortfolio.ts),
   [client/src/lib/portfolioUpload.ts](/Users/macbook/bundo/client/src/lib/portfolioUpload.ts),
   [client/src/lib/imageFile.ts](/Users/macbook/bundo/client/src/lib/imageFile.ts)
-- Artisan workspace header (full nav on desktop + mobile drawer):
-  [client/src/app/appShellComponents.tsx](/Users/macbook/bundo/client/src/app/appShellComponents.tsx) (`ArtisanAppHeader`),
+- Client shell, routes, and global state (May 2026 refactor):
+  [client/ARCHITECTURE.md](/Users/macbook/bundo/client/ARCHITECTURE.md),
+  [client/src/App.tsx](/Users/macbook/bundo/client/src/App.tsx) (thin entry),
+  [client/src/app/AppRoutes.tsx](/Users/macbook/bundo/client/src/app/AppRoutes.tsx),
+  [client/src/app/AppProvider.tsx](/Users/macbook/bundo/client/src/app/AppProvider.tsx),
   [client/src/app/MainLayout.tsx](/Users/macbook/bundo/client/src/app/MainLayout.tsx)
+- Feature UI by domain (`client/src/features/`): marketing (Hero, Footer, …), marketplace (filters, grid), artisan (header, landing, offers, profile, reviews), booking, account
+- Artisan onboarding wizard (4 steps) — logic in [useArtisanLanding.ts](/Users/macbook/bundo/client/src/features/artisan/landing/useArtisanLanding.ts); steps in `features/artisan/landing/ArtisanLandingStep*.tsx`; orchestrator [ArtisanLanding.tsx](/Users/macbook/bundo/client/src/features/artisan/ArtisanLanding.tsx)
+- Artisan workspace header (full nav on desktop + mobile drawer):
+  [client/src/features/artisan/ArtisanAppHeader.tsx](/Users/macbook/bundo/client/src/features/artisan/ArtisanAppHeader.tsx)
 - Password visibility toggle on login/signup:
   [client/src/components/PasswordInput.tsx](/Users/macbook/bundo/client/src/components/PasswordInput.tsx)
 - Logged-in customer home, artisan profile view, artisan dashboard:
@@ -461,15 +468,15 @@ After step 4 submit, artisans with `PENDING` KYC are **not** left on the setup w
 
 After KYC/admin approval, artisans use **`/workspace/*`** (not a second dashboard on `/`):
 
-1. Visiting `/` while approved **redirects** to `/workspace/overview` ([ArtisanLanding](/Users/macbook/bundo/client/src/app/appShellComponents.tsx) + `Navigate`).
+1. Visiting `/` while approved **redirects** to `/workspace/overview` ([ArtisanLanding](/Users/macbook/bundo/client/src/features/artisan/ArtisanLanding.tsx) + `Navigate`).
 2. **Dashboard** (`/workspace/overview`) — [ArtisanDashboard.tsx](/Users/macbook/bundo/client/src/views/ArtisanDashboard.tsx): booking totals, rating summary, active jobs, new requests, availability dots, quick links; soft nudge to add photos when approved with fewer than three portfolio images.
 3. **Jobs** (`/workspace/bookings`) — bookings with filters (all, pending, accepted, in progress, completed, declined).
 4. Booking detail (in jobs panel): accept/decline, **Start service** (`ONGOING`), **Mark completed**, open chat — gated by secured payment server-side and in UI.
 5. **Messages** (`/workspace/messages`) — shared [ChatPanel](/Users/macbook/bundo/client/src/panels/ChatPanel.tsx).
 6. **Reviews** (`/workspace/reviews`).
-7. **Offers** (`/workspace/offers`) — [ArtisanOffersPanel](/Users/macbook/bundo/client/src/app/appShellComponents.tsx); no portfolio or KYC here.
+7. **Offers** (`/workspace/offers`) — [ArtisanOffersPanel](/Users/macbook/bundo/client/src/features/artisan/ArtisanOffersPanel.tsx); no portfolio or KYC here.
 8. **Notifications** (`/workspace/notifications`).
-9. **Profile** (`/workspace/profile`) — [ArtisanProfileSettings](/Users/macbook/bundo/client/src/app/appShellComponents.tsx): hero + subnav (Profile / Photos / KYC / Bank); [ArtisanPortfolioManager](/Users/macbook/bundo/client/src/components/ArtisanPortfolioManager.tsx) for photos; KYC still uses document **URL fields** (not file upload like portfolio).
+9. **Profile** (`/workspace/profile`) — [ArtisanProfileSettings](/Users/macbook/bundo/client/src/features/artisan/ArtisanProfileSettings.tsx): hero + subnav (Profile / Photos / KYC / Bank); [ArtisanPortfolioManager](/Users/macbook/bundo/client/src/components/ArtisanPortfolioManager.tsx) for photos; KYC file upload via [KycImageUploadField](/Users/macbook/bundo/client/src/components/KycImageUploadField.tsx).
 
 **ArtisanAppHeader** (workspace only): Dashboard, Jobs, Messages, Reviews, Offers, Notifications, Profile; unread badge on Notifications; Log out on desktop and in mobile menu.
 
@@ -1015,13 +1022,13 @@ The app cannot fully prevent spam filtering without Firebase/domain configuratio
 
 The live app mounts [AppRoutes.tsx](/Users/macbook/bundo/client/src/app/AppRoutes.tsx) from [App.tsx](/Users/macbook/bundo/client/src/App.tsx).
 
-**Removed (May 2026):** `LandingPage.tsx`, `AppRouter.tsx`, and mock `pages/customer/Dashboard.tsx`. Auth pages use [AuthMarketingBackdrop.tsx](/Users/macbook/bundo/client/src/components/AuthMarketingBackdrop.tsx) instead of the old landing monolith.
+**Removed (May 2026):** `LandingPage.tsx`, `AppRouter.tsx`, mock `pages/customer/Dashboard.tsx`, empty `pages/artisan/Dashboard.tsx`, and legacy `features/artisan/ArtisanPanel.tsx` (unused monolith; workspace uses `ArtisanOffersPanel` + `ArtisanProfileSettings`). Auth pages use [AuthMarketingBackdrop.tsx](/Users/macbook/bundo/client/src/components/AuthMarketingBackdrop.tsx) instead of the old landing monolith.
 
-Still unused in live routes:
+**Deprecated barrel (do not add code):** [appShellComponents.tsx](/Users/macbook/bundo/client/src/app/appShellComponents.tsx) re-exports `features/*` for older imports only.
 
-- [client/src/app/appShellComponents.tsx](/Users/macbook/bundo/client/src/app/appShellComponents.tsx) — exported `ArtisanPanel` (legacy all-in-one artisan tools); workspace uses `ArtisanOffersPanel` + Profile instead.
+Prefer editing modular files under `client/src/features/`, `client/src/admin/`, `client/src/views/`, `client/src/panels/`, and `client/src/auth/`. See [client/ARCHITECTURE.md](/Users/macbook/bundo/client/ARCHITECTURE.md) for the route map and folder conventions.
 
-Prefer editing modular files under `client/src/admin/`, `client/src/views/`, `client/src/panels/`, and `client/src/auth/` for new work.
+**Verification after client refactors:** run `npm run build` in `client/` (TypeScript + Vite). Server unit tests: `npm test` in `server/`. CI also runs the lifecycle smoke job against Postgres when configured.
 
 ---
 

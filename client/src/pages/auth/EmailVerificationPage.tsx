@@ -86,7 +86,7 @@ export function EmailVerificationPage() {
 
     navigate('/loading', {
       state: {
-        redirectTo: accountKind === 'ARTISAN' ? '/?view=workspace' : '/customer/dashboard',
+        redirectTo: accountKind === 'ARTISAN' ? '/workspace/overview' : '/',
       },
     });
   } catch (error) {

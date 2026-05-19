@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { EmptyState } from '../components/EmptyState';
-import { ArtisanOffersPanel, ArtisanProfileSettings, ArtisanReviewsPanel } from '../app/appShellComponents';
+import { ArtisanOffersPanel, ArtisanProfileSettings, ArtisanReviewsPanel } from '../features/artisan';
 import { api } from '../lib/api';
 import { artisanVerificationPhase } from '../lib/artisanVerification';
 import { buildAppPath } from '../lib/appPaths';
