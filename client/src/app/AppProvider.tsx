@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { ArtisanHeaderActive, BookingSuccessState, PaymentSuccessState } from '../appTypes';
+import { isAuthPathname } from '../lib/appRouting';
 import { firebaseReady } from '../lib/firebase';
 import { useActionRunner } from '../hooks/useActionRunner';
 import { useAppAuth } from '../hooks/useAppAuth';
@@ -72,7 +73,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const isAuthed = Boolean(auth.firebaseUser && auth.token);
-  const isRestoringAuthedRoute = isAuthed && Boolean(auth.me?.role) && !auth.routeHydrated;
+  const onAuthScreen = isAuthPathname(location.pathname);
+  const isRestoringAuthedRoute =
+    isAuthed && Boolean(auth.me?.role) && !auth.routeHydrated && !onAuthScreen;
   const isAppBootstrapping = !auth.authChecked || isRestoringAuthedRoute;
   const usesArtisanSetupHeader = isAuthed && auth.me?.role === 'ARTISAN' && routeSync.view === 'home';
   const usesArtisanWorkspaceHeader = isAuthed && auth.me?.role === 'ARTISAN' && routeSync.view === 'workspace';

@@ -9,7 +9,6 @@ import { finalizeAuthSession, signInWithGooglePopup } from '../../lib/authSessio
 import { auth, firebaseReady } from '../../lib/firebase';
 import type { Role } from '../../types';
 import googleLogo from '../../assets/icons/material-icon-theme_google.svg';
-import LoadingPage from '../LoadingPage';
 import { PasswordInput } from '../../components/PasswordInput';
 
 type AuthMode = 'login' | 'signup';
@@ -41,19 +40,12 @@ export function AuthPage({ mode }: AuthPageProps) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [showLoading, setShowLoading] = useState(false);
-  const [nextRoute, setNextRoute] = useState('/');
 
   const title = mode === 'login' ? 'Welcome back!' : 'Create an account';
   const action = mode === 'login' ? 'Log in' : 'Get Started';
 
-  function showLoadingThenNavigate(route: string) {
-    setNextRoute(route);
-    setShowLoading(true);
-
-    setTimeout(() => {
-      navigate(route);
-    }, 3200);
+  function navigateAfterAuth(route: string) {
+    navigate(route, { replace: true });
   }
 
   async function continueWithGoogle() {
@@ -69,7 +61,7 @@ export function AuthPage({ mode }: AuthPageProps) {
         intendedRole: mode === 'signup' ? accountKind : undefined,
         phone: mode === 'signup' ? phone : undefined,
       });
-      showLoadingThenNavigate(destination);
+      navigateAfterAuth(destination);
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'Could not continue with Google.');
     } finally {
@@ -106,11 +98,13 @@ export function AuthPage({ mode }: AuthPageProps) {
         const session = await resolveApiSession(credential.user);
 
         const destination =
-          session.user.role === 'ARTISAN' || session.user.role === 'ADMIN'
-            ? '/?view=workspace'
-            : '/workspace/overview';
+          session.user.role === 'ARTISAN'
+            ? '/'
+            : session.user.role === 'ADMIN'
+              ? '/admin/overview'
+              : '/workspace/overview';
 
-        showLoadingThenNavigate(destination);
+        navigateAfterAuth(destination);
         return;
       }
 
@@ -144,10 +138,6 @@ export function AuthPage({ mode }: AuthPageProps) {
     } finally {
       setSubmitting(false);
     }
-  }
-
-  if (showLoading) {
-    return <LoadingPage />;
   }
 
   return (

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import bundoLogo from '../assets/BundoLogo.png';
 import { AuthMarketingBackdrop } from '../components/AuthMarketingBackdrop';
 
@@ -10,8 +10,6 @@ type AuthLayoutProps = {
 };
 
 export function AuthLayout({ title, subtitle, children }: AuthLayoutProps) {
-  const navigate = useNavigate();
-
   return (
     <main className="relative min-h-screen bg-[var(--color-page)]">
       <div
@@ -24,7 +22,6 @@ export function AuthLayout({ title, subtitle, children }: AuthLayoutProps) {
       <section
         className="fixed inset-0 z-[90] grid place-items-center overflow-auto bg-[var(--overlay-page)] p-5"
         aria-labelledby="auth-page-title"
-        onClick={() => navigate('/')}
       >
         <div
           className="grid w-full max-w-[440px] gap-4 rounded-[14px] border border-[var(--color-border)] bg-[var(--color-white)] p-4 shadow-[0_24px_80px_var(--shadow-modal)]"
@@ -33,12 +30,13 @@ export function AuthLayout({ title, subtitle, children }: AuthLayoutProps) {
           onClick={(event) => event.stopPropagation()}
         >
           <div className="grid gap-6">
-            <span
-              className="grid h-[40px] w-[40px] place-items-center justify-self-center rounded-lg"
-              aria-hidden="true"
+            <Link
+              className="grid h-[40px] w-[40px] place-items-center justify-self-center rounded-lg no-underline"
+              to="/"
+              aria-label="Back to home"
             >
               <img className="h-[34px] w-[34px] rounded-[5px] object-cover" src={bundoLogo} alt="Bundo logo" />
-            </span>
+            </Link>
 
             <div className="grid gap-2 justify-items-center text-center">
               <h2

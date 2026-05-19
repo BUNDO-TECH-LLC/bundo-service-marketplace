@@ -7,7 +7,7 @@ import { needsEmailVerification } from '../lib/authSignupStorage';
 import { auth } from '../lib/firebase';
 import { hasPushConfig } from '../lib/messaging';
 import { resolveApiSession } from '../lib/resolveApiSession';
-import { clearStoredRoute, isPublicBrowsePathname } from '../lib/appRouting';
+import { clearStoredRoute, isAuthPathname, isPublicBrowsePathname } from '../lib/appRouting';
 import { readStoredRoute, storedRouteToPath } from '../lib/workspaceRoute';
 import type { PushStatus } from '../appTypes';
 import type { ApiUser } from '../types';
@@ -79,7 +79,9 @@ export function useAppAuth({
         setRouteHydrated(false);
         clearStoredRoute();
         authBootstrapCompletedRef.current = false;
-        navigate({ pathname: '/', search: '' }, { replace: true });
+        if (!isAuthPathname(window.location.pathname)) {
+          navigate({ pathname: '/', search: '' }, { replace: true });
+        }
         setAuthChecked(true);
         return;
       }

@@ -3,6 +3,7 @@ import type { User } from 'firebase/auth';
 import type { NavigateFunction, Location } from 'react-router-dom';
 import { api } from '../lib/api';
 import { buildAppPath, parseAppPath } from '../lib/appPaths';
+import { isAuthPathname } from '../lib/appRouting';
 import { routeStorageKey } from '../lib/workspaceRoute';
 import type { AdminSection, View, WorkspaceSection } from '../appTypes';
 import type { ApiUser, Artisan, Review } from '../types';
@@ -44,6 +45,10 @@ export function useAppRouteSync({
   const [activeHelpTopicId, setActiveHelpTopicId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (isAuthPathname(location.pathname)) {
+      return;
+    }
+
     const parsed = parseAppPath(location.pathname);
     if (!parsed) {
       navigate('/', { replace: true });
