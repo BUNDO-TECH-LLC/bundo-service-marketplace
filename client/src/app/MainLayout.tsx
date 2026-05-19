@@ -12,6 +12,7 @@ import { auth } from '../lib/firebase';
 import { PaymentSuccessDialog } from '../components/PaymentSuccessDialog';
 import { ArtisanAppHeader } from '../features/artisan/ArtisanAppHeader';
 import { BookingSuccessDialog } from '../features/booking/BookingSuccessDialog';
+import { SignedInTopbarNav } from './SignedInTopbarNav';
 import { useAppRoot } from './appRootContext';
 
 export function MainLayout() {
@@ -62,107 +63,29 @@ export function MainLayout() {
           </button>
 
           <div className="topbar-collapse" id="topbar-mobile-panel">
-            <nav aria-label="Main navigation">
-              {ctx.isAuthed && (
-                <>
-                  <button
-                    type="button"
-                    className={ctx.view === 'home' ? 'active' : ''}
-                    onClick={() => goTo(() => ctx.navigate('/'))}
-                  >
-                    Dashboard
-                  </button>
-                  <button
-                    type="button"
-                    className={ctx.view === 'marketplace' ? 'active' : ''}
-                    onClick={() => goTo(() => ctx.navigate('/marketplace'))}
-                  >
-                    Categories
-                  </button>
-                  <button
-                    type="button"
-                    className={
-                      ctx.view === 'workspace' && ctx.workspaceSection === 'bookings' ? 'active' : ''
-                    }
-                    onClick={() => {
-                      goTo(() => {
-                        ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'bookings' }));
-                      });
-                    }}
-                  >
-                    {ctx.me?.role === 'ARTISAN' ? 'Jobs' : 'Bookings'}
-                  </button>
-                  <button
-                    type="button"
-                    className={
-                      ctx.view === 'workspace' && ctx.workspaceSection === 'messages' ? 'active' : ''
-                    }
-                    onClick={() => {
-                      goTo(() => {
-                        ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'messages' }));
-                      });
-                    }}
-                  >
-                    Messages
-                  </button>
-                  <button
-                    type="button"
-                    className={
-                      ctx.view === 'workspace' && ctx.workspaceSection === 'notifications' ? 'active' : ''
-                    }
-                    onClick={() => {
-                      goTo(() => {
-                        ctx.navigate(
-                          buildAppPath({ view: 'workspace', workspaceSection: 'notifications' })
-                        );
-                      });
-                    }}
-                  >
-                    Notifications
-                    {ctx.notifications.some((n) => !n.readAt) ? (
-                      <span className="nav-unread-dot" aria-hidden />
-                    ) : null}
-                  </button>
-                  {ctx.me?.role === 'ARTISAN' && (
-                    <button
-                      type="button"
-                      className={
-                        ctx.view === 'workspace' && ctx.workspaceSection === 'reviews' ? 'active' : ''
-                      }
-                      onClick={() => {
-                        goTo(() => {
-                          ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'reviews' }));
-                        });
-                      }}
-                    >
-                      Reviews
-                    </button>
-                  )}
-                </>
-              )}
-              {ctx.me?.role === 'ADMIN' && (
+            {ctx.isAuthed && ctx.me?.role ? (
+              <SignedInTopbarNav
+                role={ctx.me.role}
+                view={ctx.view}
+                workspaceSection={ctx.workspaceSection}
+                notifications={ctx.notifications}
+                onNavigate={(path) => goTo(() => ctx.navigate(path))}
+              />
+            ) : (
+              <nav aria-label="Main navigation">
                 <button
                   type="button"
-                  className={ctx.view === 'admin' ? 'active' : ''}
+                  className={ctx.view === 'help' ? 'active' : ''}
                   onClick={() => {
-                    goTo(() => ctx.navigate(buildAppPath({ view: 'admin', adminSection: 'overview' })));
+                    goTo(() => {
+                      ctx.navigate('/help', { state: nextHelpOpenState(ctx.location) });
+                    });
                   }}
                 >
-                  Admin
+                  Help
                 </button>
-              )}
-              <button
-                type="button"
-                className={ctx.view === 'help' ? 'active' : ''}
-                onClick={() => {
-                  goTo(() => {
-                    ctx.navigate('/help', { state: nextHelpOpenState(ctx.location) });
-                  });
-                }}
-              >
-                Help
-              </button>
-            </nav>
+              </nav>
+            )}
             {ctx.isAuthed && (
               <form
                 className="topbar-search"
@@ -219,9 +142,9 @@ export function MainLayout() {
               firebaseUser={ctx.firebaseUser}
               me={ctx.me}
               unreadCount={ctx.notifications.filter((notification) => !notification.readAt).length}
+              onOpenAuth={closeMobileNav}
               onReady={(nextToken, nextUser) => {
-                ctx.setToken(nextToken);
-                ctx.setMe(nextUser);
+                ctx.acknowledgeSession(nextToken, nextUser);
                 ctx.loadPrivateData(nextToken, nextUser).catch(() => undefined);
                 if (nextUser.role === 'ADMIN') {
                   const onAdminRoute = ctx.location.pathname.startsWith('/admin');

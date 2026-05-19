@@ -104,6 +104,7 @@ export type AppRootValue = {
   setRouteHydrated: (value: boolean) => void;
   setToken: (value: string) => void;
   setMe: (value: ApiUser | null) => void;
+  acknowledgeSession: (token: string, user: ApiUser) => void;
 };
 
 export const AppRootContext = createContext<AppRootValue | null>(null);

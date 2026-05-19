@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
-import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
+import { onAuthStateChanged, type User } from 'firebase/auth';
 import { ApiError } from '../lib/api';
 import { buildAppPath, legacyQueryToAppPath, parseAppPath } from '../lib/appPaths';
 import { needsEmailVerification } from '../lib/authSignupStorage';
@@ -43,9 +43,25 @@ export function useAppAuth({
   const authBootstrapCompletedRef = useRef(false);
   const authListenerGenerationRef = useRef(0);
 
+  const navigateRef = useRef(navigate);
+  const loadPrivateDataRef = useRef(loadPrivateData);
+  const clearPrivateDataRef = useRef(clearPrivateData);
+  const completePaymentReturnRef = useRef(completePaymentReturn);
+  const setNoticeRef = useRef(setNotice);
+  const processedPaymentReferenceRefRef = useRef(processedPaymentReferenceRef);
+
   useEffect(() => {
     currentTokenRef.current = token;
   }, [token]);
+
+  useEffect(() => {
+    navigateRef.current = navigate;
+    loadPrivateDataRef.current = loadPrivateData;
+    clearPrivateDataRef.current = clearPrivateData;
+    completePaymentReturnRef.current = completePaymentReturn;
+    setNoticeRef.current = setNotice;
+    processedPaymentReferenceRefRef.current = processedPaymentReferenceRef;
+  });
 
   useEffect(() => {
     if (!auth) {
@@ -59,7 +75,9 @@ export function useAppAuth({
       authInitTimedOut = true;
       setAuthChecked(true);
       setRouteHydrated(true);
-      setNotice('Authentication is taking longer than expected. You can still browse; try signing in again.');
+      setNoticeRef.current(
+        'Authentication is taking longer than expected. You can still browse; try signing in again.'
+      );
     }, AUTH_INIT_TIMEOUT_MS);
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -79,21 +97,14 @@ export function useAppAuth({
         if (isStale()) return;
         setToken('');
         setMe(null);
-        clearPrivateData();
+        clearPrivateDataRef.current();
         setRouteHydrated(true);
         setAuthChecked(true);
         authBootstrapCompletedRef.current = false;
         window.clearTimeout(authInitTimer);
-        setNotice(message);
-        if (auth) {
-          try {
-            await signOut(auth);
-          } catch {
-            // Ignore sign-out errors; Firebase session may already be cleared.
-          }
-        }
+        setNoticeRef.current(message);
         if (!isAuthPathname(window.location.pathname)) {
-          navigate({ pathname: '/', search: '' }, { replace: true });
+          navigateRef.current({ pathname: '/', search: '' }, { replace: true });
         }
       };
 
@@ -104,7 +115,7 @@ export function useAppAuth({
           const hadSession = Boolean(currentTokenRef.current);
           setToken('');
           setMe(null);
-          clearPrivateData();
+          clearPrivateDataRef.current();
           setPushToken('');
           setPushStatus(hasPushConfig() ? 'idle' : 'missing-config');
           setRouteHydrated(true);
@@ -112,7 +123,7 @@ export function useAppAuth({
           authBootstrapCompletedRef.current = false;
           window.clearTimeout(authInitTimer);
           if (hadSession) {
-            navigate({ pathname: '/', search: '' }, { replace: true });
+            navigateRef.current({ pathname: '/', search: '' }, { replace: true });
           }
           if (!isStale()) {
             setAuthChecked(true);
@@ -123,7 +134,7 @@ export function useAppAuth({
         if (needsEmailVerification(user)) {
           setToken('');
           setMe(null);
-          clearPrivateData();
+          clearPrivateDataRef.current();
           setPushToken('');
           setPushStatus(hasPushConfig() ? 'idle' : 'missing-config');
           setRouteHydrated(true);
@@ -131,7 +142,7 @@ export function useAppAuth({
           authBootstrapCompletedRef.current = false;
           window.clearTimeout(authInitTimer);
           if (!isAuthPathname(window.location.pathname)) {
-            navigate('/verify-email', {
+            navigateRef.current('/verify-email', {
               replace: true,
               state: { email: user.email ?? '' },
             });
@@ -148,8 +159,9 @@ export function useAppAuth({
             if (isStale()) return;
             setToken(session.token);
             setMe(session.user);
+            setRouteHydrated(true);
             if (session.user.role) {
-              void loadPrivateData(session.token, session.user).catch(() => undefined);
+              void loadPrivateDataRef.current(session.token, session.user).catch(() => undefined);
             }
           } catch {
             // Keep the current route if a background token refresh fails.
@@ -164,42 +176,38 @@ export function useAppAuth({
           setToken(session.token);
           setMe(session.user);
 
-          // Unblock the UI before dashboard API calls finish.
-          finishAuthBootstrap();
-
           const path = window.location.pathname.replace(/\/+$/, '') || '/';
           const onAuthScreen = isAuthPathname(path);
 
           if (!session.user.role) {
-            setNotice('Choose client or artisan to finish setting up your Bundo account before booking.');
+            finishAuthBootstrap();
+            setNoticeRef.current(
+              'Choose client or artisan to finish setting up your Bundo account before booking.'
+            );
             if (!onAuthScreen) {
-              navigate({ pathname: '/', search: '' }, { replace: true });
+              navigateRef.current({ pathname: '/', search: '' }, { replace: true });
             }
             return;
           }
 
-          void loadPrivateData(session.token, session.user).catch(() => {
-            if (!isStale()) {
-              setNotice('Some dashboard data could not be loaded. Try refreshing the page.');
-            }
-          });
+          await loadPrivateDataRef.current(session.token, session.user);
 
-          // Auth screens handle their own post-login navigation.
           if (onAuthScreen) {
+            finishAuthBootstrap();
             return;
           }
 
-          const preservePublicRoute = isPublicBrowsePathname(path) && !onAuthScreen;
+          const preservePublicRoute = isPublicBrowsePathname(path);
           const params = new URLSearchParams(window.location.search);
           const reference = params.get('reference') || params.get('trxref');
 
           if (reference) {
-            processedPaymentReferenceRef.current = reference;
+            processedPaymentReferenceRefRef.current.current = reference;
             try {
-              await completePaymentReturn(reference, session.token, session.user);
+              await completePaymentReturnRef.current(reference, session.token, session.user);
             } catch (error) {
               if (!isStale()) {
-                setNotice(
+                setNoticeRef.current(
                   error instanceof ApiError
                     ? error.message
                     : 'Payment could not be confirmed yet. Open Bookings to check status or try again.'
@@ -207,59 +215,64 @@ export function useAppAuth({
               }
             } finally {
               if (!isStale()) {
-                navigate(buildAppPath({ view: 'workspace', workspaceSection: 'bookings' }), {
+                navigateRef.current(buildAppPath({ view: 'workspace', workspaceSection: 'bookings' }), {
                   replace: true,
                 });
               }
             }
+            finishAuthBootstrap();
             return;
           }
 
           if (preservePublicRoute) {
+            finishAuthBootstrap();
             return;
           }
 
           if (session.user.role === 'ADMIN') {
             const adminPath = parseAppPath(path);
             if (adminPath?.view === 'admin') {
+              finishAuthBootstrap();
               return;
             }
 
             const storedAdminRoute = readStoredRoute(session.user.role);
             if (!isStale()) {
               if (storedAdminRoute?.view === 'admin') {
-                navigate({ pathname: storedRouteToPath(storedAdminRoute), search: '' }, { replace: true });
+                navigateRef.current({ pathname: storedRouteToPath(storedAdminRoute), search: '' }, { replace: true });
               } else {
-                navigate({ pathname: '/admin/overview', search: '' }, { replace: true });
+                navigateRef.current({ pathname: '/admin/overview', search: '' }, { replace: true });
               }
             }
+            finishAuthBootstrap();
             return;
           }
 
           const legacyTarget = legacyQueryToAppPath(window.location.search);
           if (legacyTarget) {
             if (!isStale()) {
-              navigate({ pathname: legacyTarget, search: '' }, { replace: true });
+              navigateRef.current({ pathname: legacyTarget, search: '' }, { replace: true });
             }
+            finishAuthBootstrap();
             return;
           }
 
           const storedRoute = readStoredRoute(session.user.role);
           if (!isStale()) {
             if (storedRoute) {
-              navigate({ pathname: storedRouteToPath(storedRoute), search: '' }, { replace: true });
-            } else if (session.user.role === 'ARTISAN') {
-              navigate('/workspace/overview', { replace: true });
-            } else if (session.user.role === 'CUSTOMER') {
-              navigate('/workspace/overview', { replace: true });
+              navigateRef.current({ pathname: storedRouteToPath(storedRoute), search: '' }, { replace: true });
+            } else if (session.user.role === 'ARTISAN' || session.user.role === 'CUSTOMER') {
+              navigateRef.current('/workspace/overview', { replace: true });
             }
           }
+          finishAuthBootstrap();
         } catch {
-          if (!isStale() && !authInitTimedOut) {
-            await failAuthBootstrap(
-              'We could not finish account sync. Make sure the backend is running, then sign in again.'
-            );
+          if (isStale() || authInitTimedOut || authBootstrapCompletedRef.current) {
+            return;
           }
+          await failAuthBootstrap(
+            'We could not finish account sync. Make sure the backend is running, then sign in again.'
+          );
         }
       })();
     });
@@ -268,14 +281,16 @@ export function useAppAuth({
       window.clearTimeout(authInitTimer);
       unsubscribe();
     };
-  }, [
-    navigate,
-    loadPrivateData,
-    clearPrivateData,
-    completePaymentReturn,
-    setNotice,
-    processedPaymentReferenceRef,
-  ]);
+  }, []);
+
+  const acknowledgeSession = (sessionToken: string, user: ApiUser) => {
+    authBootstrapCompletedRef.current = true;
+    currentTokenRef.current = sessionToken;
+    setToken(sessionToken);
+    setMe(user);
+    setRouteHydrated(true);
+    setAuthChecked(true);
+  };
 
   return {
     authChecked,
@@ -291,5 +306,6 @@ export function useAppAuth({
     pushToken,
     setPushToken,
     currentTokenRef,
+    acknowledgeSession,
   };
 }

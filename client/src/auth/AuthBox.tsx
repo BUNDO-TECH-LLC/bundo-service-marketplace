@@ -1,5 +1,5 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { FormEvent, useEffect, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { User } from 'firebase/auth';
 import {
   createUserWithEmailAndPassword,
@@ -26,6 +26,57 @@ import bundoLogo from '../assets/bundo-logo.png';
 import { EmailInboxHint } from '../components/EmailInboxHint';
 import { sendBundoEmailVerification } from '../lib/authEmailVerification';
 import { PasswordInput } from '../components/PasswordInput';
+import { IconHelp } from '../components/TopbarNavIcons';
+
+function AuthDrawer({
+  open,
+  onClose,
+  ariaLabel,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  ariaLabel: string;
+  children: ReactNode;
+}) {
+  useEffect(() => {
+    if (!open) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open, onClose]);
+
+  if (!open) {
+    return null;
+  }
+
+  return createPortal(
+    <div className="auth-overlay" role="presentation" onClick={onClose}>
+      <aside
+        className="auth-drawer"
+        aria-label={ariaLabel}
+        aria-modal="true"
+        role="dialog"
+        onClick={(event) => event.stopPropagation()}
+      >
+        {children}
+      </aside>
+    </div>,
+    document.body
+  );
+}
 
 export function AuthBox({
   firebaseUser,
@@ -36,6 +87,7 @@ export function AuthBox({
   onNavigate,
   onWorkspaceSection,
   onNotice,
+  onOpenAuth,
 }: {
   firebaseUser: User | null;
   me: ApiUser | null;
@@ -45,8 +97,8 @@ export function AuthBox({
   onNavigate: (view: View) => void;
   onWorkspaceSection: (section: WorkspaceSection) => void;
   onNotice: (message: string) => void;
+  onOpenAuth?: () => void;
 }) {
-  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
@@ -70,8 +122,11 @@ export function AuthBox({
       return;
     }
 
-    navigate('/signup?role=artisan');
-  }, [authPromptSignal, navigate]);
+    setPreferredRole('ARTISAN');
+    setMode('signup');
+    setAuthStep('account');
+    setDrawerOpen(true);
+  }, [authPromptSignal, firebaseUser, me]);
 
   async function finishAuth(
     firebaseAuthUser: User,
@@ -228,7 +283,10 @@ export function AuthBox({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!auth) return;
+    if (!auth) {
+      onNotice('Sign-in is not configured. Add VITE_FIREBASE_* to your client environment and reload.');
+      return;
+    }
 
     if (mode === 'signup' && !preferredRole) {
       setAuthStep('role');
@@ -274,7 +332,10 @@ export function AuthBox({
   }
 
   async function continueWithGoogle() {
-    if (!auth) return;
+    if (!auth) {
+      onNotice('Sign-in is not configured. Add VITE_FIREBASE_* to your client environment and reload.');
+      return;
+    }
 
     if (mode === 'signup' && !preferredRole) {
       setAuthStep('role');
@@ -309,13 +370,27 @@ export function AuthBox({
   }
 
   function openLogin() {
-    setDrawerOpen(false);
-    navigate('/login');
+    onOpenAuth?.();
+    setPreferredRole(null);
+    setConfirmPassword('');
+    setPendingAuthUser(null);
+    setPendingEmailVerificationUser(null);
+    setMode('login');
+    setAuthStep('account');
+    setDrawerOpen(true);
+    onNotice('');
   }
 
   function openSignup(role: SignupRole | null = null) {
-    setDrawerOpen(false);
-    navigate(role === 'ARTISAN' ? '/signup?role=artisan' : '/signup');
+    onOpenAuth?.();
+    setPreferredRole(role);
+    setConfirmPassword('');
+    setPendingAuthUser(null);
+    setPendingEmailVerificationUser(null);
+    setMode('signup');
+    setAuthStep(role ? 'account' : 'role');
+    setDrawerOpen(true);
+    onNotice('');
   }
 
   function openResetPassword() {
@@ -325,6 +400,7 @@ export function AuthBox({
     setPendingEmailVerificationUser(null);
     setMode('reset');
     setAuthStep('account');
+    setDrawerOpen(true);
   }
 
   function switchMode() {
@@ -333,12 +409,7 @@ export function AuthBox({
       return;
     }
 
-    setMode('login');
-    setPreferredRole(null);
-    setConfirmPassword('');
-    setPendingAuthUser(null);
-    setPendingEmailVerificationUser(null);
-    setAuthStep('account');
+    openLogin();
   }
 
   if (firebaseUser && me && !me.role) {
@@ -356,15 +427,7 @@ export function AuthBox({
           Complete setup
         </button>
 
-        {drawerOpen && (
-          <div className="auth-overlay" role="presentation" onClick={() => setDrawerOpen(false)}>
-            <aside
-              className="auth-drawer"
-              aria-label="Complete account setup"
-              aria-modal="true"
-              role="dialog"
-              onClick={(event) => event.stopPropagation()}
-            >
+        <AuthDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} ariaLabel="Complete account setup">
               <div className="drawer-head">
                 <img className="drawer-logo" src={bundoLogo} alt="Bundo logo" />
                 <button type="button" onClick={() => setDrawerOpen(false)}>Close</button>
@@ -394,9 +457,7 @@ export function AuthBox({
               >
                 Use another account
               </button>
-            </aside>
-          </div>
-        )}
+        </AuthDrawer>
       </div>
     );
   }
@@ -473,7 +534,10 @@ export function AuthBox({
               </>
             )}
 
-            <button onClick={() => goTo('help')}>Help</button>
+            <button type="button" className="account-menu-item-with-icon" onClick={() => goTo('help')}>
+              <IconHelp />
+              <span>Help</span>
+            </button>
             <button
               className="danger-menu-item"
               onClick={() => {
@@ -500,19 +564,19 @@ export function AuthBox({
         Sign up
       </button>
 
-      {drawerOpen && (
-        <div className="auth-overlay" role="presentation" onClick={() => setDrawerOpen(false)}>
-          <aside
-            className="auth-drawer"
-            aria-label="Authentication panel"
-            aria-modal="true"
-            role="dialog"
-            onClick={(event) => event.stopPropagation()}
-          >
+      <AuthDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} ariaLabel="Authentication panel">
             <div className="drawer-head">
               <img className="drawer-logo" src={bundoLogo} alt="Bundo logo" />
-              <button type="button" onClick={() => setDrawerOpen(false)}>Close</button>
+              <button type="button" onClick={() => setDrawerOpen(false)}>
+                Close
+              </button>
             </div>
+
+            {!firebaseReady && (
+              <p className="auth-form-error">
+                Sign-in is not configured. Add VITE_FIREBASE_* to your client environment and reload.
+              </p>
+            )}
 
             {authStep === 'verify' ? (
               <>
@@ -530,10 +594,15 @@ export function AuthBox({
                   </span>
                 </div>
                 <div className="auth-action-stack">
-                  <button type="button" onClick={confirmEmailVerification} disabled={submitting}>
+                  <button type="button" onClick={() => void confirmEmailVerification()} disabled={submitting}>
                     {submitting ? 'Checking...' : "I've verified my email"}
                   </button>
-                  <button type="button" className="secondary-button" onClick={resendVerification} disabled={submitting}>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => void resendVerification()}
+                    disabled={submitting}
+                  >
                     Resend verification email
                   </button>
                   <button type="button" className="mode-switch" onClick={openLogin}>
@@ -605,7 +674,12 @@ export function AuthBox({
 
                 {mode !== 'reset' && (
                   <>
-                    <button type="button" className="google-auth-button" onClick={continueWithGoogle} disabled={!firebaseReady || submitting}>
+                    <button
+                      type="button"
+                      className="google-auth-button"
+                      onClick={() => void continueWithGoogle()}
+                      disabled={!firebaseReady || submitting}
+                    >
                       <span aria-hidden="true">G</span>
                       Continue with Google
                     </button>
@@ -689,9 +763,7 @@ export function AuthBox({
             </button>
               </>
             )}
-          </aside>
-        </div>
-      )}
+      </AuthDrawer>
     </div>
   );
 }

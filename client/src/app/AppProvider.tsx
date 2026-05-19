@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { ArtisanHeaderActive, BookingSuccessState, PaymentSuccessState } from '../appTypes';
 import { isAuthPathname } from '../lib/appRouting';
@@ -22,12 +22,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [paymentSuccess, setPaymentSuccess] = useState<PaymentSuccessState | null>(null);
   const processedPaymentReferenceRef = useRef<string | null>(null);
 
-  const completePaymentReturn = async (reference: string, authToken: string, user: ApiUser) => {
+  const completePaymentReturn = useCallback(async (reference: string, authToken: string, user: ApiUser) => {
     const success = await appData.completePaymentReturn(reference, authToken, user);
     setPaymentSuccess(success);
     setNotice('Payment confirmed. Your booking is now secured.');
     return success;
-  };
+  }, [appData.completePaymentReturn, setNotice]);
 
   const auth = useAppAuth({
     navigate,
@@ -183,6 +183,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setRouteHydrated: auth.setRouteHydrated,
     setToken: auth.setToken,
     setMe: auth.setMe,
+    acknowledgeSession: auth.acknowledgeSession,
   };
 
   return <AppRootContext.Provider value={rootValue}>{children}</AppRootContext.Provider>;
