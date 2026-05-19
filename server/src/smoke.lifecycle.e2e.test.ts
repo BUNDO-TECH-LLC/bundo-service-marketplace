@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
-import { BookingStatus, Role, UserStatus } from '@prisma/client';
+import { BookingStatus, PaymentStatus, Role, UserStatus } from '@prisma/client';
 import db from './db/client';
 
 const SLUG = 'smoke-lifecycle-category';
@@ -55,6 +55,7 @@ const hasDatabase = Boolean(process.env.DATABASE_URL);
 async function wipeFixture() {
   const uids = [CUSTOMER_UID, ARTISAN_UID, ADMIN_UID];
   await db.notification.deleteMany({ where: { userId: { in: uids } } });
+  await db.payment.deleteMany({ where: { customerId: CUSTOMER_UID } });
   await db.booking.deleteMany({ where: { customerId: CUSTOMER_UID } });
   const artisan = await db.artisanProfile.findUnique({ where: { userId: ARTISAN_UID } });
   if (artisan) {
@@ -79,6 +80,7 @@ describe.skipIf(!hasDatabase)(
     const app = createApp();
     let offeringId: string;
     let bookingId: string;
+    let artisanProfileId: string;
     let conversationId: string;
 
     beforeAll(async () => {
@@ -152,6 +154,7 @@ describe.skipIf(!hasDatabase)(
       expect(res.status).toBe(201);
       expect(res.body.booking.status).toBe(BookingStatus.REQUESTED);
       bookingId = res.body.booking.id;
+      artisanProfileId = res.body.booking.artisanId;
 
       const conv = await db.conversation.findUnique({
         where: {
@@ -174,6 +177,20 @@ describe.skipIf(!hasDatabase)(
 
       expect(res.status).toBe(200);
       expect(res.body.booking.status).toBe(BookingStatus.ACCEPTED);
+
+      await db.payment.create({
+        data: {
+          bookingId,
+          customerId: CUSTOMER_UID,
+          artisanId: artisanProfileId,
+          amount: 10_000,
+          platformFee: 1_000,
+          providerEarning: 9_000,
+          status: PaymentStatus.PAID_HELD,
+          paystackReference: `smoke-pay-${bookingId}`,
+          paidAt: new Date(),
+        },
+      });
 
       const messages = await db.message.findMany({
         where: { conversationId },
