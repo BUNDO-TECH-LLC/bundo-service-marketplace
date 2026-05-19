@@ -1,4 +1,6 @@
-import type { Artisan, ArtisanKycSubmission } from '../types';
+import { ArtisanPortfolioManager } from '../components/ArtisanPortfolioManager';
+import type { ActionRunner } from '../appTypes';
+import type { Artisan, ArtisanKycSubmission, PortfolioImage } from '../types';
 import { kycStatusLabel } from '../lib/artisanVerification';
 import { bookingDate } from '../lib/bookingDisplay';
 
@@ -7,11 +9,25 @@ export function ArtisanPendingApproval({
   kycSubmission,
   variant = 'submitted',
   onEditSubmission,
+  portfolioImages = [],
+  busy = false,
+  uploadingPortfolio = false,
+  runAction,
+  uploadPortfolioFile,
+  uploadPortfolioFiles,
+  removePortfolioImage,
 }: {
   profile: Artisan | null;
   kycSubmission: ArtisanKycSubmission | null;
   variant?: 'submitted' | 'changes_requested' | 'rejected';
   onEditSubmission?: () => void;
+  portfolioImages?: PortfolioImage[];
+  busy?: boolean;
+  uploadingPortfolio?: boolean;
+  runAction?: ActionRunner;
+  uploadPortfolioFile?: (file: File, displayOrder: number) => Promise<void>;
+  uploadPortfolioFiles?: (files: File[]) => Promise<void>;
+  removePortfolioImage?: (imageId: string) => Promise<void>;
 }) {
   const displayName = profile?.displayName || 'Artisan';
   const submittedAt = kycSubmission?.submittedAt
@@ -95,9 +111,22 @@ export function ArtisanPendingApproval({
           <strong>While you wait</strong>
           <p>
             Jobs, marketplace visibility, and customer messaging stay locked until approval. You can
-            still sign out, read Help, or check notifications once they arrive.
+            still add photos below, sign out, read Help, or check notifications once they arrive.
           </p>
         </aside>
+
+        {runAction && uploadPortfolioFile && uploadPortfolioFiles && removePortfolioImage && (
+          <ArtisanPortfolioManager
+            variant="pending"
+            portfolioImages={portfolioImages}
+            busy={busy}
+            uploadingPortfolio={uploadingPortfolio}
+            runAction={runAction}
+            uploadPortfolioFile={uploadPortfolioFile}
+            uploadPortfolioFiles={uploadPortfolioFiles}
+            removePortfolioImage={removePortfolioImage}
+          />
+        )}
 
         {(variant === 'changes_requested' || variant === 'rejected') && onEditSubmission && (
           <div className="artisan-pending-actions">

@@ -2498,43 +2498,6 @@ function ArtisanPanel({
         ))}
       </article>
       <article className="panel-card form-card">
-        <p className="eyebrow">Portfolio</p>
-        <h2>Upload work samples</h2>
-        <p>Add a few clean job photos so customers can trust what you do before they book.</p>
-        <label className="upload-field">
-          <span>Choose image</span>
-          <input
-            type="file"
-            accept="image/*"
-            disabled={busy || uploadingPortfolio}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (!file) return;
-              void runAction(
-                () => uploadPortfolioFile(file),
-                'Portfolio image uploaded'
-              );
-              event.currentTarget.value = '';
-            }}
-          />
-        </label>
-        <div className="workspace-media-grid">
-          {portfolioImages.length === 0 && <p className="muted">No portfolio images uploaded yet.</p>}
-          {portfolioImages.map((image) => (
-            <div className="workspace-media-card" key={image.id}>
-              <img src={image.url} alt="Portfolio upload" />
-              <button
-                className="secondary-button"
-                disabled={busy || uploadingPortfolio}
-                onClick={() => runAction(() => removePortfolioImage(image.id), 'Portfolio image removed')}
-              >
-                Remove
-              </button>
-            </div>
-          ))}
-        </div>
-      </article>
-      <article className="panel-card form-card">
         <p className="eyebrow">Availability</p>
         <h2>Working hours</h2>
         <form

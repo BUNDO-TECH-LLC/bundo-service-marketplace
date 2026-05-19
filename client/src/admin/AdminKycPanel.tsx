@@ -2,6 +2,7 @@ import { api } from '../lib/api';
 import { bookingDate } from '../lib/bookingDisplay';
 import type { ActionRunner, AdminArtisanRecord } from '../appTypes';
 import type { ArtisanKycSubmission } from '../types';
+import { AdminPortfolioGallery } from '../components/AdminPortfolioGallery';
 import { EmptyState } from '../components/EmptyState';
 
 export function AdminKycPanel({
@@ -104,6 +105,14 @@ export function AdminKycPanel({
                 </dd>
               </div>
             </dl>
+
+            <div className="admin-review-photos">
+              <h4>Portfolio photos ({submission.artisan?.portfolioImages?.length ?? 0})</h4>
+              <AdminPortfolioGallery
+                images={submission.artisan?.portfolioImages ?? []}
+                artisanName={submission.artisan?.displayName}
+              />
+            </div>
 
             <div className="booking-card-actions">
               <button

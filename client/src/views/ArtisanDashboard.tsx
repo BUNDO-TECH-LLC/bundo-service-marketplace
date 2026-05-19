@@ -5,7 +5,7 @@ import { bookingDate } from '../lib/bookingDisplay';
 import { dayLabels, formatMessageTime, money } from '../lib/formatting';
 import { userDisplayName } from '../lib/userDisplayName';
 import type { ActionRunner } from '../appTypes';
-import type { Artisan, ArtisanKycSubmission, AvailabilitySlot, Booking } from '../types';
+import type { Artisan, ArtisanKycSubmission, AvailabilitySlot, Booking, PortfolioImage } from '../types';
 import { EmptyState } from '../components/EmptyState';
 import { StatCard } from '../components/StatCard';
 
@@ -35,6 +35,7 @@ export function ArtisanDashboard({
   openOffers: () => void;
 }) {
   const [profile, setProfile] = useState<Artisan | null>(null);
+  const [portfolioImages, setPortfolioImages] = useState<PortfolioImage[]>([]);
   const [availabilitySlots, setAvailabilitySlots] = useState<AvailabilitySlot[]>([]);
   const [kycSubmission, setKycSubmission] = useState<ArtisanKycSubmission | null>(null);
   const displayName = profile?.displayName || firebaseUser?.displayName || userDisplayName(firebaseUser, null) || 'Artisan';
@@ -46,11 +47,13 @@ export function ArtisanDashboard({
     let mounted = true;
     Promise.all([
       api<{ profile: Artisan }>('/artisans/me', { token }).catch(() => ({ profile: null as unknown as Artisan })),
+      api<{ images: PortfolioImage[] }>('/artisans/portfolio-images/me', { token }).catch(() => ({ images: [] })),
       api<{ slots: AvailabilitySlot[] }>('/artisans/availability-slots/me', { token }).catch(() => ({ slots: [] })),
       api<{ submission: ArtisanKycSubmission | null }>('/artisans/kyc', { token }).catch(() => ({ submission: null })),
-    ]).then(([profileResponse, slotResponse, kycResponse]) => {
+    ]).then(([profileResponse, imageResponse, slotResponse, kycResponse]) => {
       if (!mounted) return;
       setProfile(profileResponse.profile || null);
+      setPortfolioImages(imageResponse.images);
       setAvailabilitySlots(slotResponse.slots);
       setKycSubmission(kycResponse.submission);
     });
@@ -82,6 +85,18 @@ export function ArtisanDashboard({
         <span className={`booking-status ${isApproved ? 'completed' : 'pending'}`}>
           {isApproved ? 'Approved' : kycSubmission?.status?.toLowerCase().replace(/_/g, ' ') || 'Pending review'}
         </span>
+        {isApproved && portfolioImages.length < 3 && (
+          <div className="payment-note artisan-photo-nudge">
+            <strong>Add photos to your profile</strong>
+            <span>
+              Profiles with work samples get more bookings. Add photos from{' '}
+              <button type="button" className="text-button" onClick={openProfile}>
+                Profile settings
+              </button>
+              .
+            </span>
+          </div>
+        )}
         <div className="artisan-stat-grid">
           <StatCard label="Total bookings" value={bookings.length} hint="All time" />
           <StatCard label="Ratings" value={`${profile?.avgRating || 0}/5.0`} hint={`${profile?.ratingCount || 0} reviews`} />

@@ -6,6 +6,8 @@ import { EmptyState } from '../components/EmptyState';
 import { StatCard } from '../components/StatCard';
 import { api } from '../lib/api';
 import { uploadPortfolioImage } from '../lib/portfolioUpload';
+import { useArtisanPortfolio } from '../lib/useArtisanPortfolio';
+import { ArtisanPortfolioManager } from '../components/ArtisanPortfolioManager';
 import { bookingDate } from '../lib/bookingDisplay';
 import { auth, firebaseReady } from '../lib/firebase';
 import { dayLabels, money } from '../lib/formatting';
@@ -517,7 +519,17 @@ export function ArtisanLanding({
   if (phase === 'awaiting_approval') {
     return (
       <ArtisanSetupShell displayName={displayName} email={accountEmail}>
-        <ArtisanPendingApproval profile={profile} kycSubmission={kycSubmission} />
+        <ArtisanPendingApproval
+          profile={profile}
+          kycSubmission={kycSubmission}
+          portfolioImages={portfolioImages}
+          busy={busy}
+          uploadingPortfolio={uploadingPortfolio}
+          runAction={runAction}
+          uploadPortfolioFile={uploadPortfolioFile}
+          uploadPortfolioFiles={uploadPortfolioFiles}
+          removePortfolioImage={removePortfolioImage}
+        />
       </ArtisanSetupShell>
     );
   }
@@ -530,6 +542,13 @@ export function ArtisanLanding({
           kycSubmission={kycSubmission}
           variant="changes_requested"
           onEditSubmission={openSetupEditor}
+          portfolioImages={portfolioImages}
+          busy={busy}
+          uploadingPortfolio={uploadingPortfolio}
+          runAction={runAction}
+          uploadPortfolioFile={uploadPortfolioFile}
+          uploadPortfolioFiles={uploadPortfolioFiles}
+          removePortfolioImage={removePortfolioImage}
         />
       </ArtisanSetupShell>
     );
@@ -543,6 +562,13 @@ export function ArtisanLanding({
           kycSubmission={kycSubmission}
           variant="rejected"
           onEditSubmission={openSetupEditor}
+          portfolioImages={portfolioImages}
+          busy={busy}
+          uploadingPortfolio={uploadingPortfolio}
+          runAction={runAction}
+          uploadPortfolioFile={uploadPortfolioFile}
+          uploadPortfolioFiles={uploadPortfolioFiles}
+          removePortfolioImage={removePortfolioImage}
         />
       </ArtisanSetupShell>
     );
@@ -807,10 +833,16 @@ export function ArtisanLanding({
       )}
 
       <div className="artisan-setup-actions">
-        <button type="button" className="secondary-button" onClick={() => setStep((current) => Math.max(1, current - 1))}>{step === 1 ? 'Back' : 'Skip'}</button>
+        <button type="button" className="secondary-button" onClick={() => setStep((current) => Math.max(1, current - 1))}>
+          {step === 1 ? 'Back' : 'Previous'}
+        </button>
         {step === 1 && <button disabled={busy || !agreed || !setup.fullName || !setup.categoryId || !setup.location} onClick={() => runAction(saveBasicInfo, 'Basic profile saved')}>Next</button>}
         {step === 2 && <button disabled={busy || !servicePackages.some((servicePackage) => servicePackage.title.trim() && servicePackage.priceFrom.trim())} onClick={() => runAction(saveOffering, servicePackages.length > 1 ? 'Service packages saved' : 'Service package saved')}>Next</button>}
-        {step === 3 && <button disabled={busy || uploadingPortfolio} onClick={() => setStep(4)}>Next</button>}
+        {step === 3 && (
+          <button disabled={busy || uploadingPortfolio} onClick={() => setStep(4)}>
+            {portfolioImages.length > 0 ? 'Next' : 'Skip for now'}
+          </button>
+        )}
         {step === 4 && <button disabled={busy || !submitAgreed || !setup.documentNumber || selectedDays.length === 0} onClick={() => runAction(submitForVerification, 'Application submitted — awaiting approval')}>Submit for verification</button>}
       </div>
     </main>
@@ -1650,6 +1682,13 @@ export function ArtisanProfileSettings({
   const [kycSubmission, setKycSubmission] = useState<ArtisanKycSubmission | null>(null);
   const kycStatus = kycSubmission?.status ?? 'NOT_SUBMITTED';
   const approved = profile?.verifyStatus === 'APPROVED' && kycStatus === 'APPROVED';
+  const {
+    portfolioImages,
+    uploadingPortfolio,
+    uploadPortfolioFile,
+    uploadPortfolioFiles,
+    removePortfolioImage,
+  } = useArtisanPortfolio(token);
 
   useEffect(() => {
     let mounted = true;
@@ -1756,7 +1795,7 @@ export function ArtisanProfileSettings({
           {approved ? 'Approved' : kycStatus.toLowerCase().replace(/_/g, ' ')}
         </span>
         <button>Edit Profile</button>
-        {['Your Profile', 'KYC verification', 'Bank information', 'Business information', 'Job history', 'Service and pricing', 'Settings', 'Notifications'].map((item, index) => (
+        {['Your Profile', 'Photos', 'KYC verification', 'Bank information'].map((item, index) => (
           <span className={index === 0 ? 'active' : ''} key={item}>{item}</span>
         ))}
         <button className="danger-outline">Log out</button>
@@ -1774,11 +1813,14 @@ export function ArtisanProfileSettings({
           <h2>Edit Personal Information</h2>
           <p>Update the public profile details customers see on Bundo.</p>
           <div className="profile-picture-row">
-            <span className="recommended-avatar large">{(profile?.displayName || 'A').slice(0, 1).toUpperCase()}</span>
+            {portfolioImages[0] ? (
+              <img className="profile-picture-preview" src={portfolioImages[0].url} alt="" />
+            ) : (
+              <span className="recommended-avatar large">{(profile?.displayName || 'A').slice(0, 1).toUpperCase()}</span>
+            )}
             <div>
-              <strong>Profile Picture</strong>
-              <p>JPG, GIF or PNG. Max size of 800K</p>
-              <button type="button" className="text-button">Upload new</button>
+              <strong>Profile picture</strong>
+              <p className="muted">Your first photo in the gallery below is shown on your public profile.</p>
             </div>
           </div>
           <label>Full Name<input name="displayName" defaultValue={profile?.displayName || ''} required /></label>
@@ -1791,6 +1833,17 @@ export function ArtisanProfileSettings({
             <button disabled={busy}>Save Changes</button>
           </div>
         </form>
+
+        <ArtisanPortfolioManager
+          variant="settings"
+          portfolioImages={portfolioImages}
+          busy={busy}
+          uploadingPortfolio={uploadingPortfolio}
+          runAction={runAction}
+          uploadPortfolioFile={uploadPortfolioFile}
+          uploadPortfolioFiles={uploadPortfolioFiles}
+          removePortfolioImage={removePortfolioImage}
+        />
 
         <form
           className="artisan-settings-card"
@@ -2362,43 +2415,6 @@ export function ArtisanPanel({
             </span>
           </div>
         ))}
-      </article>
-      <article className="panel-card form-card">
-        <p className="eyebrow">Portfolio</p>
-        <h2>Upload work samples</h2>
-        <p>Add a few clean job photos so customers can trust what you do before they book.</p>
-        <label className="upload-field">
-          <span>Choose image</span>
-          <input
-            type="file"
-            accept="image/*"
-            disabled={busy || uploadingPortfolio}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (!file) return;
-              void runAction(
-                () => uploadPortfolioFile(file),
-                'Portfolio image uploaded'
-              );
-              event.currentTarget.value = '';
-            }}
-          />
-        </label>
-        <div className="workspace-media-grid">
-          {portfolioImages.length === 0 && <p className="muted">No portfolio images uploaded yet.</p>}
-          {portfolioImages.map((image) => (
-            <div className="workspace-media-card" key={image.id}>
-              <img src={image.url} alt="Portfolio upload" />
-              <button
-                className="secondary-button"
-                disabled={busy || uploadingPortfolio}
-                onClick={() => runAction(() => removePortfolioImage(image.id), 'Portfolio image removed')}
-              >
-                Remove
-              </button>
-            </div>
-          ))}
-        </div>
       </article>
       <article className="panel-card form-card">
         <p className="eyebrow">Availability</p>

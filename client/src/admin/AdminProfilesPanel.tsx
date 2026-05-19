@@ -1,5 +1,6 @@
 import { api } from '../lib/api';
 import type { ActionRunner, AdminArtisanRecord, AdminUserRecord } from '../appTypes';
+import { AdminPortfolioGallery } from '../components/AdminPortfolioGallery';
 import type { Artisan, Role } from '../types';
 
 export function AdminProfilesPanel({
@@ -146,12 +147,23 @@ export function AdminProfilesPanel({
                     <dd>{[artisan.area, artisan.city].filter(Boolean).join(', ')}</dd>
                   </div>
                   <div>
+                    <dt>Photos</dt>
+                    <dd>
+                      {artisan._count?.portfolioImages ?? artisan.portfolioImages?.length ?? 0} uploaded
+                    </dd>
+                  </div>
+                  <div>
                     <dt>Activity</dt>
                     <dd>
                       {artisan._count?.offerings || 0} offers, {artisan._count?.bookingsReceived || 0} jobs
                     </dd>
                   </div>
                 </dl>
+                {(artisan.portfolioImages?.length ?? 0) > 0 && (
+                  <div className="admin-review-photos">
+                    <AdminPortfolioGallery images={artisan.portfolioImages ?? []} artisanName={artisan.displayName} />
+                  </div>
+                )}
                 <div className="admin-action-row">
                   {(['PENDING', 'APPROVED', 'REJECTED'] as Artisan['verifyStatus'][]).map((status) => (
                     <button

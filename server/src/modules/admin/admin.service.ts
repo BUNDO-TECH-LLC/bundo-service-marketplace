@@ -159,11 +159,16 @@ export const getAdminArtisans = async (pagination?: Pagination) => {
           status: true,
         },
       },
+      portfolioImages: {
+        orderBy: { displayOrder: 'asc' },
+        take: 12,
+      },
       _count: {
         select: {
           offerings: true,
           bookingsReceived: true,
           reviewsReceived: true,
+          portfolioImages: true,
         },
       },
     },
@@ -208,6 +213,10 @@ export const getAdminKycSubmissions = async (pagination?: Pagination) => {
               role: true,
               status: true,
             },
+          },
+          portfolioImages: {
+            orderBy: { displayOrder: 'asc' },
+            take: 12,
           },
         },
       },

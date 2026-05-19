@@ -1,4 +1,4 @@
-import type { ApiUser, Artisan, ArtisanKycSubmission, Category, Offering, Review, Role } from './types';
+import type { ApiUser, Artisan, ArtisanKycSubmission, Category, Offering, PortfolioImage, Review, Role } from './types';
 
 export type View = 'home' | 'marketplace' | 'workspace' | 'admin' | 'help' | 'artisan-profile';
 export type WorkspaceSection = 'overview' | 'bookings' | 'messages' | 'offers' | 'notifications' | 'reviews' | 'profile';
@@ -28,10 +28,12 @@ export type AdminUserRecord = ApiUser & {
 };
 export type AdminArtisanRecord = Artisan & {
   user?: Pick<ApiUser, 'firebaseUid' | 'email' | 'phone' | 'role' | 'status'>;
+  portfolioImages?: PortfolioImage[];
   _count?: {
     offerings: number;
     bookingsReceived: number;
     reviewsReceived: number;
+    portfolioImages?: number;
   };
 };
 export type AdminCategoryRecord = Category & {
