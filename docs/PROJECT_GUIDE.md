@@ -30,6 +30,82 @@ Current launch-oriented structure:
 - root `package.json` as the shared entrypoint for running both sides cleanly
 - root [README.md](/Users/macbook/bundo/README.md) for quick start commands and a pointer into this guide
 
+**Production URLs:** Web https://bundo-service-marketplace.vercel.app · API https://bundo-service-marketplace.onrender.com
+
+---
+
+## Recent changes (May 2026)
+
+Shipped on `main` (newest first):
+
+| Commit / area | Summary |
+|---------------|---------|
+| **Forgot password** (`476eac9`) | Dedicated `/forgot-password` page (`ForgotPassword.tsx`, `AuthLayout`); Firebase reset via `sendBundoPasswordResetEmail` with continue URL → `/login`; login links here with optional `?email=`; removed inline reset from `AuthPage`. |
+| **CI Postgres SSL** (`fc0dbf9`) | GitHub Actions smoke job uses `sslmode=disable` for the local Postgres service so `prisma migrate deploy` succeeds (Prisma config defaults to `sslmode=require`). |
+| **Client architecture refactor** (`b9240a0`) | Thin `App.tsx` → `AppProvider` + hooks (`useAppAuth`, `useAppData`, `useAppRouteSync`, …); domain UI under `client/src/features/*`; artisan onboarding split into `features/artisan/landing/`; dedicated auth routes `/login`, `/signup`, `/verify-email`; [client/ARCHITECTURE.md](/Users/macbook/bundo/client/ARCHITECTURE.md). |
+| **Admin & artisan ops** (`07c1970`, `b1de47a`) | Paystack transfer webhooks; admin ledger/reviews; KYC Cloudinary upload; moderator assignment; legacy `LandingPage` / `AppRouter` removed; CI lifecycle smoke (with `PAID_HELD` seed after accept). |
+
+**Removed / deprecated:** `LandingPage.tsx`, `AppRouter.tsx`, mock customer dashboard, `ArtisanPanel.tsx`, empty `pages/artisan/Dashboard.tsx`. Do not extend [appShellComponents.tsx](/Users/macbook/bundo/client/src/app/appShellComponents.tsx) — import from `features/*`.
+
+---
+
+## Full project analysis (current state)
+
+### What Bundo is today
+
+A **two-sided marketplace** for home and personal services in Nigeria: customers discover approved artisans, request bookings, pay through Paystack (held until completion), chat in-app, and leave reviews; artisans onboard with KYC, manage jobs in a workspace, and receive payouts to a Nigerian bank account; admins operate a control center for verification, jobs, money, and support chat.
+
+### Technical stack
+
+| Layer | Technology |
+|-------|------------|
+| Web | React 18, Vite, TypeScript, React Router, lazy routes, Tailwind-style CSS variables |
+| API | Express 5, TypeScript, Prisma 7, PostgreSQL (Supabase in production) |
+| Auth | Firebase Auth (email/password; Google in header `AuthBox` only) |
+| Media | Cloudinary signed uploads (portfolio, KYC, chat images) |
+| Payments | Paystack (initialize, verify, webhooks, transfers, disputes) |
+| Push | Firebase Cloud Messaging (token storage; browser permission flow) |
+| Hosting | Vercel (client), Render (API) |
+| CI | GitHub Actions: server test+build, client build, Postgres smoke e2e |
+
+### Backend capabilities (implemented)
+
+- **Users:** Firebase token verification, role (`CUSTOMER` / `ARTISAN` / `ADMIN`), profile sync
+- **Artisans:** Profile CRUD, portfolio images, availability slots, KYC submission, payout bank account, public discovery with approval gates
+- **Catalog:** Categories and offerings (artisan-created; hidden until approved)
+- **Bookings:** Full lifecycle with payment guards, rescheduling, conversation auto-creation, lifecycle chat messages
+- **Payments:** Paystack checkout, `PAID_HELD`, confirm policy (production fail-closed without Paystack), disputes, admin release/refund, ledger entries, transfer webhooks (`transfer.success` / `failed` / `reversed`)
+- **Chat:** Customer–artisan threads, admin support view, image attachments
+- **Reviews:** Post-completion only, admin moderation
+- **Admin:** Overview metrics, users, profiles, KYC queue, catalog, jobs (200 limit, moderator assign, inline chat), messages, reviews, finance/ledger, disputes
+- **Ops:** `/health`, `/ready`, request IDs, structured logging
+
+### Frontend capabilities (implemented)
+
+- **Public:** Marketing home, marketplace filters/sort, artisan public profile, help center
+- **Auth routes:** `/login`, `/signup`, `/forgot-password`, `/verify-email` (dedicated pages + `AuthLayout` backdrop)
+- **Customer workspace:** Bookings, messages, notifications, account settings, leave review
+- **Artisan:** 4-step onboarding wizard, pending-approval screen, `/workspace/*` (dashboard, jobs, messages, reviews, offers, notifications, profile with photos/KYC/bank/availability)
+- **Admin:** `/admin/*` sections with mobile drawer
+- **State:** `AppProvider` + `useAppRoot()`; path sync via `appPaths.ts`
+
+### Known gaps (honest)
+
+| Area | Status |
+|------|--------|
+| Paystack production E2E | Code + webhooks exist; **not fully verified** with live money and dashboard webhook URL |
+| CI smoke e2e | Migrate step fixed; **e2e test may still fail intermittently** on GitHub — passes locally with real DB |
+| Google/Apple on `/login` | **Stub buttons** on `AuthPage`; Google works in header **`AuthBox`** modal only |
+| Search ranking | Filters/sort only — no geo distance ranking |
+| Observability | Health/ready only — no Sentry/Datadog/alerting |
+| Profile phone | Read-only from Firebase |
+| Notification prefs | No user-facing preferences UI |
+| Auth email deliverability | Firebase default sender; custom domain not configured |
+
+### Maturity assessment
+
+**Ready for controlled beta / soft launch** if you complete payment verification and manual QA on production. **Not ready for high-traffic public launch** until Paystack settlement is proven, CI smoke is stable, and basic alerting exists.
+
 ---
 
 ## Core Product Roles
@@ -230,7 +306,7 @@ The app uses **React Router** with lazy-loaded pages and a shared layout shell.
 Entry and routing:
 
 - [client/src/main.tsx](/Users/macbook/bundo/client/src/main.tsx) — `BrowserRouter`
-- [client/src/app/AppRoutes.tsx](/Users/macbook/bundo/client/src/app/AppRoutes.tsx) — routes: `/`, `/marketplace`, `/workspace/:section`, `/admin/:section`, `/help`, `/artisans/:artisanId`
+- [client/src/app/AppRoutes.tsx](/Users/macbook/bundo/client/src/app/AppRoutes.tsx) — routes: `/`, `/marketplace`, `/workspace/:section`, `/admin/:section`, `/help`, `/artisans/:artisanId`, `/login`, `/signup`, `/forgot-password`, `/verify-email`
 - [client/src/app/MainLayout.tsx](/Users/macbook/bundo/client/src/app/MainLayout.tsx) — global header/footer wrapper
 - [client/src/app/appRootContext.tsx](/Users/macbook/bundo/client/src/app/appRootContext.tsx) — shared app state for pages
 
@@ -249,9 +325,11 @@ Pages:
 - [client/src/pages/HelpPage.tsx](/Users/macbook/bundo/client/src/pages/HelpPage.tsx)
 - [client/src/pages/ArtisanProfileRoute.tsx](/Users/macbook/bundo/client/src/pages/ArtisanProfileRoute.tsx)
 
-The main data/orchestration layer is still:
+The app shell and global state:
 
-- [client/src/App.tsx](/Users/macbook/bundo/client/src/App.tsx)
+- [client/src/App.tsx](/Users/macbook/bundo/client/src/App.tsx) — thin wrapper (`AppProvider` + `AppRoutes`)
+- [client/src/app/AppProvider.tsx](/Users/macbook/bundo/client/src/app/AppProvider.tsx) — composes auth, data, route sync, push, and action runner hooks
+- [client/src/pages/auth/ForgotPassword.tsx](/Users/macbook/bundo/client/src/pages/auth/ForgotPassword.tsx) — password reset email flow
 
 Supporting client files:
 
@@ -1131,19 +1209,66 @@ Templates: [client/.env.production.example](/Users/macbook/bundo/client/.env.pro
 - **Booking transition tests** cover [bookingStatus.ts](/Users/macbook/bundo/server/src/lib/bookingStatus.ts).
 - **Payment guard tests** cover [bookingPayment.ts](/Users/macbook/bundo/server/src/lib/bookingPayment.ts).
 - **E2E smoke** ([smoke.lifecycle.e2e.test.ts](/Users/macbook/bundo/server/src/smoke.lifecycle.e2e.test.ts)): booking lifecycle, admin jobs, and chat — run with `BUNDO_E2E=1` / `npm run test:smoke` (requires `DATABASE_URL` + migrated schema).
-- **CI** (`.github/workflows/ci.yml`): server unit tests + build, client build, and a **smoke** job (Postgres service + `prisma migrate deploy` + lifecycle smoke test) on pushes/PRs to `main` / `master`.
+- **CI** (`.github/workflows/ci.yml`): three jobs on `main` — `server` (unit tests + build), `client` (build), `smoke` (Postgres + `migrate deploy` + lifecycle e2e). CI Postgres URLs use `sslmode=disable` for the service container.
 
 ---
 
-## MVP Readiness Checklist
+## Launch readiness checklist
+
+Use this before calling the product **publicly launched**. Items marked **Blocker** should be done first.
+
+### Blockers (must complete)
+
+- [ ] **Paystack live test** — Real customer payment → `PAID_HELD` → job completion → artisan payout (or admin release) on production API keys
+- [ ] **Paystack webhooks** — Dashboard webhook URL → `https://bundo-service-marketplace.onrender.com/webhooks/paystack`; verify `charge.success` and transfer events update DB
+- [ ] **`PAYSTACK_CALLBACK_URL`** — Must be `https://bundo-service-marketplace.vercel.app/workspace/bookings` (or your canonical web origin)
+- [ ] **Production env audit** — `CORS_ORIGIN`, `VITE_API_BASE_URL`, Firebase authorized domains, Cloudinary, Firebase Admin on Render
+- [ ] **DB migrations** — `cd server && npm run db:migrate:deploy:pooler` on production after each release
+- [ ] **Manual QA script** — Customer: signup → verify email → browse → book → pay → message → review. Artisan: onboarding → KYC → admin approve → accept job → complete. Admin: KYC, job lifecycle, payout/dispute
+- [ ] **Firebase authorized domains** — Include production + preview Vercel URLs for auth and password reset emails
+
+### High priority (strongly recommended)
+
+- [ ] **Stabilize CI smoke** — Green `smoke` job on every `main` push (investigate GitHub-only e2e failures if migrate passes)
+- [ ] **Google sign-in on `/login`** — Wire `AuthPage` to same flow as `AuthBox` or remove stub buttons until ready
+- [ ] **Legal / trust pages** — Terms, Privacy linked from signup and footer (content + routes if not already live)
+- [ ] **Support contact** — Monitored email or channel linked from Help and dispute flows
+- [ ] **Firebase email domain** — Custom domain + templates for verification and reset (reduce spam folder)
+- [ ] **Error monitoring** — Sentry or similar on client + server
+- [ ] **Uptime alerting** — Ping `/health` and `/ready` (e.g. Better Uptime, Render/Vercel notifications)
+
+### Medium priority (post-launch or parallel)
+
+- [ ] Search ranking by distance / rating / relevance
+- [ ] Notification preferences UI
+- [ ] Editable phone on artisan profile (beyond Firebase login phone)
+- [ ] E2E payment smoke in CI (Paystack test mode or mocked)
+- [ ] Remove deprecated `appShellComponents.tsx` barrel when no imports remain
+- [ ] Client Vitest for critical routes (login, marketplace, workspace guards)
+
+### Already done (reference)
+
+<details>
+<summary>Core product (shipped)</summary>
+
+- Firebase auth, roles, email verification, password reset page (`/forgot-password`)
+- 4-step artisan onboarding, KYC upload, admin approval, artisan workspace
+- Bookings lifecycle, chat, reviews, Paystack held payments, disputes, admin ledger
+- Admin jobs queue, moderator assign, mobile admin nav, portfolio gallery in KYC review
+- Client feature-based architecture, dedicated auth routes, production deploy pipeline
+</details>
+
+---
+
+## MVP Readiness Checklist (historical)
 
 ### Core marketplace flow
 
 - [x] Firebase authentication
 - [x] Signup role selection for customer and artisan
 - [x] Email verification for email/password signup
-- [x] Password reset by Firebase email
-- [x] Google sign-in with role completion for new users
+- [x] Password reset by Firebase email (dedicated `/forgot-password` page; May 2026)
+- [x] Google sign-in with role completion for new users (via header `AuthBox`; `/login` page buttons still stubbed)
 - [x] Artisan profile creation
 - [x] 4-step artisan onboarding flow
 - [x] Public artisan discovery
@@ -1186,19 +1311,14 @@ Templates: [client/.env.production.example](/Users/macbook/bundo/client/.env.pro
 
 ### Still needed before a stronger public MVP launch
 
-- [ ] Production webhook exposure and confirmed end-to-end Paystack settlement testing
-- [ ] Stronger payout audit and settlement reconciliation in production (transfer webhooks implemented in code; confirm in Paystack dashboard)
-- [ ] Search ranking tuned with distance and recommendation signals
-- [ ] Production observability and alerting beyond basic health checks
-- [x] KYC document upload via Cloudinary (`POST /artisans/kyc/sign-upload`; onboarding step 4 + Profile KYC)
-- [ ] Editable phone on profile (still synced from Firebase login only); notification preferences module
-- [x] Artisan portfolio reorder in profile settings; availability editor in Profile
-- [x] Artisan dashboard earnings from completed payouts / held balance
-- [x] Admin reviews panel; admin jobs **Load more** + moderator filter chips
-- [x] Modal prompts for admin catalog/KYC/disputes and customer reschedule (replaces `window.prompt` in live panels)
-- [ ] Firebase custom domain + templates for verification email inbox placement (see [Email verification and deliverability](#email-verification-and-deliverability))
-- [x] Remove legacy `LandingPage.tsx`, `AppRouter.tsx`, and mock customer `Dashboard.tsx`
-- [x] E2E lifecycle smoke in CI (Postgres + migrate + `smoke.lifecycle.e2e.test.ts`)
+See **[Launch readiness checklist](#launch-readiness-checklist)** above for the canonical pre-launch list. Summary of open items:
+
+- [ ] Production Paystack webhook + real-money settlement test (**blocker**)
+- [ ] Confirm transfer webhooks in Paystack dashboard (`PROCESSING` → `SENT` / `FAILED`)
+- [ ] CI smoke e2e consistently green on GitHub
+- [ ] Google/Apple on dedicated `/login` page (or remove stubs)
+- [ ] Search ranking, observability/alerting, notification prefs, editable phone
+- [ ] Firebase custom domain for auth emails (see [Email verification and deliverability](#email-verification-and-deliverability))
 
 ---
 
@@ -1221,12 +1341,12 @@ The project is strong for MVP, but these are sensible next expansions:
 
 The smartest order from here is:
 
-1. Production-grade webhook exposure and Paystack dashboard setup
-2. Full real payment + refund + payout acceptance test
-3. Firebase auth email custom domain + template polish (inbox deliverability)
-4. Search relevance and marketplace ranking
-5. Production alerting and support tooling
-6. Notification preferences and editable phone in profile
+1. **Launch blockers** — Paystack webhooks + live payment/payout test on production
+2. **Manual QA + Firebase domains** — Full role walkthrough; authorized domains + reset/verify emails
+3. **CI smoke green** — Fix intermittent GitHub e2e if still failing after SSL migrate fix
+4. **Auth polish** — Google on `/login` or remove stubs; custom email domain
+5. **Observability** — Sentry + uptime alerts on `/health`
+6. **Post-launch** — Search ranking, notification prefs, editable phone
 
 ---
 
@@ -1245,6 +1365,9 @@ If someone new joins the project, these are the best first reads:
 - [client/src/app/AppRoutes.tsx](/Users/macbook/bundo/client/src/app/AppRoutes.tsx)
 - [client/src/lib/appPaths.ts](/Users/macbook/bundo/client/src/lib/appPaths.ts)
 - [client/src/App.tsx](/Users/macbook/bundo/client/src/App.tsx)
+- [client/ARCHITECTURE.md](/Users/macbook/bundo/client/ARCHITECTURE.md)
+- [client/src/app/AppProvider.tsx](/Users/macbook/bundo/client/src/app/AppProvider.tsx)
+- [client/src/pages/auth/ForgotPassword.tsx](/Users/macbook/bundo/client/src/pages/auth/ForgotPassword.tsx)
 - [server/src/lib/bookingStatus.ts](/Users/macbook/bundo/server/src/lib/bookingStatus.ts)
 - [server/src/lib/bookingConversations.ts](/Users/macbook/bundo/server/src/lib/bookingConversations.ts)
 - [client/src/lib/api.ts](/Users/macbook/bundo/client/src/lib/api.ts)

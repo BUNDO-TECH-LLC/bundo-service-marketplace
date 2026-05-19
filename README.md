@@ -27,7 +27,7 @@ npm test        # server unit tests (Vitest)
 
 ## Documentation
 
-Product architecture, API index, payment flows, deployment steps, and launch checklist live in **[docs/PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md)**. Start there for onboarding.
+Product architecture, API index, payment flows, deployment steps, **recent changes**, full project analysis, and **launch readiness checklist** live in **[docs/PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md)**. Client folder layout: **[client/ARCHITECTURE.md](client/ARCHITECTURE.md)**.
 
 ## Deploy checklist (production)
 
