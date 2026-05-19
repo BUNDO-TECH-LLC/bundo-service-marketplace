@@ -12,8 +12,8 @@ jobs:
       NODE_ENV: test
       PORT: '3000'
       CORS_ORIGIN: http://localhost:5173
-      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci?schema=public
-      DIRECT_URL: postgresql://ci:ci@127.0.0.1:5432/ci?schema=public
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci?schema=public&sslmode=disable
+      DIRECT_URL: postgresql://ci:ci@127.0.0.1:5432/ci?schema=public&sslmode=disable
       FIREBASE_PROJECT_ID: ci-placeholder
       FIREBASE_PRIVATE_KEY: placeholder
       FIREBASE_CLIENT_EMAIL: ci@example.com
@@ -55,8 +55,8 @@ jobs:
       NODE_ENV: test
       PORT: '3000'
       CORS_ORIGIN: http://localhost:5173
-      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci?schema=public
-      DIRECT_URL: postgresql://ci:ci@127.0.0.1:5432/ci?schema=public
+      DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci?schema=public&sslmode=disable
+      DIRECT_URL: postgresql://ci:ci@127.0.0.1:5432/ci?schema=public&sslmode=disable
       FIREBASE_PROJECT_ID: ci-placeholder
       FIREBASE_PRIVATE_KEY: placeholder
       FIREBASE_CLIENT_EMAIL: ci@example.com
