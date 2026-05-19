@@ -14,6 +14,7 @@ import { finalizeAuthSession, signInWithGooglePopup } from '../../lib/authSessio
 import { auth, firebaseReady } from '../../lib/firebase';
 import type { ApiUser, Role } from '../../types';
 import googleLogo from '../../assets/icons/material-icon-theme_google.svg';
+import { LegalLinks } from '../../components/LegalLinks';
 import { PasswordInput } from '../../components/PasswordInput';
 
 type AuthMode = 'login' | 'signup';
@@ -344,6 +345,12 @@ export function AuthPage({ mode }: AuthPageProps) {
         >
           {submitting ? 'Please wait...' : action}
         </button>
+
+        {mode === 'signup' && (
+          <p className="m-0 text-center text-sm leading-relaxed text-[var(--color-ink-soft)]">
+            By creating an account, you agree to our <LegalLinks />.
+          </p>
+        )}
       </form>
     </AuthLayout>
   );

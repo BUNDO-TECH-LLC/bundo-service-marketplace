@@ -4,6 +4,7 @@ import type { NavigateFunction, Location } from 'react-router-dom';
 import { api } from '../lib/api';
 import { buildAppPath, parseAppPath } from '../lib/appPaths';
 import { isAuthPathname } from '../lib/appRouting';
+import { auth } from '../lib/firebase';
 import { routeStorageKey } from '../lib/workspaceRoute';
 import type { AdminSection, View, WorkspaceSection } from '../appTypes';
 import type { ApiUser, Artisan, Review } from '../types';
@@ -49,15 +50,23 @@ export function useAppRouteSync({
       return;
     }
 
+    const path = location.pathname.replace(/\/+$/, '') || '/';
+    if (path === '/terms' || path === '/privacy') {
+      return;
+    }
+
     const parsed = parseAppPath(location.pathname);
     if (!parsed) {
       navigate('/', { replace: true });
       return;
     }
 
+    const firebaseProvisional = Boolean(auth?.currentUser);
+
     if (
       authChecked &&
       (parsed.view === 'workspace' || parsed.view === 'admin') &&
+      !firebaseProvisional &&
       !firebaseUser &&
       !token
     ) {

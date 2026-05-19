@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import bundoLogo from '../../assets/bundo-logo.png';
 
 export function Footer({
@@ -12,7 +13,6 @@ export function Footer({
     ['Disputes', 'disputes'],
     ['Cancellations', 'cancellations'],
     ['Provider standards', 'artisan-standards'],
-    ['Privacy', 'privacy'],
     ['Quick links', 'support'],
   ] as const;
 
@@ -24,6 +24,8 @@ export function Footer({
             {label}
           </button>
         ))}
+        <Link to="/terms">Terms</Link>
+        <Link to="/privacy">Privacy</Link>
       </div>
       <h4>Currently live in</h4>
       <div className="city-list">{cities.map((city) => <span key={city}>{city}</span>)}</div>

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { EmptyState } from '../components/EmptyState';
+import { AccountSettingsHub } from '../features/account/AccountSettingsHub';
 import { ArtisanOffersPanel, ArtisanProfileSettings, ArtisanReviewsPanel } from '../features/artisan';
 import { api } from '../lib/api';
+import type { ApiUser } from '../types';
 import { artisanVerificationPhase } from '../lib/artisanVerification';
 import { buildAppPath } from '../lib/appPaths';
 import { firebaseReady } from '../lib/firebase';
@@ -79,7 +81,7 @@ export default function WorkspacePage() {
     <main
       className={`page workspace-page ${workspaceSection === 'messages' ? 'messages-workspace' : ''} ${me?.role === 'ARTISAN' ? 'artisan-workspace-page' : ''}`}
     >
-      {workspaceSection !== 'messages' && me?.role !== 'ARTISAN' && (
+      {workspaceSection !== 'messages' && me?.role !== 'ARTISAN' && workspaceSection !== 'settings' && (
         <section className="section-head">
           <p className="eyebrow">Workspace</p>
           <h1>
@@ -183,6 +185,23 @@ export default function WorkspacePage() {
           busy={ctx.busy}
           runAction={ctx.withNotice}
           refresh={() => ctx.loadPrivateData()}
+        />
+      )}
+
+      {me && workspaceSection === 'settings' && (
+        <AccountSettingsHub
+          token={ctx.token}
+          me={me}
+          firebaseUser={ctx.firebaseUser}
+          busy={ctx.busy}
+          runAction={ctx.withNotice}
+          refresh={async () => {
+            const response = await api<{ user: ApiUser }>('/me', { token: ctx.token });
+            ctx.setMe(response.user);
+            await ctx.loadPrivateData();
+          }}
+          onNavigate={(path) => ctx.navigate(path)}
+          onNotice={ctx.setNotice}
         />
       )}
 

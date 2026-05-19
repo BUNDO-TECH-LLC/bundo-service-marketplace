@@ -16,3 +16,4 @@ export { MarketplaceFilters } from '../features/marketplace/MarketplaceFilters';
 export { MarketplacePreview } from '../features/marketplace/MarketplacePreview';
 export { OfferingGrid } from '../features/marketplace/OfferingGrid';
 export { AccountSettingsPanel } from '../features/account/AccountSettingsPanel';
+export { AccountSettingsHub } from '../features/account/AccountSettingsHub';

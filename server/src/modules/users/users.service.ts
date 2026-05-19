@@ -1,4 +1,4 @@
-import { Prisma, Role } from '@prisma/client';
+import { Prisma, Role, UserStatus } from '@prisma/client';
 import db from '../../db/client';
 import {
   defaultNotificationPreferences,
@@ -235,6 +235,33 @@ export const updateUserNotificationPreferences = async (
     user: updated,
     preferences: getUserNotificationPreferences(updated),
   };
+};
+
+export const deleteUserAccount = async (firebaseUid: string) => {
+  const user = await db.user.findUnique({ where: { firebaseUid } });
+
+  if (!user) {
+    return { status: 'missing_user' as const };
+  }
+
+  if (user.role === Role.ADMIN) {
+    return { status: 'locked_role' as const };
+  }
+
+  const anonymizedEmail = `deleted+${firebaseUid}@bundo.invalid`;
+
+  await db.user.update({
+    where: { firebaseUid },
+    data: {
+      status: UserStatus.BANNED,
+      email: anonymizedEmail,
+      phone: null,
+      fcmToken: null,
+      notificationPreferences: Prisma.JsonNull,
+    },
+  });
+
+  return { status: 'deleted' as const };
 };
 
 export function serializeUser(user: {

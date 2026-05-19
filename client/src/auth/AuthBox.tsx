@@ -25,8 +25,9 @@ import type { SignupRole, View, WorkspaceSection } from '../appTypes';
 import bundoLogo from '../assets/bundo-logo.png';
 import { EmailInboxHint } from '../components/EmailInboxHint';
 import { sendBundoEmailVerification } from '../lib/authEmailVerification';
+import { LegalLinks } from '../components/LegalLinks';
 import { PasswordInput } from '../components/PasswordInput';
-import { IconHelp } from '../components/TopbarNavIcons';
+import { IconHelp, IconSettings } from '../components/TopbarNavIcons';
 
 function AuthDrawer({
   open,
@@ -156,7 +157,7 @@ export function AuthBox({
       };
     }
 
-    if (!session.user.role && session.user.role !== 'ADMIN') {
+    if (!session.user.role) {
       setPendingAuthUser(firebaseAuthUser);
       setPreferredRole(rememberedRole);
       setMode('signup');
@@ -539,6 +540,17 @@ export function AuthBox({
               <span>Help</span>
             </button>
             <button
+              type="button"
+              className="account-menu-item-with-icon"
+              onClick={() => {
+                goToWorkspace('settings');
+              }}
+            >
+              <IconSettings />
+              <span>Settings</span>
+            </button>
+            <button
+              type="button"
               className="danger-menu-item"
               onClick={() => {
                 setMenuOpen(false);
@@ -750,6 +762,11 @@ export function AuthBox({
                           ? 'Create artisan account'
                           : 'Create client account'}
               </button>
+                  {mode === 'signup' && (
+                    <p className="auth-legal-note">
+                      By creating an account, you agree to our <LegalLinks />.
+                    </p>
+                  )}
             </form>
 
                 {mode === 'login' && (

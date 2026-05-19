@@ -190,10 +190,15 @@ export function useAppAuth({
             return;
           }
 
-          await loadPrivateDataRef.current(session.token, session.user);
+          // Unblock the shell before dashboard fetches — avoids a full-screen loader on session restore.
+          finishAuthBootstrap();
+          void loadPrivateDataRef.current(session.token, session.user).catch(() => {
+            if (!isStale()) {
+              setNoticeRef.current('Some dashboard data could not be loaded. Try refreshing the page.');
+            }
+          });
 
           if (onAuthScreen) {
-            finishAuthBootstrap();
             return;
           }
 
@@ -220,19 +225,16 @@ export function useAppAuth({
                 });
               }
             }
-            finishAuthBootstrap();
             return;
           }
 
           if (preservePublicRoute) {
-            finishAuthBootstrap();
             return;
           }
 
           if (session.user.role === 'ADMIN') {
             const adminPath = parseAppPath(path);
             if (adminPath?.view === 'admin') {
-              finishAuthBootstrap();
               return;
             }
 
@@ -244,7 +246,6 @@ export function useAppAuth({
                 navigateRef.current({ pathname: '/admin/overview', search: '' }, { replace: true });
               }
             }
-            finishAuthBootstrap();
             return;
           }
 
@@ -253,7 +254,6 @@ export function useAppAuth({
             if (!isStale()) {
               navigateRef.current({ pathname: legacyTarget, search: '' }, { replace: true });
             }
-            finishAuthBootstrap();
             return;
           }
 
@@ -265,7 +265,6 @@ export function useAppAuth({
               navigateRef.current('/workspace/overview', { replace: true });
             }
           }
-          finishAuthBootstrap();
         } catch {
           if (isStale() || authInitTimedOut || authBootstrapCompletedRef.current) {
             return;

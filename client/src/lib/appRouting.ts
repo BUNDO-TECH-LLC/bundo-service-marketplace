@@ -21,6 +21,8 @@ export function isPublicBrowsePathname(pathname: string): boolean {
   return (
     p === '/help' ||
     p.startsWith('/help/') ||
+    p === '/terms' ||
+    p === '/privacy' ||
     p === '/marketplace' ||
     p.startsWith('/artisans/') ||
     isAuthPathname(p)

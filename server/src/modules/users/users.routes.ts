@@ -5,6 +5,7 @@ import { asyncHandler } from '../../middlewares/errorHandler';
 import { ConflictError, NotFoundError, ValidationError } from '../../utils/errors';
 import { throwOnServiceStatus } from '../../utils/resultErrors';
 import {
+  deleteUserAccount,
   updateUserFcmToken,
   updateUserNotificationPreferences,
   updateUserPhone,
@@ -125,6 +126,27 @@ router.patch(
       message: 'Notification preferences updated',
       preferences: result.preferences,
     });
+  })
+);
+
+router.delete(
+  '/account',
+  verifyFirebaseToken,
+  asyncHandler(async (req, res) => {
+    const { confirm } = req.body;
+
+    if (confirm !== 'DELETE') {
+      throw new ValidationError('Send { "confirm": "DELETE" } to permanently delete your account.');
+    }
+
+    const result = await deleteUserAccount((req as any).user.firebaseUid);
+
+    throwOnServiceStatus(result.status, {
+      missing_user: new NotFoundError('User'),
+      locked_role: new ConflictError('Admin accounts cannot be deleted from the app.', 'LOCKED_ROLE'),
+    });
+
+    res.json({ message: 'Account deleted' });
   })
 );
 

@@ -40,6 +40,7 @@ Shipped on `main` (newest first):
 
 | Commit / area | Summary |
 |---------------|---------|
+| **Pre-launch polish (May 19)** | Account **Settings** hub at `/workspace/settings` (personal, business, phone, email, language, notifications, password, delete account); `DELETE /users/account`; mobile settings layout; icon topbar for signed-in users; **auth drawer** stability (`useAppAuth` ref-based Firebase subscription); **`/terms`** and **`/privacy`** legal pages + footer/signup links; support email constant `support@bundo.market`. |
 | **Forgot password** (`476eac9`) | Dedicated `/forgot-password` page (`ForgotPassword.tsx`, `AuthLayout`); Firebase reset via `sendBundoPasswordResetEmail` with continue URL → `/login`; login links here with optional `?email=`; removed inline reset from `AuthPage`. |
 | **CI Postgres SSL** (`fc0dbf9`) | GitHub Actions smoke job uses `sslmode=disable` for the local Postgres service so `prisma migrate deploy` succeeds (Prisma config defaults to `sslmode=require`). |
 | **Client architecture refactor** (`b9240a0`) | Thin `App.tsx` → `AppProvider` + hooks (`useAppAuth`, `useAppData`, `useAppRouteSync`, …); domain UI under `client/src/features/*`; artisan onboarding split into `features/artisan/landing/`; dedicated auth routes `/login`, `/signup`, `/verify-email`; [client/ARCHITECTURE.md](/Users/macbook/bundo/client/ARCHITECTURE.md). |
@@ -82,9 +83,9 @@ A **two-sided marketplace** for home and personal services in Nigeria: customers
 
 ### Frontend capabilities (implemented)
 
-- **Public:** Marketing home, marketplace filters/sort, artisan public profile, help center
-- **Auth routes:** `/login`, `/signup`, `/forgot-password`, `/verify-email` (dedicated pages + `AuthLayout` backdrop)
-- **Customer workspace:** Bookings, messages, notifications, account settings, leave review
+- **Public:** Marketing home, marketplace filters/sort, artisan public profile, help center, **`/terms`**, **`/privacy`**
+- **Auth routes:** `/login`, `/signup`, `/forgot-password`, `/verify-email` (dedicated pages + `AuthLayout` backdrop); header **auth drawer** (login/signup portal, not `/login` redirect)
+- **Customer workspace:** Bookings, messages, notifications, **`/workspace/settings`** hub, leave review
 - **Artisan:** 4-step onboarding wizard, pending-approval screen, `/workspace/*` (dashboard, jobs, messages, reviews, offers, notifications, profile with photos/KYC/bank/availability)
 - **Admin:** `/admin/*` sections with mobile drawer
 - **State:** `AppProvider` + `useAppRoot()`; path sync via `appPaths.ts`
@@ -102,6 +103,9 @@ A **two-sided marketplace** for home and personal services in Nigeria: customers
 | Profile phone | **Editable** — `PATCH /users/phone` in Account settings + artisan profile form |
 | Notification prefs | **Done** — `PATCH /users/notification-preferences`; enforced when creating notifications |
 | Auth email deliverability | Firebase default sender; custom domain not configured |
+| Terms / Privacy pages | **Done** — `/terms`, `/privacy`; linked from footer, signup, artisan onboarding |
+| Account settings hub | **Done** — `/workspace/settings`; delete account via `DELETE /users/account` |
+| Support contact | **Partial** — `BUNDO_SUPPORT_EMAIL` in legal pages; monitor inbox before launch |
 
 ### Maturity assessment
 
@@ -1232,8 +1236,8 @@ Use this before calling the product **publicly launched**. Items marked **Blocke
 
 - [ ] **Stabilize CI smoke** — Green `smoke` job on every `main` push (investigate GitHub-only e2e failures if migrate passes)
 - [x] **Google sign-in on `/login`** — `lib/authSessionFlow.ts` + `AuthPage` (May 2026)
-- [ ] **Legal / trust pages** — Terms, Privacy linked from signup and footer (content + routes if not already live)
-- [ ] **Support contact** — Monitored email or channel linked from Help and dispute flows
+- [x] **Legal / trust pages** — `/terms`, `/privacy` (`LegalPage.tsx`, `legalContent.ts`); footer + signup + drawer links
+- [ ] **Support contact** — Monitored `support@bundo.market` (constant in `client/src/constants/support.ts`); wire in Help footer if not already
 - [ ] **Firebase email domain** — Custom domain + templates for verification and reset (reduce spam folder)
 - [ ] **Error monitoring** — Sentry or similar on client + server
 - [ ] **Uptime alerting** — Ping `/health` and `/ready` (e.g. Better Uptime, Render/Vercel notifications)
@@ -1257,7 +1261,64 @@ Use this before calling the product **publicly launched**. Items marked **Blocke
 - Bookings lifecycle, chat, reviews, Paystack held payments, disputes, admin ledger
 - Admin jobs queue, moderator assign, mobile admin nav, portfolio gallery in KYC review
 - Client feature-based architecture, dedicated auth routes, production deploy pipeline
+- Account settings hub, delete account API, Terms/Privacy routes, auth drawer stability, signed-in icon topbar
 </details>
+
+---
+
+## Pre-launch manual QA checklist (printable)
+
+Run on **production** (Vercel + Render) after each release. Check boxes when pass; note failures in your issue tracker.
+
+### Guest & marketing
+
+- [ ] Home loads; marketplace link works
+- [ ] Footer **Terms** → `/terms`, **Privacy** → `/privacy`
+- [ ] Help center topics open; no console errors
+
+### Auth (customer)
+
+- [ ] Header **Log in** opens drawer (page does not freeze)
+- [ ] Email signup → verification email → `/verify-email` flow
+- [ ] `/login` and `/signup` pages work; Google sign-in completes role if new user
+- [ ] Forgot password email → reset → sign in at `/login`
+- [ ] Signup shows Terms/Privacy links
+
+### Auth (artisan)
+
+- [ ] Artisan signup from drawer or `/signup?role=artisan`
+- [ ] Onboarding steps; terms checkbox links to `/terms` and `/privacy`
+- [ ] Pending approval screen after submit; logout works
+
+### Customer workspace
+
+- [ ] Browse marketplace, open artisan profile, create booking
+- [ ] Paystack test payment → booking shows paid / held state
+- [ ] Messages send/receive; image upload if used
+- [ ] Complete job → leave review
+- [ ] **Settings** (`/workspace/settings`): phone save, notification toggles, password reset email, language preference persists
+
+### Artisan workspace
+
+- [ ] Dashboard, jobs list, accept → start → complete lifecycle
+- [ ] Profile: photos, KYC, bank, availability
+- [ ] Settings (personal + business link to profile)
+
+### Admin
+
+- [ ] KYC approve/reject; artisan appears on marketplace when approved
+- [ ] Jobs queue: assign moderator, lifecycle actions, inline chat
+- [ ] Finance / disputes visible for test booking
+
+### Account deletion (staging or test user only)
+
+- [ ] Settings → Delete account → type `DELETE` → signed out; cannot sign in with same email without new signup
+
+### Mobile (375px width)
+
+- [ ] Topbar icon nav + tooltips; Help only in account menu
+- [ ] Settings: pill nav, one panel at a time, full-width actions
+- [ ] Auth drawer scrolls; signup legal text readable
 
 ---
 
@@ -1269,7 +1330,7 @@ Use this before calling the product **publicly launched**. Items marked **Blocke
 - [x] Signup role selection for customer and artisan
 - [x] Email verification for email/password signup
 - [x] Password reset by Firebase email (dedicated `/forgot-password` page; May 2026)
-- [x] Google sign-in with role completion for new users (via header `AuthBox`; `/login` page buttons still stubbed)
+- [x] Google sign-in with role completion for new users (header `AuthBox` drawer + `/login` / `/signup` via `authSessionFlow`)
 - [x] Artisan profile creation
 - [x] 4-step artisan onboarding flow
 - [x] Public artisan discovery
@@ -1317,8 +1378,9 @@ See **[Launch readiness checklist](#launch-readiness-checklist)** above for the 
 - [ ] Production Paystack webhook + real-money settlement test (**blocker**)
 - [ ] Confirm transfer webhooks in Paystack dashboard (`PROCESSING` → `SENT` / `FAILED`)
 - [ ] CI smoke e2e consistently green on GitHub
-- [ ] Google/Apple on dedicated `/login` page (or remove stubs)
-- [ ] Search ranking, observability/alerting, notification prefs, editable phone
+- [ ] Apple Sign In (not implemented)
+- [ ] Observability/alerting on production
+- [x] Search ranking (distance), notification prefs, editable phone, Terms/Privacy, account settings hub
 - [ ] Firebase custom domain for auth emails (see [Email verification and deliverability](#email-verification-and-deliverability))
 
 ---

@@ -1,3 +1,4 @@
+import { LegalLinks } from '../../../components/LegalLinks';
 import type { ArtisanLandingModel } from './artisanLandingTypes';
 
 export function ArtisanLandingStepBasic({ landing }: { landing: ArtisanLandingModel }) {
@@ -56,7 +57,9 @@ export function ArtisanLandingStepBasic({ landing }: { landing: ArtisanLandingMo
       </button>
       <label className="terms-row">
         <input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} />{' '}
-        <span>By continuing, you agree to our Terms of Service and Privacy Policy.</span>
+        <span>
+          By continuing, you agree to our <LegalLinks />.
+        </span>
       </label>
     </section>
   );

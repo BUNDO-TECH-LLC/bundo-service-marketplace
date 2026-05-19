@@ -8,6 +8,7 @@ export const VALID_WORKSPACE_SECTIONS: WorkspaceSection[] = [
   'notifications',
   'reviews',
   'profile',
+  'settings',
 ];
 
 export const VALID_ADMIN_SECTIONS: AdminSection[] = [

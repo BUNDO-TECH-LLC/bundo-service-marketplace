@@ -1,7 +1,24 @@
 import type { ApiUser, Artisan, ArtisanKycSubmission, Category, Offering, PortfolioImage, Review, Role } from './types';
 
 export type View = 'home' | 'marketplace' | 'workspace' | 'admin' | 'help' | 'artisan-profile';
-export type WorkspaceSection = 'overview' | 'bookings' | 'messages' | 'offers' | 'notifications' | 'reviews' | 'profile';
+export type WorkspaceSection =
+  | 'overview'
+  | 'bookings'
+  | 'messages'
+  | 'offers'
+  | 'notifications'
+  | 'reviews'
+  | 'profile'
+  | 'settings';
+export type AccountSettingsSection =
+  | 'personal'
+  | 'business'
+  | 'phone'
+  | 'email'
+  | 'language'
+  | 'notifications'
+  | 'password'
+  | 'delete';
 export type ArtisanHeaderActive =
   | 'Dashboard'
   | 'Jobs'

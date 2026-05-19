@@ -4,6 +4,7 @@ import { BundoLoadingScreen } from '../components/BundoLoadingScreen';
 import { AuthPage } from '../pages/auth/AuthPage';
 import { EmailVerificationPage } from '../pages/auth/EmailVerificationPage';
 import ForgotPasswordPage from '../pages/auth/ForgotPassword';
+import { PrivacyPage, TermsPage } from '../pages/LegalPage';
 import { MainLayout } from './MainLayout';
 
 const HomePage = lazy(() => import('../pages/HomePage'));
@@ -44,6 +45,8 @@ export function AppRoutes() {
             <Route index element={<HelpPage />} />
             <Route path=":topicId" element={<HelpPage />} />
           </Route>
+          <Route path="terms" element={<TermsPage />} />
+          <Route path="privacy" element={<PrivacyPage />} />
           <Route path="artisans/:artisanId" element={<ArtisanProfileRoute />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
