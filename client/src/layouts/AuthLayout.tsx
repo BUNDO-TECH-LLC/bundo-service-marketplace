@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import bundoLogo from '../assets/BundoLogo.png';
-import LandingPage from '../pages/LandingPage';
+import { AuthMarketingBackdrop } from '../components/AuthMarketingBackdrop';
 
 type AuthLayoutProps = {
   title: string;
@@ -15,10 +15,10 @@ export function AuthLayout({ title, subtitle, children }: AuthLayoutProps) {
   return (
     <main className="relative min-h-screen bg-[var(--color-page)]">
       <div
-        className="pointer-events-none fixed inset-0 overflow-hidden select-none [&>.app-shell]:min-h-screen [&>.app-shell]:scale-[1.004] [&>.app-shell]:blur-[1.5px]"
+        className="pointer-events-none fixed inset-0 overflow-hidden select-none [&_.auth-marketing-backdrop]:min-h-screen [&_.auth-marketing-backdrop]:scale-[1.004] [&_.auth-marketing-backdrop]:blur-[1.5px]"
         aria-hidden="true"
       >
-        <LandingPage />
+        <AuthMarketingBackdrop />
       </div>
 
       <section

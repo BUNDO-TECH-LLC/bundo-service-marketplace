@@ -10,7 +10,15 @@ export type ArtisanHeaderActive =
   | 'Offers'
   | 'Notifications'
   | 'Profile';
-export type AdminSection = 'overview' | 'profiles' | 'jobs' | 'messages' | 'verification' | 'catalog';
+export type AdminSection =
+  | 'overview'
+  | 'profiles'
+  | 'jobs'
+  | 'messages'
+  | 'verification'
+  | 'catalog'
+  | 'reviews'
+  | 'finance';
 export type ActionRunner = (action: () => Promise<void>, done?: string) => Promise<void>;
 export type PushStatus = 'idle' | 'unsupported' | 'missing-config' | 'unavailable' | 'enabled' | 'denied';
 export type MarketplaceSort = 'newest' | 'rating' | 'price_low' | 'price_high';

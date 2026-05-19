@@ -467,7 +467,12 @@ export const releaseBookingPayment = async (bookingId: string) => {
     return { status: 'blocked_by_dispute' as const };
   }
 
-  if (booking.payouts.some((payout) => payout.status === PayoutStatus.SENT)) {
+  if (
+    booking.payouts.some(
+      (payout) =>
+        payout.status === PayoutStatus.SENT || payout.status === PayoutStatus.PROCESSING
+    )
+  ) {
     return { status: 'already_released' as const };
   }
 
@@ -495,11 +500,10 @@ export const releaseBookingPayment = async (bookingId: string) => {
         paymentId: booking.payment!.id,
         artisanId: booking.artisanId,
         amount: booking.payment!.providerEarning,
-        status: PayoutStatus.SENT,
+        status: PayoutStatus.PROCESSING,
         paystackTransferCode: transfer.data.transfer_code,
         paystackReference: reference,
         reason: 'Final service payout',
-        sentAt: new Date(),
       },
     });
 
@@ -544,6 +548,47 @@ export const releaseBookingPayment = async (bookingId: string) => {
   ]);
 
   return { status: 'released' as const, ...result };
+};
+
+export const syncPayoutFromPaystackTransfer = async (input: {
+  reference: string;
+  event: 'transfer.success' | 'transfer.failed' | 'transfer.reversed';
+}) => {
+  const payout = await db.payout.findFirst({
+    where: { paystackReference: input.reference },
+  });
+
+  if (!payout) {
+    logger.warn({ reference: input.reference, event: input.event }, 'Paystack transfer webhook: payout not found');
+    return { status: 'missing_payout' as const };
+  }
+
+  if (input.event === 'transfer.success') {
+    if (payout.status === PayoutStatus.SENT) {
+      return { status: 'already_confirmed' as const, payout };
+    }
+
+    const updated = await db.payout.update({
+      where: { id: payout.id },
+      data: {
+        status: PayoutStatus.SENT,
+        sentAt: payout.sentAt ?? new Date(),
+      },
+    });
+
+    return { status: 'confirmed' as const, payout: updated };
+  }
+
+  if (input.event === 'transfer.failed' || input.event === 'transfer.reversed') {
+    const updated = await db.payout.update({
+      where: { id: payout.id },
+      data: { status: PayoutStatus.FAILED },
+    });
+
+    return { status: 'failed' as const, payout: updated };
+  }
+
+  return { status: 'ignored' as const };
 };
 
 export const createBookingDispute = async (input: {

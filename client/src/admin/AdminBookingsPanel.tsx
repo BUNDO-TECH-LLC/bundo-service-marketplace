@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
+import { PromptDialog } from '../components/PromptDialog';
 import { bookingDate, paymentLabel } from '../lib/bookingDisplay';
 import { canStartOrCompleteBooking } from '../lib/bookingPayment';
 import { money } from '../lib/formatting';
@@ -51,10 +52,50 @@ export function AdminBookingsPanel({
   onOpenConversation: (conversationId: string) => void;
 }) {
   const [filter, setFilter] = useState<AdminJobFilter>('all');
+  const [moderatorFilter, setModeratorFilter] = useState<'all' | 'unassigned' | string>('all');
   const [expandedChatId, setExpandedChatId] = useState<string | null>(null);
   const [expandedActionsId, setExpandedActionsId] = useState<string | null>(null);
+  const [jobs, setJobs] = useState(bookings);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(bookingsTotal ?? bookings.length);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [disputePrompt, setDisputePrompt] = useState<null | {
+    disputeId: string;
+    action: 'RELEASE' | 'REFUND_FULL' | 'REFUND_PARTIAL';
+    step: 'note' | 'amount';
+    note?: string;
+  }>(null);
 
-  const jobBookings = bookings as AdminBooking[];
+  useEffect(() => {
+    setJobs(bookings);
+    setPage(1);
+    setTotal(bookingsTotal ?? bookings.length);
+  }, [bookings, bookingsTotal]);
+
+  useEffect(() => {
+    if (moderatorFilter === 'all') {
+      return;
+    }
+
+    let mounted = true;
+    const params = new URLSearchParams({ page: '1', limit: '200', moderatorId: moderatorFilter });
+    api<{ bookings: Booking[]; meta: { total: number } }>(`/admin/bookings?${params}`, { token })
+      .then((response) => {
+        if (!mounted) return;
+        setJobs(response.bookings);
+        setPage(1);
+        setTotal(response.meta.total);
+      })
+      .catch(() => {
+        if (!mounted) return;
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [moderatorFilter, token]);
+
+  const jobBookings = jobs as AdminBooking[];
   const adminModerators = useMemo(
     () => adminUsers.filter((user) => user.role === 'ADMIN' && user.status === 'ACTIVE'),
     [adminUsers]
@@ -65,7 +106,70 @@ export function AdminBookingsPanel({
     [filter, jobBookings]
   );
   const loadedCount = jobBookings.length;
-  const totalCount = bookingsTotal ?? loadedCount;
+  const totalCount = total;
+
+  async function loadMoreJobs() {
+    if (loadingMore || loadedCount >= totalCount) return;
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const params = new URLSearchParams({ page: String(nextPage), limit: '200' });
+      if (moderatorFilter !== 'all') {
+        params.set('moderatorId', moderatorFilter);
+      }
+      const response = await api<{ bookings: Booking[]; meta: { total: number } }>(
+        `/admin/bookings?${params}`,
+        { token }
+      );
+      setJobs((current) => [...current, ...response.bookings]);
+      setPage(nextPage);
+      setTotal(response.meta.total);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  async function submitDisputeResolution(resolutionInput: string) {
+    if (!disputePrompt) return;
+
+    if (disputePrompt.step === 'note') {
+      if (disputePrompt.action === 'REFUND_PARTIAL') {
+        setDisputePrompt({ ...disputePrompt, step: 'amount', note: resolutionInput });
+        return;
+      }
+
+      await api(`/admin/disputes/${disputePrompt.disputeId}/resolve`, {
+        method: 'POST',
+        token,
+        body: JSON.stringify({
+          action: disputePrompt.action,
+          resolution: resolutionInput || undefined,
+        }),
+      });
+      setDisputePrompt(null);
+      await refresh();
+      return;
+    }
+
+    await api(`/admin/disputes/${disputePrompt.disputeId}/resolve`, {
+      method: 'POST',
+      token,
+      body: JSON.stringify({
+        action: disputePrompt.action,
+        resolution: disputePrompt.note || undefined,
+        refundAmount: Number(resolutionInput),
+      }),
+    });
+    setDisputePrompt(null);
+    await refresh();
+  }
+
+  function startDisputeResolution(
+    disputeId: string,
+    action: 'RELEASE' | 'REFUND_FULL' | 'REFUND_PARTIAL'
+  ) {
+    setDisputePrompt({ disputeId, action, step: 'note' });
+  }
 
   async function updateStatus(bookingId: string, status: Booking['status']) {
     await api(`/admin/bookings/${bookingId}/status`, {
@@ -97,39 +201,6 @@ export function AdminBookingsPanel({
     await refresh();
   }
 
-  async function resolveDispute(
-    disputeId: string,
-    action: 'RELEASE' | 'REFUND_FULL' | 'REFUND_PARTIAL'
-  ) {
-    const resolution = window.prompt(
-      action === 'RELEASE'
-        ? 'Add a short admin note for this payout release'
-        : 'Add a short admin note for this refund decision',
-      ''
-    );
-
-    let refundAmount: number | undefined;
-
-    if (action === 'REFUND_PARTIAL') {
-      const rawAmount = window.prompt('Enter the refund amount in NGN', '');
-      if (!rawAmount) {
-        return;
-      }
-      refundAmount = Number(rawAmount);
-    }
-
-    await api(`/admin/disputes/${disputeId}/resolve`, {
-      method: 'POST',
-      token,
-      body: JSON.stringify({
-        action,
-        resolution: resolution || undefined,
-        refundAmount,
-      }),
-    });
-    await refresh();
-  }
-
   return (
     <section className="admin-jobs">
       <header className="admin-panel-head">
@@ -156,10 +227,47 @@ export function AdminBookingsPanel({
         ))}
       </div>
 
+      <div className="admin-job-moderator-filters" role="group" aria-label="Filter by moderator">
+        <button
+          type="button"
+          className={moderatorFilter === 'all' ? 'active' : ''}
+          onClick={() => setModeratorFilter('all')}
+        >
+          All moderators
+        </button>
+        <button
+          type="button"
+          className={moderatorFilter === 'unassigned' ? 'active' : ''}
+          onClick={() => setModeratorFilter('unassigned')}
+        >
+          Unassigned
+        </button>
+        {adminModerators.map((admin) => (
+          <button
+            key={admin.firebaseUid}
+            type="button"
+            className={moderatorFilter === admin.firebaseUid ? 'active' : ''}
+            onClick={() => setModeratorFilter(admin.firebaseUid)}
+          >
+            {moderatorLabel(admin)}
+          </button>
+        ))}
+      </div>
+
       {totalCount > loadedCount && (
-        <p className="admin-list-hint" role="status">
-          {totalCount - loadedCount} older jobs are not loaded. Increase the limit or add pagination to load more.
-        </p>
+        <div className="admin-list-hint-row">
+          <p className="admin-list-hint" role="status">
+            Showing {loadedCount} of {totalCount} jobs.
+          </p>
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={loadingMore || busy}
+            onClick={() => void loadMoreJobs()}
+          >
+            {loadingMore ? 'Loading…' : 'Load more'}
+          </button>
+        </div>
       )}
 
       {visibleJobs.length === 0 && (
@@ -365,12 +473,7 @@ export function AdminBookingsPanel({
                         type="button"
                         className="primary-action"
                         disabled={busy}
-                        onClick={() =>
-                          runAction(
-                            () => resolveDispute(openDispute.id, 'RELEASE'),
-                            'Dispute resolved with release'
-                          )
-                        }
+                        onClick={() => startDisputeResolution(openDispute.id, 'RELEASE')}
                       >
                         Resolve & release
                       </button>
@@ -378,12 +481,7 @@ export function AdminBookingsPanel({
                         type="button"
                         className="secondary-button"
                         disabled={busy}
-                        onClick={() =>
-                          runAction(
-                            () => resolveDispute(openDispute.id, 'REFUND_FULL'),
-                            'Full refund issued'
-                          )
-                        }
+                        onClick={() => startDisputeResolution(openDispute.id, 'REFUND_FULL')}
                       >
                         Full refund
                       </button>
@@ -416,6 +514,28 @@ export function AdminBookingsPanel({
           );
         })}
       </div>
+
+      <PromptDialog
+        open={disputePrompt !== null}
+        title={
+          disputePrompt?.step === 'amount'
+            ? 'Partial refund amount'
+            : disputePrompt?.action === 'RELEASE'
+              ? 'Resolve dispute — release payout'
+              : 'Resolve dispute — refund'
+        }
+        message={
+          disputePrompt?.step === 'note'
+            ? 'Add a short admin note for the audit trail.'
+            : 'Enter the refund amount in NGN.'
+        }
+        label={disputePrompt?.step === 'amount' ? 'Amount (NGN)' : 'Admin note'}
+        inputType={disputePrompt?.step === 'amount' ? 'number' : 'text'}
+        confirmLabel={disputePrompt?.step === 'amount' ? 'Issue refund' : 'Continue'}
+        busy={busy}
+        onCancel={() => setDisputePrompt(null)}
+        onConfirm={(value) => runAction(() => submitDisputeResolution(value), 'Dispute resolved')}
+      />
     </section>
   );
 }

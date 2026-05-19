@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { api } from '../lib/api';
 import { bookingDate } from '../lib/bookingDisplay';
+import { summarizeArtisanEarnings } from '../lib/artisanEarnings';
 import { dayLabels, formatMessageTime, money } from '../lib/formatting';
 import { userDisplayName } from '../lib/userDisplayName';
 import type { ActionRunner } from '../appTypes';
@@ -42,6 +43,7 @@ export function ArtisanDashboard({
   const requestedBookings = bookings.filter((booking) => booking.status === 'REQUESTED');
   const activeBookings = bookings.filter((booking) => ['ACCEPTED', 'COMPLETED'].includes(booking.status));
   const isApproved = profile?.verifyStatus === 'APPROVED' && kycSubmission?.status === 'APPROVED';
+  const earnings = summarizeArtisanEarnings(bookings);
 
   useEffect(() => {
     let mounted = true;
@@ -160,7 +162,15 @@ export function ArtisanDashboard({
             <dl className="summary-list">
               <div><dt>Jobs Completed</dt><dd>{bookings.filter((booking) => booking.status === 'COMPLETED').length}</dd></div>
               <div><dt>Jobs Upcoming</dt><dd>{activeBookings.length}</dd></div>
-              <div><dt>Earnings</dt><dd>{money(0)}</dd></div>
+              <div>
+                <dt>Earnings</dt>
+                <dd>
+                  {money(earnings.paidOut)}
+                  {earnings.pendingRelease > 0 && (
+                    <small className="muted"> · {money(earnings.pendingRelease)} pending</small>
+                  )}
+                </dd>
+              </div>
             </dl>
           </article>
           <article className="artisan-soft-card quick-links">

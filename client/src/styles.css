@@ -828,6 +828,27 @@ canvas {
   color: var(--ink);
 }
 
+.auth-email-inbox-hint {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgb(185 81 27 / 28%);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: var(--ink);
+  background: #fff8f3;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.auth-email-inbox-hint p {
+  margin: 0;
+}
+
+.auth-email-inbox-hint-secondary {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .auth-status-card span {
   color: var(--muted);
   line-height: 1.5;
@@ -4665,6 +4686,190 @@ footer h4 {
   border-color: rgb(185 81 27 / 45%);
   color: var(--ink);
   background: #fff7f1;
+}
+
+.admin-job-moderator-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.admin-job-moderator-filters button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  background: #fff;
+}
+
+.admin-job-moderator-filters button.active {
+  border-color: rgb(185 81 27 / 45%);
+  background: #fff7f1;
+}
+
+.admin-list-hint-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.prompt-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(15 18 24 / 55%);
+}
+
+.prompt-dialog {
+  width: min(100%, 420px);
+  padding: 20px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgb(15 18 24 / 18%);
+}
+
+.prompt-dialog--wide {
+  width: min(100%, 480px);
+}
+
+.prompt-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.prompt-dialog-message {
+  margin: 0 0 12px;
+  color: var(--muted);
+}
+
+.prompt-dialog label {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.prompt-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.availability-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 16px;
+}
+
+.availability-slot-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.availability-slot-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.availability-slot-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.portfolio-image-order {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.portfolio-image-order button {
+  min-width: 2rem;
+  padding: 2px 6px;
+}
+
+.auth-marketing-backdrop {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 20% 20%, rgb(255 247 241 / 90%), transparent 55%),
+    radial-gradient(circle at 80% 10%, rgb(255 230 214 / 70%), transparent 45%),
+    linear-gradient(180deg, #fffaf6 0%, #f6f1ea 100%);
+}
+
+.auth-marketing-backdrop__orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(40px);
+  opacity: 0.55;
+}
+
+.auth-marketing-backdrop__orb--one {
+  top: 10%;
+  left: -5%;
+  width: 320px;
+  height: 320px;
+  background: #ffd8bf;
+}
+
+.auth-marketing-backdrop__orb--two {
+  right: -8%;
+  bottom: 8%;
+  width: 380px;
+  height: 380px;
+  background: #ffe8d4;
+}
+
+.auth-marketing-backdrop__grid {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgb(15 18 24 / 4%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(15 18 24 / 4%) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(180deg, rgb(0 0 0 / 35%), transparent 85%);
+}
+
+.kyc-upload-field {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.kyc-upload-field input[type='file'] {
+  margin-top: 6px;
+}
+
+.kyc-upload-preview {
+  display: inline-grid;
+  gap: 6px;
+  max-width: 200px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.kyc-upload-preview img {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  object-fit: cover;
+  aspect-ratio: 4 / 3;
 }
 
 .admin-list-hint {

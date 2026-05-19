@@ -464,13 +464,32 @@ function adminBookingStageWhere(stage?: AdminBookingStage) {
   }
 }
 
+function adminBookingModeratorWhere(
+  moderatorId?: string
+): Prisma.BookingWhereInput | undefined {
+  if (!moderatorId) {
+    return undefined;
+  }
+
+  if (moderatorId === 'unassigned') {
+    return { moderatorId: null };
+  }
+
+  return { moderatorId };
+}
+
 export const getAdminBookings = async (
   pagination?: Pagination,
-  options?: { stage?: AdminBookingStage }
+  options?: { stage?: AdminBookingStage; moderatorId?: string }
 ) => {
   const stageWhere = adminBookingStageWhere(options?.stage);
+  const moderatorWhere = adminBookingModeratorWhere(options?.moderatorId);
+  const where: Prisma.BookingWhereInput = {
+    ...(stageWhere ?? {}),
+    ...(moderatorWhere ?? {}),
+  };
   const bookings = await db.booking.findMany({
-    ...(stageWhere ? { where: stageWhere } : {}),
+    ...(Object.keys(where).length ? { where } : {}),
     orderBy: { createdAt: 'desc' },
     ...paginationArgs(pagination, 100),
     include: bookingAdminInclude,
@@ -565,11 +584,44 @@ export const updateAdminBookingStatus = async (input: {
   return { status: 'updated' as const, booking: withConversation };
 };
 
-export const countAdminBookings = async (options?: { stage?: AdminBookingStage }) => {
+export const countAdminBookings = async (options?: {
+  stage?: AdminBookingStage;
+  moderatorId?: string;
+}) => {
   const stageWhere = adminBookingStageWhere(options?.stage);
+  const moderatorWhere = adminBookingModeratorWhere(options?.moderatorId);
+  const where: Prisma.BookingWhereInput = {
+    ...(stageWhere ?? {}),
+    ...(moderatorWhere ?? {}),
+  };
   return db.booking.count({
-    ...(stageWhere ? { where: stageWhere } : {}),
+    ...(Object.keys(where).length ? { where } : {}),
   });
+};
+
+export const getAdminLedgerEntries = async (pagination?: Pagination) => {
+  return db.ledgerEntry.findMany({
+    orderBy: { createdAt: 'desc' },
+    ...paginationArgs(pagination, 50),
+    include: {
+      booking: {
+        select: {
+          id: true,
+          offering: { select: { title: true } },
+        },
+      },
+      payment: {
+        select: {
+          status: true,
+          paystackReference: true,
+        },
+      },
+    },
+  });
+};
+
+export const countAdminLedgerEntries = async () => {
+  return db.ledgerEntry.count();
 };
 
 export const assignBookingModerator = async (input: {

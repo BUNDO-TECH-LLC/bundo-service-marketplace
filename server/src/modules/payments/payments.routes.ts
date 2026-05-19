@@ -18,6 +18,7 @@ import {
   getPaymentForBooking,
   initializeBookingPayment,
   markPaymentReferencePaid,
+  syncPayoutFromPaystackTransfer,
   verifyPaymentReferenceForUser,
 } from './payments.service';
 import { verifyPaystackSignature } from './paystack.service';
@@ -171,8 +172,21 @@ router.post(
       throw new UnauthorizedError('Invalid Paystack signature');
     }
 
-    if (req.body?.event === 'charge.success' && req.body?.data?.reference) {
-      await markPaymentReferencePaid(String(req.body.data.reference));
+    const event = req.body?.event;
+    const reference = req.body?.data?.reference ? String(req.body.data.reference) : null;
+
+    if (event === 'charge.success' && reference) {
+      await markPaymentReferencePaid(reference);
+    }
+
+    if (
+      reference &&
+      (event === 'transfer.success' || event === 'transfer.failed' || event === 'transfer.reversed')
+    ) {
+      await syncPayoutFromPaystackTransfer({
+        reference,
+        event,
+      });
     }
 
     res.json({ received: true });

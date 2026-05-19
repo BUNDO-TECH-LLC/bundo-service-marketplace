@@ -17,6 +17,8 @@ export const VALID_ADMIN_SECTIONS: AdminSection[] = [
   'messages',
   'verification',
   'catalog',
+  'reviews',
+  'finance',
 ];
 
 export type ParsedAppRoute = {

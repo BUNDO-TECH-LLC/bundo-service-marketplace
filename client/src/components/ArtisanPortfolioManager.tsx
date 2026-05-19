@@ -10,6 +10,7 @@ type ArtisanPortfolioManagerProps = {
   uploadPortfolioFile: (file: File, displayOrder: number) => Promise<void>;
   uploadPortfolioFiles: (files: File[]) => Promise<void>;
   removePortfolioImage: (imageId: string) => Promise<void>;
+  reorderPortfolioImage?: (imageId: string, displayOrder: number) => Promise<void>;
 };
 
 export function ArtisanPortfolioManager({
@@ -21,6 +22,7 @@ export function ArtisanPortfolioManager({
   uploadPortfolioFile,
   uploadPortfolioFiles,
   removePortfolioImage,
+  reorderPortfolioImage,
 }: ArtisanPortfolioManagerProps) {
   const remaining = Math.max(0, 12 - portfolioImages.length);
   const rootClass =
@@ -94,6 +96,8 @@ export function ArtisanPortfolioManager({
               uploadingPortfolio={uploadingPortfolio}
               runAction={runAction}
               removePortfolioImage={removePortfolioImage}
+              reorderPortfolioImage={reorderPortfolioImage}
+              imageCount={portfolioImages.length}
             />
           ))}
 
@@ -234,6 +238,8 @@ function PortfolioImageCard({
   uploadingPortfolio,
   runAction,
   removePortfolioImage,
+  reorderPortfolioImage,
+  imageCount,
 }: {
   image: PortfolioImage;
   index: number;
@@ -241,10 +247,38 @@ function PortfolioImageCard({
   uploadingPortfolio: boolean;
   runAction: ActionRunner;
   removePortfolioImage: (imageId: string) => Promise<void>;
+  reorderPortfolioImage?: (imageId: string, displayOrder: number) => Promise<void>;
+  imageCount: number;
 }) {
   return (
     <div className="portfolio-image-card">
       <img src={image.url} alt={`Work photo ${index + 1}`} />
+      {reorderPortfolioImage && imageCount > 1 && (
+        <div className="portfolio-image-order">
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={busy || uploadingPortfolio || index === 0}
+            aria-label={`Move photo ${index + 1} earlier`}
+            onClick={() =>
+              runAction(() => reorderPortfolioImage(image.id, index - 1), 'Photo order updated')
+            }
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={busy || uploadingPortfolio || index >= imageCount - 1}
+            aria-label={`Move photo ${index + 1} later`}
+            onClick={() =>
+              runAction(() => reorderPortfolioImage(image.id, index + 1), 'Photo order updated')
+            }
+          >
+            ↓
+          </button>
+        </div>
+      )}
       <button
         type="button"
         className="portfolio-image-remove"

@@ -6,7 +6,9 @@ import { AdminBookingsPanel } from './AdminBookingsPanel';
 import { AdminCatalogPanel } from './AdminCatalogPanel';
 import { AdminKycPanel } from './AdminKycPanel';
 import { AdminOverviewPanel } from './AdminOverviewPanel';
+import { AdminLedgerPanel } from './AdminLedgerPanel';
 import { AdminProfilesPanel } from './AdminProfilesPanel';
+import { AdminReviewsPanel } from './AdminReviewsPanel';
 
 export function AdminConsole({
   section,
@@ -58,6 +60,8 @@ export function AdminConsole({
     { id: 'messages', label: 'Messages', description: 'Threads and notes', count: conversations.length },
     { id: 'verification', label: 'Verification', description: 'KYC and approvals', count: submissions.length },
     { id: 'catalog', label: 'Catalog', description: 'Service categories', count: categories.length },
+    { id: 'reviews', label: 'Reviews', description: 'Moderate customer reviews' },
+    { id: 'finance', label: 'Finance', description: 'Ledger & settlement trail' },
   ];
 
   const activeSection = sections.find((item) => item.id === section) ?? sections[0];
@@ -206,6 +210,10 @@ export function AdminConsole({
             refresh={refresh}
           />
         )}
+        {section === 'reviews' && (
+          <AdminReviewsPanel token={token} busy={busy} runAction={runAction} />
+        )}
+        {section === 'finance' && <AdminLedgerPanel token={token} />}
       </section>
     </section>
   );

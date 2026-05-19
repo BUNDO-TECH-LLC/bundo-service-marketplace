@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { LeaveReviewDialog } from '../components/LeaveReviewDialog';
+import { PromptDialog } from '../components/PromptDialog';
 import { api } from '../lib/api';
 import { formatMessageTime, money } from '../lib/formatting';
 import {
@@ -229,6 +230,11 @@ export function BookingsPage({
   const [selectedArtisanBookingId, setSelectedArtisanBookingId] = useState<string | null>(null);
   const selectedArtisanBooking = bookings.find((booking) => booking.id === selectedArtisanBookingId) || null;
   const [reviewBooking, setReviewBooking] = useState<Booking | null>(null);
+  const [reschedulePrompt, setReschedulePrompt] = useState<null | {
+    booking: Booking;
+    step: 'datetime' | 'note';
+    scheduledAt?: string;
+  }>(null);
 
   async function submitReview(input: { rating: number; comment: string }) {
     if (!reviewBooking) return;
@@ -288,32 +294,35 @@ export function BookingsPage({
     await refresh();
   }
 
-  async function reschedule(booking: Booking) {
-    const nextValue = window.prompt(
-      'Enter the new date and time in this format: YYYY-MM-DD HH:MM',
-      bookingInputValue(booking.scheduledAt)
-    );
+  function startReschedule(booking: Booking) {
+    setReschedulePrompt({ booking, step: 'datetime' });
+  }
 
-    if (!nextValue) {
+  async function submitReschedule(input: string) {
+    if (!reschedulePrompt) return;
+
+    if (reschedulePrompt.step === 'datetime') {
+      const parsed = parseBookingInput(input);
+      if (!parsed) {
+        throw new Error('Please enter a valid date and time like 2026-05-15 14:30');
+      }
+      setReschedulePrompt({
+        booking: reschedulePrompt.booking,
+        step: 'note',
+        scheduledAt: parsed.toISOString(),
+      });
       return;
     }
 
-    const parsed = parseBookingInput(nextValue);
-
-    if (!parsed) {
-      throw new Error('Please enter a valid date and time like 2026-05-15 14:30');
-    }
-
-    const nextNote = window.prompt('Optional note for the reschedule', booking.note || '');
-
-    await api(`/bookings/${booking.id}/reschedule`, {
+    await api(`/bookings/${reschedulePrompt.booking.id}/reschedule`, {
       method: 'PATCH',
       token,
       body: JSON.stringify({
-        scheduledAt: parsed.toISOString(),
-        note: nextNote === null ? booking.note : nextNote,
+        scheduledAt: reschedulePrompt.scheduledAt,
+        note: input || reschedulePrompt.booking.note,
       }),
     });
+    setReschedulePrompt(null);
     await refresh();
   }
 
@@ -346,6 +355,24 @@ export function BookingsPage({
         onSubmit={(input) => runAction(() => submitReview(input), 'Review submitted')}
       />
     )}
+    <PromptDialog
+      open={reschedulePrompt !== null}
+      title={reschedulePrompt?.step === 'note' ? 'Reschedule note' : 'Reschedule booking'}
+      message={
+        reschedulePrompt?.step === 'datetime'
+          ? 'Enter the new date and time (YYYY-MM-DD HH:MM).'
+          : 'Optional note for the artisan.'
+      }
+      label={reschedulePrompt?.step === 'datetime' ? 'Date and time' : 'Note'}
+      defaultValue={
+        reschedulePrompt?.step === 'datetime'
+          ? bookingInputValue(reschedulePrompt.booking.scheduledAt)
+          : reschedulePrompt?.booking.note || ''
+      }
+      busy={busy}
+      onCancel={() => setReschedulePrompt(null)}
+      onConfirm={(value) => runAction(() => submitReschedule(value), 'Booking rescheduled')}
+    />
     <section className="bookings-page">
       <div className="bookings-toolbar">
         <div>
@@ -490,7 +517,7 @@ export function BookingsPage({
                   <button
                     className="secondary-button"
                     disabled={busy}
-                    onClick={() => runAction(() => reschedule(booking), 'Booking rescheduled')}
+                    onClick={() => startReschedule(booking)}
                   >
                     Reschedule
                   </button>

@@ -7,16 +7,16 @@ Bundo is a service marketplace that connects customers with artisans. The curren
 - Firebase-authenticated users
 - Signup role selection for `CUSTOMER` and `ARTISAN`, with `ADMIN` managed through admin tools
 - Public artisan discovery
-- 4-step artisan profile onboarding
+- 4-step artisan profile onboarding (optional portfolio photos; manage photos in Profile after approval)
 - Artisan KYC submission and admin review
 - Category-based offerings
 - Booking requests with a full lifecycle: `REQUESTED` → `ACCEPTED` (appointment) → `ONGOING` → `COMPLETED`
-- Artisan jobs dashboard, request handling, in-progress work, profile settings, and reviews
+- Artisan workspace (dashboard, jobs, messages, reviews, offers, notifications, profile) with full header navigation
 - Direct chat between customer and artisan, with image attachments
 - Reviews for completed jobs
 - In-app notifications
 - Push-ready notification delivery through Firebase Cloud Messaging token storage
-- Admin moderation
+- Admin moderation (inline job queue, moderator assignment per booking, mobile-friendly console)
 - Marketplace-style payments through Paystack
 - Held funds, disputes, and admin-controlled payout release
 
@@ -52,7 +52,7 @@ A customer can:
 An artisan can:
 
 - choose the artisan path during signup or apply from profile settings
-- complete a 4-step onboarding flow for basic info, services/pricing, portfolio, and availability
+- complete a 4-step onboarding flow for basic info, services/pricing, optional portfolio photos, and availability
 - create an artisan profile
 - create service packages under categories during onboarding
 - upload portfolio and availability data
@@ -61,7 +61,7 @@ An artisan can:
 - message customers
 - configure a payout bank account
 - submit KYC identity details for review
-- use artisan dashboard surfaces for jobs, reviews, and profile settings
+- use artisan workspace surfaces for dashboard, jobs, messages, reviews, offers, notifications, and profile settings (including portfolio photos)
 
 ### Admin
 
@@ -72,10 +72,12 @@ An admin can:
 - approve or reject artisan verification
 - review artisan KYC submissions
 - manage categories
-- manage the **jobs queue**: filter by stage, confirm appointments, mark in progress or completed, release payouts, resolve disputes
+- manage the **jobs queue**: filter by stage, confirm appointments, mark in progress or completed, release payouts, resolve disputes (loads up to **200** bookings per request; UI shows total vs loaded count)
+- **assign a moderator** (another active `ADMIN` user) to any booking for multi-admin operations
 - open the customer–artisan chat from any job entry (inline thread or full support view)
 - inspect conversations globally, reply as Bundo support with text or images, and write internal admin notes
-- moderate reviews
+- moderate reviews in **Admin → Reviews** (`GET` / `DELETE /admin/reviews`)
+- inspect ledger entries in **Admin → Finance** (`GET /admin/ledger-entries`)
 - release held payments to artisans
 - resolve disputes with release, full refund, or partial refund
 
@@ -190,7 +192,7 @@ Main business entities:
 - `ArtisanProfile`
 - `Category`
 - `Offering`
-- `Booking`
+- `Booking` (optional `moderatorId` → assigned admin `User` for job support ownership)
 - `Conversation`
 - `Message`
 - `Review`
@@ -294,6 +296,19 @@ Supporting client files:
   [client/src/components/StatCard.tsx](/Users/macbook/bundo/client/src/components/StatCard.tsx)
 - Auth surface (Firebase email/Google, verification, role completion), imported by `App.tsx`:
   [client/src/auth/AuthBox.tsx](/Users/macbook/bundo/client/src/auth/AuthBox.tsx)
+- Email verification helpers and inbox guidance:
+  [client/src/lib/authEmailVerification.ts](/Users/macbook/bundo/client/src/lib/authEmailVerification.ts),
+  [client/src/components/EmailInboxHint.tsx](/Users/macbook/bundo/client/src/components/EmailInboxHint.tsx)
+- Artisan portfolio upload/management (onboarding, pending, profile settings):
+  [client/src/components/ArtisanPortfolioManager.tsx](/Users/macbook/bundo/client/src/components/ArtisanPortfolioManager.tsx),
+  [client/src/lib/useArtisanPortfolio.ts](/Users/macbook/bundo/client/src/lib/useArtisanPortfolio.ts),
+  [client/src/lib/portfolioUpload.ts](/Users/macbook/bundo/client/src/lib/portfolioUpload.ts),
+  [client/src/lib/imageFile.ts](/Users/macbook/bundo/client/src/lib/imageFile.ts)
+- Artisan workspace header (full nav on desktop + mobile drawer):
+  [client/src/app/appShellComponents.tsx](/Users/macbook/bundo/client/src/app/appShellComponents.tsx) (`ArtisanAppHeader`),
+  [client/src/app/MainLayout.tsx](/Users/macbook/bundo/client/src/app/MainLayout.tsx)
+- Password visibility toggle on login/signup:
+  [client/src/components/PasswordInput.tsx](/Users/macbook/bundo/client/src/components/PasswordInput.tsx)
 - Logged-in customer home, artisan profile view, artisan dashboard:
   [client/src/views/LoggedInHome.tsx](/Users/macbook/bundo/client/src/views/LoggedInHome.tsx),
   [client/src/views/ArtisanProfilePage.tsx](/Users/macbook/bundo/client/src/views/ArtisanProfilePage.tsx),
@@ -304,7 +319,8 @@ Supporting client files:
 - Admin console and section panels (overview, jobs, messages, KYC, profiles, catalog):
   [client/src/admin/AdminConsole.tsx](/Users/macbook/bundo/client/src/admin/AdminConsole.tsx),
   [client/src/admin/AdminOverviewPanel.tsx](/Users/macbook/bundo/client/src/admin/AdminOverviewPanel.tsx),
-  [client/src/admin/AdminBookingsPanel.tsx](/Users/macbook/bundo/client/src/admin/AdminBookingsPanel.tsx) — job entries, appointment alerts, status actions, inline chat,
+  [client/src/admin/AdminBookingsPanel.tsx](/Users/macbook/bundo/client/src/admin/AdminBookingsPanel.tsx) — inline job rows, moderator dropdown, appointment alerts, status actions, inline chat,
+  [client/src/components/AdminPortfolioGallery.tsx](/Users/macbook/bundo/client/src/components/AdminPortfolioGallery.tsx) — portfolio thumbnails in KYC and artisan profile review,
   [client/src/admin/AdminJobChat.tsx](/Users/macbook/bundo/client/src/admin/AdminJobChat.tsx),
   [client/src/admin/AdminKycPanel.tsx](/Users/macbook/bundo/client/src/admin/AdminKycPanel.tsx),
   [client/src/admin/AdminProfilesPanel.tsx](/Users/macbook/bundo/client/src/admin/AdminProfilesPanel.tsx),
@@ -331,13 +347,17 @@ The current frontend is a single-page React app that manages:
 - workspace by role
 - signup role choice for client or artisan
 - logged-in customer home dashboard
-- 4-step artisan onboarding wizard
-- approved-artisan dashboard with jobs, active booking detail, reviews, and profile settings
-- artisan setup uses a simple sticky Bundo setup header and does not show dashboard navigation before approval
-- approved artisan dashboard screens switch to a single artisan-specific header; the global marketplace header is hidden there to avoid duplicate navigation
+- 4-step artisan onboarding wizard (step 3 portfolio photos are **optional** — “Skip for now” supported)
+- approved artisans visiting `/` are **redirected** to `/workspace/overview` (no duplicate home dashboard + second header)
+- artisan setup uses a sticky Bundo setup header and does not show workspace navigation before approval
+- approved artisan **workspace** uses `ArtisanAppHeader` with Dashboard, Jobs, Messages, Reviews, Offers, Notifications, and Profile; global marketplace header is hidden on workspace routes
+- artisan **Profile** settings: horizontal section nav (Profile / Photos / KYC / Bank); photos are the canonical portfolio home (not Offers)
+- pending artisans can upload portfolio photos while awaiting approval
 - chat with photo attachments
 - bookings
-- a dedicated admin operations console with its own navigation for overview, profiles, jobs, messages, verification, and catalog; the **Jobs** section is a structured queue (requests, appointments, in progress, completed, payouts) with chat access per entry; admin sessions do not show the customer/artisan marketplace navbar
+- a dedicated admin operations console with sidebar navigation (desktop) and **mobile slide-out menu** + top bar; sections: overview, profiles, jobs, messages, verification, catalog
+- admin **Jobs**, **Profiles**, and **KYC** lists use **inline row** layout (not large cards) for better scanning on mobile
+- admin sessions do not show the customer/artisan marketplace navbar
 - URL-based navigation (`/workspace/bookings`, `/admin/jobs`, etc.) instead of query-string views
 - payment actions in the booking flow
 - help-center and trust-policy content for payments, disputes, cancellations, KYC, privacy, and support
@@ -353,8 +373,8 @@ The current frontend is a single-page React app that manages:
 1. User signs up or logs in with Firebase on the frontend.
 2. Signup asks the user to choose client or artisan before account creation.
 3. User can continue with Google or email/name/password. Email signup requires a standard password and verify-password confirmation before the Firebase account is created.
-4. Email/password signup sends a Firebase email verification link before the user is synced into the Bundo backend.
-5. Unverified email/password users stay on the verification screen and can resend the verification email or confirm after clicking the email link.
+4. Email/password signup sends a Firebase email verification link (via `sendBundoEmailVerification` in [authEmailVerification.ts](/Users/macbook/bundo/client/src/lib/authEmailVerification.ts)) with continue URL set to the current site origin before the user is synced into the Bundo backend.
+5. Unverified email/password users stay on the verification screen with **[EmailInboxHint](/Users/macbook/bundo/client/src/components/EmailInboxHint.tsx)** guidance to check **spam/junk** and Promotions/Updates folders; they can resend the verification email or confirm after clicking the link.
 6. The selected signup role is remembered locally during email verification, so an artisan who verifies in another tab and returns to login still continues into artisan onboarding.
 7. Password reset is handled from the login drawer through Firebase password reset email.
 8. Google sign-in uses Firebase Google Auth. Returning Google users continue directly; brand-new Google users choose client or artisan before their Bundo role is finalized.
@@ -374,7 +394,8 @@ Result:
 - email/password users verify their email before entering the marketplace workspace
 - verified artisan signups keep their selected role across the email verification handoff
 - role-less verified users cannot silently enter a disabled booking state; they must finish client/artisan setup first
-- password reset stays with Firebase Auth email templates
+- password reset stays with Firebase Auth email templates (toasts also mention checking spam)
+- verification deliverability is primarily controlled in **Firebase Console** (templates, authorized domains, optional custom sending domain with SPF/DKIM); the app cannot guarantee inbox placement without that setup
 - casual client/artisan switching is not exposed in the profile UI
 - artisan-to-client switching through the public role endpoint is blocked and should go through admin/support if needed
 
@@ -389,11 +410,13 @@ Result:
    - creates one or more service packages through `/offerings`
    - each package captures category, service name, price, and description
    - packages can exist before approval, but public discovery only shows offerings attached to approved artisans
-5. Step 3, Portfolio:
-   - signs direct upload through `/artisans/portfolio-images/sign-upload`
-   - uploads one or more images to Cloudinary from the browser
-   - stores portfolio image metadata through `/artisans/portfolio-images`
-   - requires a valid backend `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET`; local E2E testing currently reaches Cloudinary but fails with an invalid configured cloud name
+5. Step 3, Portfolio (**optional** — Option C):
+   - artisan can upload photos or choose **Skip for now**
+   - signs direct upload through `/artisans/portfolio-images/sign-upload` (shared [portfolioUpload.ts](/Users/macbook/bundo/client/src/lib/portfolioUpload.ts))
+   - uploads one or more images to Cloudinary from the browser ([imageFile.ts](/Users/macbook/bundo/client/src/lib/imageFile.ts) accepts mobile files with empty MIME when extension is known)
+   - stores portfolio image metadata through `/artisans/portfolio-images` (returns `201` + `{ image }`; `GET /portfolio-images/me` returns `[]` if no profile yet)
+   - requires valid `CLOUDINARY_*` env vars; local E2E may fail with an invalid configured cloud name
+   - **no minimum photo count** gates marketplace listing after approval
 6. Step 4, Availability and submit:
    - saves availability through `/artisans/availability-slots`
    - submits KYC through `/artisans/kyc`
@@ -404,7 +427,7 @@ Result:
 - artisan profile and service setup are collected before public launch
 - artisan becomes discoverable only after KYC/admin approval
 - offerings created during onboarding stay hidden from public marketplace until the artisan is approved
-- artisan is ready for payouts
+- artisan can be approved and appear on the marketplace **without** portfolio photos; photos are managed anytime after profile exists in **Profile → Photos**
 
 ## 2B. Artisan KYC
 
@@ -429,33 +452,32 @@ Result:
 
 After step 4 submit, artisans with `PENDING` KYC are **not** left on the setup wizard:
 
-- [ArtisanPendingApproval.tsx](/Users/macbook/bundo/client/src/views/ArtisanPendingApproval.tsx) — success screen, “profile awaiting approval”, timeline, and what unlocks after approval
+- [ArtisanPendingApproval.tsx](/Users/macbook/bundo/client/src/views/ArtisanPendingApproval.tsx) — success screen, “profile awaiting approval”, timeline, optional **portfolio upload while pending**, and what unlocks after approval
 - [ArtisanSetupShell.tsx](/Users/macbook/bundo/client/src/views/ArtisanSetupShell.tsx) — top bar with **Help** and account menu including **Log out** (global header stays hidden on artisan home during setup)
 - [artisanVerification.ts](/Users/macbook/bundo/client/src/lib/artisanVerification.ts) — routes among setup, awaiting approval, changes requested, rejected, and approved
 - Unapproved artisans who open `/workspace/*` are redirected to `/` with a notice
 
 ## 2C. Approved artisan workspace
 
-After KYC/admin approval, the artisan home becomes an operations dashboard:
+After KYC/admin approval, artisans use **`/workspace/*`** (not a second dashboard on `/`):
 
-1. Dashboard is the default approved-artisan landing page and shows booking totals, rating summary, active jobs, new requests, weekly summary, availability, quick links, and a simple approval badge.
-2. Jobs tab shows bookings with filters for all, pending, accepted, in progress, completed, and declined.
-3. Selecting a job opens the booking detail screen:
-   - customer details
-   - service, date, time, note, and status
-   - request accept/decline for pending jobs
-   - **Start service** (`ONGOING`) and **Mark completed** for accepted or in-progress jobs
-   - open chat
-4. Messages tab opens the shared conversation UI.
-5. Reviews tab shows rating summary, rating bars, and review cards from completed bookings.
-6. Service offers tab is limited to offer creation and existing offer review; sensitive verification and payout details are not shown there.
-7. Profile/settings contains personal profile controls, KYC verification status and fields, bank/payout information, and links to business info, job history, service/pricing, settings, and notifications.
+1. Visiting `/` while approved **redirects** to `/workspace/overview` ([ArtisanLanding](/Users/macbook/bundo/client/src/app/appShellComponents.tsx) + `Navigate`).
+2. **Dashboard** (`/workspace/overview`) — [ArtisanDashboard.tsx](/Users/macbook/bundo/client/src/views/ArtisanDashboard.tsx): booking totals, rating summary, active jobs, new requests, availability dots, quick links; soft nudge to add photos when approved with fewer than three portfolio images.
+3. **Jobs** (`/workspace/bookings`) — bookings with filters (all, pending, accepted, in progress, completed, declined).
+4. Booking detail (in jobs panel): accept/decline, **Start service** (`ONGOING`), **Mark completed**, open chat — gated by secured payment server-side and in UI.
+5. **Messages** (`/workspace/messages`) — shared [ChatPanel](/Users/macbook/bundo/client/src/panels/ChatPanel.tsx).
+6. **Reviews** (`/workspace/reviews`).
+7. **Offers** (`/workspace/offers`) — [ArtisanOffersPanel](/Users/macbook/bundo/client/src/app/appShellComponents.tsx); no portfolio or KYC here.
+8. **Notifications** (`/workspace/notifications`).
+9. **Profile** (`/workspace/profile`) — [ArtisanProfileSettings](/Users/macbook/bundo/client/src/app/appShellComponents.tsx): hero + subnav (Profile / Photos / KYC / Bank); [ArtisanPortfolioManager](/Users/macbook/bundo/client/src/components/ArtisanPortfolioManager.tsx) for photos; KYC still uses document **URL fields** (not file upload like portfolio).
+
+**ArtisanAppHeader** (workspace only): Dashboard, Jobs, Messages, Reviews, Offers, Notifications, Profile; unread badge on Notifications; Log out on desktop and in mobile menu.
 
 Result:
 
-- artisans have a role-specific workspace rather than using the customer dashboard
-- approved artisans land on dashboard, not KYC or setup screens
-- sensitive KYC and bank details live in profile settings rather than the main dashboard or service-offer page
+- artisans have a role-specific workspace rather than the customer dashboard
+- approved artisans land on `/workspace/overview`, not KYC or setup screens
+- sensitive KYC and bank details live in Profile, not Offers
 - booking lifecycle actions stay connected to `/bookings/:id/status`
 - chat and reviews stay connected to the shared backend modules
 
@@ -677,6 +699,8 @@ Authenticated artisan:
   Update artisan profile.
 - `POST /artisans/portfolio-images/sign-upload`
   Create a signed Cloudinary upload payload for direct browser portfolio uploads.
+- `POST /artisans/kyc/sign-upload`
+  Signed Cloudinary upload for KYC document/selfie images (`bundo/artisan-kyc` folder).
 - `GET /artisans/kyc`
   Fetch my current KYC submission.
 - `POST /artisans/kyc`
@@ -784,7 +808,7 @@ Mounted at root.
 - `POST /payments/verify-reference`
   Verify and sync a Paystack payment reference for the current user. Returns **503** when Paystack is not configured and payment simulation is not allowed (see payment confirmation policy).
 - `POST /webhooks/paystack`
-  Paystack webhook endpoint.
+  Paystack webhook endpoint (`charge.success` → mark payment `PAID_HELD`; `transfer.success` / `transfer.failed` / `transfer.reversed` → confirm or fail artisan payout).
 
 ## Notifications
 
@@ -836,11 +860,13 @@ Categories:
 Bookings and payments:
 
 - `GET /admin/bookings`
-  List bookings with `conversationId`. Optional query: `?stage=requests|appointments|ongoing|completed`.
+  List bookings with `conversationId` and optional `moderator` user. Pagination default limit **100**, max **200** per page. Optional query: `?stage=requests|appointments|ongoing|completed`, `?moderatorId=<firebaseUid|unassigned>`.
 - `GET /admin/bookings/:id`
   Single booking with `conversationId`.
 - `PATCH /admin/bookings/:id/status`
   Admin lifecycle: `ACCEPTED`, `ONGOING`, `COMPLETED`, or `CANCELLED` (validated transitions).
+- `PATCH /admin/bookings/:id/moderator`
+  Body: `{ "moderatorId": "<firebaseUid>" | null }`. Assigns an active `ADMIN` user to moderate the job, or clears assignment.
 - `POST /admin/bookings/:id/release-payment`
 - `POST /admin/disputes/:id/resolve`
 
@@ -858,6 +884,11 @@ Reviews:
 
 - `GET /admin/reviews`
 - `DELETE /admin/reviews/:id`
+
+Ledger:
+
+- `GET /admin/ledger-entries`
+  Recent ledger rows for settlement audit (paginated).
 
 Stats:
 
@@ -946,6 +977,54 @@ Reference environment template:
 
 ---
 
+## Email verification and deliverability
+
+Signup and login use **Firebase Authentication** for verification and password-reset emails (not a custom Bundo SMTP server).
+
+**In-app behavior:**
+
+- [sendBundoEmailVerification](/Users/macbook/bundo/client/src/lib/authEmailVerification.ts) wraps `sendEmailVerification` with `actionCodeSettings.url` set to `window.location.origin + '/'`.
+- [EmailInboxHint](/Users/macbook/bundo/client/src/components/EmailInboxHint.tsx) is shown on the verification step in [AuthBox.tsx](/Users/macbook/bundo/client/src/auth/AuthBox.tsx) (and alternate auth pages) telling users to check spam/junk and mark as “Not spam”.
+- Success toasts mention **inbox and spam folder** for verification resend and password reset.
+
+**Improving inbox placement (Firebase Console — recommended for production):**
+
+1. **Authentication → Settings → Authorized domains** — include production and preview domains.
+2. **Authentication → Templates** — customize verification email subject/body and sender display name.
+3. **Custom domain for auth emails** (best) — configure SPF/DKIM per Firebase/Google instructions so mail is not sent only from `noreply@<project>.firebaseapp.com`.
+
+The app cannot fully prevent spam filtering without Firebase/domain configuration; the inbox hint is the fallback UX.
+
+---
+
+## Pagination limits (admin API)
+
+[utils/pagination.ts](/Users/macbook/bundo/server/src/utils/pagination.ts) accepts an optional `maxLimit` per route:
+
+| Route | Default limit | Max limit |
+|-------|---------------|-----------|
+| `GET /admin/bookings` | 100 | 200 |
+| `GET /admin/users` | 50 | 100 |
+| Most other admin lists | 20 | 50 |
+
+`App.tsx` loads admin bookings with `limit=200` and tracks `adminBookingsTotal` from response `meta.total` for the jobs panel header.
+
+---
+
+## Legacy / unused frontend paths
+
+The live app mounts [AppRoutes.tsx](/Users/macbook/bundo/client/src/app/AppRoutes.tsx) from [App.tsx](/Users/macbook/bundo/client/src/App.tsx).
+
+**Removed (May 2026):** `LandingPage.tsx`, `AppRouter.tsx`, and mock `pages/customer/Dashboard.tsx`. Auth pages use [AuthMarketingBackdrop.tsx](/Users/macbook/bundo/client/src/components/AuthMarketingBackdrop.tsx) instead of the old landing monolith.
+
+Still unused in live routes:
+
+- [client/src/app/appShellComponents.tsx](/Users/macbook/bundo/client/src/app/appShellComponents.tsx) — exported `ArtisanPanel` (legacy all-in-one artisan tools); workspace uses `ArtisanOffersPanel` + Profile instead.
+
+Prefer editing modular files under `client/src/admin/`, `client/src/views/`, `client/src/panels/`, and `client/src/auth/` for new work.
+
+---
+
 ## Current Strengths
 
 - clean role-based access control
@@ -954,7 +1033,7 @@ Reference environment template:
 - signup flow separates client and artisan intent before account creation
 - artisan onboarding now follows a guided 4-step setup flow
 - unapproved artisan offerings are hidden from public discovery until admin approval
-- approved artisans have dedicated dashboard, jobs, reviews, and profile settings surfaces
+- approved artisans use `/workspace` with dashboard, jobs, messages, reviews, offers, notifications, and profile settings (photos in Profile)
 - artisan refresh restore now lands in the workspace instead of reopening onboarding from a stale saved route
 - marketplace payment structure already modeled correctly
 - production fail-closed payment confirmation when Paystack is not configured; optional `ALLOW_PAYMENT_SIMULATION` for non-production demos only
@@ -967,7 +1046,11 @@ Reference environment template:
 - artisan KYC submission and admin review workflow
 - KYC flow validated end to end across artisan and admin roles
 - richer marketplace filtering and sorting for discovery
-- direct browser portfolio uploads through signed Cloudinary uploads
+- direct browser portfolio uploads through signed Cloudinary uploads (optional in onboarding; full management in Profile)
+- optional portfolio during onboarding and upload while pending approval (Option C)
+- artisan workspace header with full section navigation on desktop and mobile
+- admin jobs queue with inline rows, mobile drawer nav, and per-booking moderator assignment
+- email verification UX with spam-folder guidance and site-origin continue URLs
 - request-id aware health and readiness endpoints for observability
 - Vitest unit tests for payment confirmation policy and Paystack signing helpers; GitHub Actions CI builds client and server (see [.github/workflows/ci.yml](/Users/macbook/bundo/.github/workflows/ci.yml))
 
@@ -1022,7 +1105,10 @@ Typical layout for Bundo today:
 **After pushing to `main`:**
 
 1. Confirm [GitHub Actions CI](https://github.com/BUNDO-TECH-LLC/bundo-service-marketplace/actions) is green (build + tests in `server/` and `client/`).
-2. **Database:** apply migrations on production (`db:migrate:deploy`) before or immediately after API deploy. This release adds `20260516120000_add_booking_ongoing_status` (`ONGOING` on `BookingStatus`). If `migrate deploy` fails with Prisma `P1001` on `db.<ref>.supabase.co`, set `DIRECT_URL` to the Supabase **session pooler** hostname on port **5432** (keep transaction pooler on **6543** for `DATABASE_URL` at runtime).
+2. **Database:** apply migrations on production (`db:migrate:deploy`) before or immediately after API deploy. Recent migrations include:
+   - `20260516120000_add_booking_ongoing_status` — `ONGOING` on `BookingStatus`
+   - `20260519120000_add_booking_moderator` — optional `bookings.moderator_id` → `users.firebase_uid` for admin job ownership
+   If `migrate deploy` fails with Prisma `P1001` on `db.<ref>.supabase.co`, set `DIRECT_URL` to the Supabase **session pooler** hostname on port **5432** (keep transaction pooler on **6543** for `DATABASE_URL` at runtime).
 3. **API:** redeploy or restart so the new build is live; verify `GET /health` and `GET /ready`.
 4. **Web:** Vercel (if connected to the repo) usually auto-deploys `client/` on push; confirm `VITE_API_BASE_URL` points at the live API.
 5. **Paystack:** `PAYSTACK_CALLBACK_URL` must be **`https://`** in production (e.g. `https://bundo-service-marketplace.vercel.app/workspace/bookings`). A localhost callback will make Render **build succeed but crash on start** with a Zod validation error.
@@ -1037,8 +1123,8 @@ Templates: [client/.env.production.example](/Users/macbook/bundo/client/.env.pro
 - **Policy tests** cover [paymentConfirmPolicy.ts](/Users/macbook/bundo/server/src/modules/payments/paymentConfirmPolicy.ts) so production vs simulation rules cannot regress silently.
 - **Booking transition tests** cover [bookingStatus.ts](/Users/macbook/bundo/server/src/lib/bookingStatus.ts).
 - **Payment guard tests** cover [bookingPayment.ts](/Users/macbook/bundo/server/src/lib/bookingPayment.ts).
-- **E2E smoke** ([smoke.lifecycle.e2e.test.ts](/Users/macbook/bundo/server/src/smoke.lifecycle.e2e.test.ts)): booking lifecycle, admin jobs, and chat — run with `BUNDO_E2E=1` / `npm run test:smoke`.
-- **CI** (`.github/workflows/ci.yml`) runs `npm ci`, `npm test`, and `npm run build` in `server/`, and `npm ci` + `npm run build` in `client/`, on pushes and pull requests to `main` / `master`.
+- **E2E smoke** ([smoke.lifecycle.e2e.test.ts](/Users/macbook/bundo/server/src/smoke.lifecycle.e2e.test.ts)): booking lifecycle, admin jobs, and chat — run with `BUNDO_E2E=1` / `npm run test:smoke` (requires `DATABASE_URL` + migrated schema).
+- **CI** (`.github/workflows/ci.yml`): server unit tests + build, client build, and a **smoke** job (Postgres service + `prisma migrate deploy` + lifecycle smoke test) on pushes/PRs to `main` / `master`.
 
 ---
 
@@ -1080,8 +1166,12 @@ Templates: [client/.env.production.example](/Users/macbook/bundo/client/.env.pro
 - [x] Browser push notification support
 - [x] Help-center and trust-policy content
 - [x] Search and sorting filters for public marketplace discovery
-- [x] Direct browser media upload flow for artisan portfolio
-- [x] Artisan profile/settings surface
+- [x] Direct browser media upload flow for artisan portfolio (optional onboarding; Profile is canonical photo home)
+- [x] Artisan profile/settings surface with Photos / KYC / Bank sections
+- [x] Artisan workspace header navigation (Dashboard through Profile)
+- [x] Admin mobile-friendly console (drawer nav, inline job/profile/KYC rows)
+- [x] Admin job moderator assignment per booking
+- [x] Email verification spam-folder guidance in signup UI
 - [x] Basic production observability with health, readiness, request IDs, and structured request logging
 - [x] Server unit tests for payment confirmation policy, booking transitions, and CI build pipeline
 - [x] React Router path-based navigation and notification deep links
@@ -1090,11 +1180,18 @@ Templates: [client/.env.production.example](/Users/macbook/bundo/client/.env.pro
 ### Still needed before a stronger public MVP launch
 
 - [ ] Production webhook exposure and confirmed end-to-end Paystack settlement testing
-- [ ] Stronger payout audit and settlement reconciliation
+- [ ] Stronger payout audit and settlement reconciliation in production (transfer webhooks implemented in code; confirm in Paystack dashboard)
 - [ ] Search ranking tuned with distance and recommendation signals
 - [ ] Production observability and alerting beyond basic health checks
-- [ ] Richer media management for artisan portfolio editing, image replacement, and reordering
-- [ ] Deeper artisan profile settings for business information, pricing edits, and notification preferences
+- [x] KYC document upload via Cloudinary (`POST /artisans/kyc/sign-upload`; onboarding step 4 + Profile KYC)
+- [ ] Editable phone on profile (still synced from Firebase login only); notification preferences module
+- [x] Artisan portfolio reorder in profile settings; availability editor in Profile
+- [x] Artisan dashboard earnings from completed payouts / held balance
+- [x] Admin reviews panel; admin jobs **Load more** + moderator filter chips
+- [x] Modal prompts for admin catalog/KYC/disputes and customer reschedule (replaces `window.prompt` in live panels)
+- [ ] Firebase custom domain + templates for verification email inbox placement (see [Email verification and deliverability](#email-verification-and-deliverability))
+- [x] Remove legacy `LandingPage.tsx`, `AppRouter.tsx`, and mock customer `Dashboard.tsx`
+- [x] E2E lifecycle smoke in CI (Postgres + migrate + `smoke.lifecycle.e2e.test.ts`)
 
 ---
 
@@ -1102,13 +1199,14 @@ Templates: [client/.env.production.example](/Users/macbook/bundo/client/.env.pro
 
 The project is strong for MVP, but these are sensible next expansions:
 
-1. transfer success webhook handling for payout settlement confirmation
-2. richer refund and payout audit trail entities
-3. richer scheduling windows and negotiated rescheduling flow
+1. production confirmation of Paystack transfer webhooks and payout `PROCESSING` → `SENT` lifecycle
+2. richer refund and payout audit trail entities beyond ledger list view
+3. richer scheduling windows and negotiated rescheduling flow (basic modal reschedule shipped)
 4. search ranking and recommendation quality by price/rating/distance
-5. richer cloud media management for artisan portfolio
-6. production observability, alerting, and background job handling
-7. full artisan settings modules beyond the first profile-settings screen
+5. production observability, alerting, and background job handling
+6. notification preferences and editable phone in artisan profile
+7. Firebase custom sending domain for auth emails (reduce spam-folder rate)
+8. E2E **payment** smoke in CI (Paystack; lifecycle smoke already runs in CI)
 
 ---
 
@@ -1118,10 +1216,10 @@ The smartest order from here is:
 
 1. Production-grade webhook exposure and Paystack dashboard setup
 2. Full real payment + refund + payout acceptance test
-3. Better scheduling and negotiated rescheduling polish
+3. Firebase auth email custom domain + template polish (inbox deliverability)
 4. Search relevance and marketplace ranking
-5. Portfolio and profile management polish
-6. Production alerting and support tooling
+5. Production alerting and support tooling
+6. Notification preferences and editable phone in profile
 
 ---
 
@@ -1144,6 +1242,8 @@ If someone new joins the project, these are the best first reads:
 - [server/src/lib/bookingConversations.ts](/Users/macbook/bundo/server/src/lib/bookingConversations.ts)
 - [client/src/lib/api.ts](/Users/macbook/bundo/client/src/lib/api.ts)
 - [client/src/lib/formatting.ts](/Users/macbook/bundo/client/src/lib/formatting.ts)
-- [client/src/appTypes.ts](/Users/macbook/bundo/client/src/appTypes.ts)
+- [client/src/appTypes.ts](/Users/macbook/bundo/client/src/appTypes.ts) (`ArtisanHeaderActive`, `WorkspaceSection`, admin record types)
+- [client/src/lib/authEmailVerification.ts](/Users/macbook/bundo/client/src/lib/authEmailVerification.ts)
+- [client/src/lib/portfolioUpload.ts](/Users/macbook/bundo/client/src/lib/portfolioUpload.ts)
 - [client/src/panels/BookingsPanel.tsx](/Users/macbook/bundo/client/src/panels/BookingsPanel.tsx)
 - [client/src/types.ts](/Users/macbook/bundo/client/src/types.ts)

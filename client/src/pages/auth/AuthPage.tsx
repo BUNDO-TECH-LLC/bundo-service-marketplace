@@ -1,7 +1,6 @@
 import { FormEvent, useState } from 'react';
 import {
   createUserWithEmailAndPassword,
-  sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   updateProfile,
@@ -10,6 +9,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthLayout } from '../../layouts/AuthLayout';
 import { api } from '../../lib/api';
 import { resolveApiSession } from '../../lib/authSession';
+import { sendBundoEmailVerification } from '../../lib/authEmailVerification';
 import { auth, firebaseReady } from '../../lib/firebase';
 import type { Role } from '../../types';
 import googleLogo from '../../assets/icons/material-icon-theme_google.svg';
@@ -74,7 +74,7 @@ export function AuthPage({ mode }: AuthPageProps) {
 
     try {
       await sendPasswordResetEmail(auth, email.trim());
-      setError('Password reset email sent. Check your inbox.');
+      setError('Password reset email sent. Check your inbox and spam folder.');
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'Could not send password reset email.');
     } finally {
@@ -125,7 +125,7 @@ export function AuthPage({ mode }: AuthPageProps) {
         await updateProfile(credential.user, { displayName: fullName.trim() });
       }
 
-      await sendEmailVerification(credential.user);
+      await sendBundoEmailVerification(credential.user);
 
       const session = await resolveApiSession(credential.user);
       await ensureRole(session.token, accountKind);

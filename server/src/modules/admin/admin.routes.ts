@@ -34,6 +34,8 @@ import {
   getAdminKycSubmissionById,
   getAdminKycSubmissions,
   getAdminReviews,
+  getAdminLedgerEntries,
+  countAdminLedgerEntries,
   getAdminStats,
   getUserById,
   getUsers,
@@ -408,10 +410,18 @@ router.get('/bookings', asyncHandler(async (req, res) => {
     throw httpError(400, 'stage must be requests, appointments, ongoing, or completed');
   }
 
+  const moderatorParam =
+    typeof req.query.moderatorId === 'string' ? req.query.moderatorId.trim() : undefined;
+  const moderatorId = moderatorParam || undefined;
+
   const stageFilter = stage ? { stage } : {};
+  const listFilter = {
+    ...stageFilter,
+    ...(moderatorId ? { moderatorId } : {}),
+  };
   const [bookings, total] = await Promise.all([
-    getAdminBookings(pagination, stageFilter),
-    countAdminBookings(stageFilter),
+    getAdminBookings(pagination, listFilter),
+    countAdminBookings(listFilter),
   ]);
 
   res.json({
@@ -755,6 +765,23 @@ router.get('/reviews', asyncHandler(async (req, res) => {
   res.json({
     message: 'Admin reviews fetched',
     reviews,
+    meta: {
+      ...paginationMeta(pagination),
+      total,
+    },
+  });
+}));
+
+router.get('/ledger-entries', asyncHandler(async (req, res) => {
+  const pagination = getPagination(req, 50, 100);
+  const [entries, total] = await Promise.all([
+    getAdminLedgerEntries(pagination),
+    countAdminLedgerEntries(),
+  ]);
+
+  res.json({
+    message: 'Ledger entries fetched',
+    entries,
     meta: {
       ...paginationMeta(pagination),
       total,

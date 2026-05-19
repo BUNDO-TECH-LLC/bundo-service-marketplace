@@ -115,6 +115,31 @@ router.get(
 );
 
 router.post(
+  '/kyc/sign-upload',
+  verifyFirebaseToken,
+  requireRole(Role.ARTISAN),
+  asyncHandler(async (_req, res) => {
+    const timestamp = Math.floor(Date.now() / 1000);
+    const folder = 'bundo/artisan-kyc';
+    const signature = buildCloudinaryUploadSignature(
+      { folder, timestamp },
+      env.CLOUDINARY_API_SECRET
+    );
+
+    res.json({
+      message: 'KYC upload signature created',
+      upload: {
+        cloudName: env.CLOUDINARY_CLOUD_NAME,
+        apiKey: env.CLOUDINARY_API_KEY,
+        timestamp,
+        folder,
+        signature,
+      },
+    });
+  })
+);
+
+router.post(
   '/portfolio-images/sign-upload',
   verifyFirebaseToken,
   requireRole(Role.ARTISAN),

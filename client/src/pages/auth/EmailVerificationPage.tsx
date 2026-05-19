@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { sendEmailVerification } from 'firebase/auth';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthLayout } from '../../layouts/AuthLayout';
 import { api, ApiError } from '../../lib/api';
 import { resolveApiSession } from '../../lib/authSession';
+import { EmailInboxHint } from '../../components/EmailInboxHint';
+import { sendBundoEmailVerification } from '../../lib/authEmailVerification';
 import { auth } from '../../lib/firebase';
 
 type VerificationState = {
@@ -40,8 +41,8 @@ export function EmailVerificationPage() {
     setMessage('');
 
     try {
-      await sendEmailVerification(auth.currentUser);
-      setMessage('Verification link sent again. Check your inbox.');
+      await sendBundoEmailVerification(auth.currentUser);
+      setMessage('Verification link sent again. Check your inbox and spam folder.');
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -67,7 +68,7 @@ export function EmailVerificationPage() {
 
     if (!auth.currentUser.emailVerified) {
       setMessage(
-        'Your email is not verified yet. Click the link in your inbox, then try again.'
+        'Your email is not verified yet. Click the link in your inbox (or spam folder), then try again.'
       );
       return;
     }
@@ -110,7 +111,9 @@ export function EmailVerificationPage() {
         {email}
       </>
     }
-  > <div className="grid gap-[18px]">
+  >
+      <EmailInboxHint email={typeof email === 'string' ? email : undefined} />
+      <div className="grid gap-[18px]">
         <button
           type="button"
           onClick={continueAfterVerification}

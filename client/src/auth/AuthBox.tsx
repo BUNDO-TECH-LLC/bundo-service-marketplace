@@ -3,7 +3,6 @@ import type { User } from 'firebase/auth';
 import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
-  sendEmailVerification,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
@@ -23,6 +22,8 @@ import { userDisplayName } from '../lib/userDisplayName';
 import type { ApiUser, Role } from '../types';
 import type { SignupRole, View, WorkspaceSection } from '../appTypes';
 import bundoLogo from '../assets/bundo-logo.png';
+import { EmailInboxHint } from '../components/EmailInboxHint';
+import { sendBundoEmailVerification } from '../lib/authEmailVerification';
 import { PasswordInput } from '../components/PasswordInput';
 
 export function AuthBox({
@@ -140,10 +141,10 @@ export function AuthBox({
 
   async function sendVerification(user: User) {
     savePendingSignupRole(user.email, preferredRole);
-    await sendEmailVerification(user);
+    await sendBundoEmailVerification(user);
     setPendingEmailVerificationUser(user);
     setAuthStep('verify');
-    onNotice('Verification email sent. Check your inbox, then come back to continue.');
+    onNotice('Verification email sent. Check your inbox and spam folder, then come back to continue.');
   }
 
   async function confirmEmailVerification() {
@@ -160,7 +161,9 @@ export function AuthBox({
       const refreshedUser = auth?.currentUser || user;
 
       if (!refreshedUser.emailVerified) {
-        onNotice('Email is not verified yet. Open the verification link, then try again.');
+        onNotice(
+          'Email is not verified yet. Open the link in your inbox (or spam folder), then try again.'
+        );
         return;
       }
 
@@ -213,7 +216,7 @@ export function AuthBox({
     setSubmitting(true);
     try {
       await sendPasswordResetEmail(auth, email.trim());
-      onNotice('Password reset email sent. Check your inbox.');
+      onNotice('Password reset email sent. Check your inbox and spam folder.');
       setMode('login');
       setAuthStep('account');
       setPassword('');
@@ -530,6 +533,7 @@ export function AuthBox({
                   We sent a verification link to {pendingEmailVerificationUser?.email || email || 'your email address'}.
                   Open that link, then return here to continue into your Bundo account.
                 </p>
+                <EmailInboxHint email={pendingEmailVerificationUser?.email || email || undefined} />
                 <div className="auth-status-card">
                   <strong>Email verification required</strong>
                   <span>

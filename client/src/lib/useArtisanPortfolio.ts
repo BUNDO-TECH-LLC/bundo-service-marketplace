@@ -63,6 +63,15 @@ export function useArtisanPortfolio(token: string) {
     await refreshPortfolio();
   }
 
+  async function reorderPortfolioImage(imageId: string, displayOrder: number) {
+    await api(`/artisans/portfolio-images/${imageId}`, {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify({ displayOrder }),
+    });
+    await refreshPortfolio();
+  }
+
   return {
     portfolioImages,
     uploadingPortfolio,
@@ -70,5 +79,6 @@ export function useArtisanPortfolio(token: string) {
     uploadPortfolioFile,
     uploadPortfolioFiles,
     removePortfolioImage,
+    reorderPortfolioImage,
   };
 }

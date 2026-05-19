@@ -1,5 +1,3 @@
-import { existsSync } from 'node:fs';
-import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import { BookingStatus, Role, UserStatus } from '@prisma/client';
@@ -52,7 +50,6 @@ vi.mock('./middlewares/verifyFirebaseToken', () => ({
 
 import { createApp } from './createApp';
 
-const hasDotEnv = existsSync(path.join(process.cwd(), '.env'));
 const hasDatabase = Boolean(process.env.DATABASE_URL);
 
 async function wipeFixture() {
@@ -76,7 +73,7 @@ async function wipeFixture() {
   await db.category.deleteMany({ where: { slug: SLUG } });
 }
 
-describe.skipIf(!hasDotEnv || !hasDatabase)(
+describe.skipIf(!hasDatabase)(
   'Smoke: booking lifecycle, admin jobs, and chat',
   () => {
     const app = createApp();

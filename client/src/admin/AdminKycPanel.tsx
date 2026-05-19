@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { api } from '../lib/api';
 import { bookingDate } from '../lib/bookingDisplay';
+import { PromptDialog } from '../components/PromptDialog';
 import type { ActionRunner, AdminArtisanRecord } from '../appTypes';
 import type { ArtisanKycSubmission } from '../types';
 import { AdminPortfolioGallery } from '../components/AdminPortfolioGallery';
@@ -20,25 +22,22 @@ export function AdminKycPanel({
   runAction: ActionRunner;
   refresh: () => Promise<void>;
 }) {
-  async function reviewSubmission(
-    submissionId: string,
-    status: 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED'
-  ) {
-    const reviewNote = window.prompt(
-      status === 'APPROVED'
-        ? 'Optional approval note'
-        : 'Add a short note for the artisan',
-      ''
-    );
+  const [reviewPrompt, setReviewPrompt] = useState<null | {
+    submissionId: string;
+    status: 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED';
+  }>(null);
 
-    await api(`/admin/kyc-submissions/${submissionId}/review`, {
+  async function submitReview(note: string) {
+    if (!reviewPrompt) return;
+    await api(`/admin/kyc-submissions/${reviewPrompt.submissionId}/review`, {
       method: 'PATCH',
       token,
       body: JSON.stringify({
-        status,
-        reviewNote: reviewNote || undefined,
+        status: reviewPrompt.status,
+        reviewNote: note || undefined,
       }),
     });
+    setReviewPrompt(null);
     await refresh();
   }
 
@@ -51,6 +50,33 @@ export function AdminKycPanel({
           <p>Review submitted identity details before scaling artisan approvals and payouts.</p>
         </div>
       </header>
+
+      <PromptDialog
+        open={reviewPrompt !== null}
+        title={
+          reviewPrompt?.status === 'APPROVED'
+            ? 'Approve KYC'
+            : reviewPrompt?.status === 'REJECTED'
+              ? 'Reject KYC'
+              : 'Request KYC changes'
+        }
+        message="Add an optional note for the artisan."
+        label="Review note"
+        confirmLabel="Save"
+        required={false}
+        busy={busy}
+        onCancel={() => setReviewPrompt(null)}
+        onConfirm={(note) =>
+          runAction(
+            () => submitReview(note),
+            reviewPrompt?.status === 'APPROVED'
+              ? 'KYC approved'
+              : reviewPrompt?.status === 'REJECTED'
+                ? 'KYC rejected'
+                : 'KYC returned for changes'
+          )
+        }
+      />
 
       {submissions.length === 0 && (
         <EmptyState
@@ -119,10 +145,7 @@ export function AdminKycPanel({
                 className="primary-action"
                 disabled={busy || submission.status === 'APPROVED'}
                 onClick={() =>
-                  runAction(
-                    () => reviewSubmission(submission.id, 'APPROVED'),
-                    'KYC approved'
-                  )
+                  setReviewPrompt({ submissionId: submission.id, status: 'APPROVED' })
                 }
               >
                 Approve
@@ -131,10 +154,7 @@ export function AdminKycPanel({
                 className="secondary-button"
                 disabled={busy || submission.status === 'CHANGES_REQUESTED'}
                 onClick={() =>
-                  runAction(
-                    () => reviewSubmission(submission.id, 'CHANGES_REQUESTED'),
-                    'KYC returned for changes'
-                  )
+                  setReviewPrompt({ submissionId: submission.id, status: 'CHANGES_REQUESTED' })
                 }
               >
                 Request changes
@@ -143,10 +163,7 @@ export function AdminKycPanel({
                 className="secondary-button"
                 disabled={busy || submission.status === 'REJECTED'}
                 onClick={() =>
-                  runAction(
-                    () => reviewSubmission(submission.id, 'REJECTED'),
-                    'KYC rejected'
-                  )
+                  setReviewPrompt({ submissionId: submission.id, status: 'REJECTED' })
                 }
               >
                 Reject

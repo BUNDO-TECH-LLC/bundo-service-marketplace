@@ -8,7 +8,10 @@ import { EmptyState } from '../components/EmptyState';
 import { api } from '../lib/api';
 import { uploadPortfolioImage } from '../lib/portfolioUpload';
 import { useArtisanPortfolio } from '../lib/useArtisanPortfolio';
+import { ArtisanAvailabilityEditor } from '../components/ArtisanAvailabilityEditor';
 import { ArtisanPortfolioManager } from '../components/ArtisanPortfolioManager';
+import { KycImageUploadField } from '../components/KycImageUploadField';
+import { uploadKycImage } from '../lib/kycUpload';
 import { bookingDate } from '../lib/bookingDisplay';
 import { auth, firebaseReady } from '../lib/firebase';
 import { dayLabels, money } from '../lib/formatting';
@@ -211,6 +214,7 @@ export function ArtisanLanding({
   const [kycSubmission, setKycSubmission] = useState<ArtisanKycSubmission | null>(null);
   const [step, setStep] = useState(1);
   const [uploadingPortfolio, setUploadingPortfolio] = useState(false);
+  const [kycDocumentFile, setKycDocumentFile] = useState<File | null>(null);
   const [setup, setSetup] = useState({
     fullName: firebaseUser?.displayName || '',
     businessName: '',
@@ -492,6 +496,12 @@ export function ArtisanLanding({
         )
     );
 
+    if (!kycDocumentFile) {
+      throw new Error('Please upload a photo of your ID document before submitting.');
+    }
+
+    const documentImageUrl = await uploadKycImage(token, kycDocumentFile);
+
     const response = await api<{ submission: ArtisanKycSubmission }>('/artisans/kyc', {
       method: 'POST',
       token,
@@ -499,7 +509,7 @@ export function ArtisanLanding({
         legalName: setup.fullName || displayName,
         documentType: 'NIN',
         documentNumber: setup.documentNumber,
-        documentImageUrl: `pending-manual-review:${setup.documentNumber}`,
+        documentImageUrl,
         address: setup.address || setup.location,
         city: setup.location,
       }),
@@ -752,6 +762,17 @@ export function ArtisanLanding({
           </div>
           <label>Residential address<input value={setup.address} onChange={(event) => updateSetup('address', event.target.value)} placeholder="Address for manual verification" /></label>
           <label>NIN or ID number<input value={setup.documentNumber} onChange={(event) => updateSetup('documentNumber', event.target.value)} placeholder="Required for verification" /></label>
+          <label>
+            ID document photo
+            <input
+              type="file"
+              accept="image/*"
+              disabled={busy}
+              onChange={(event) => setKycDocumentFile(event.target.files?.[0] || null)}
+            />
+            <small className="muted">Upload a clear photo of your NIN slip or government ID (JPG/PNG, max 5MB).</small>
+          </label>
+          {kycDocumentFile && <p className="muted">Selected: {kycDocumentFile.name}</p>}
           <label className="terms-row"><input type="checkbox" checked={submitAgreed} onChange={(event) => setSubmitAgreed(event.target.checked)} /> <span>Submitting for verification means our team will review your profile before it goes live.</span></label>
         </section>
       )}
@@ -767,7 +788,14 @@ export function ArtisanLanding({
             {portfolioImages.length > 0 ? 'Next' : 'Skip for now'}
           </button>
         )}
-        {step === 4 && <button disabled={busy || !submitAgreed || !setup.documentNumber || selectedDays.length === 0} onClick={() => runAction(submitForVerification, 'Application submitted — awaiting approval')}>Submit for verification</button>}
+        {step === 4 && (
+          <button
+            disabled={busy || !submitAgreed || !setup.documentNumber || !kycDocumentFile || selectedDays.length === 0}
+            onClick={() => runAction(submitForVerification, 'Application submitted — awaiting approval')}
+          >
+            Submit for verification
+          </button>
+        )}
       </div>
     </main>
     </ArtisanSetupShell>
@@ -1587,7 +1615,7 @@ export function ArtisanReviewsPanel({ token }: { token: string }) {
   );
 }
 
-type ProfileSettingsSection = 'profile' | 'photos' | 'kyc' | 'bank';
+type ProfileSettingsSection = 'profile' | 'photos' | 'availability' | 'kyc' | 'bank';
 
 export function ArtisanProfileSettings({
   token,
@@ -1603,6 +1631,7 @@ export function ArtisanProfileSettings({
   refresh: () => Promise<void>;
 }) {
   const [activeSection, setActiveSection] = useState<ProfileSettingsSection>('profile');
+  const [profileFormKey, setProfileFormKey] = useState(0);
   const [profile, setProfile] = useState<Artisan | null>(null);
   const [payoutAccount, setPayoutAccount] = useState<ProviderPayoutAccount | null>(null);
   const [banks, setBanks] = useState<PayoutBank[]>([]);
@@ -1615,6 +1644,7 @@ export function ArtisanProfileSettings({
     uploadPortfolioFile,
     uploadPortfolioFiles,
     removePortfolioImage,
+    reorderPortfolioImage,
   } = useArtisanPortfolio(token);
 
   useEffect(() => {
@@ -1676,6 +1706,11 @@ export function ArtisanProfileSettings({
 
   async function submitKyc(formElement: HTMLFormElement) {
     const form = new FormData(formElement);
+    const documentImageUrl = String(form.get('documentImageUrl') || '').trim();
+    if (!documentImageUrl) {
+      throw new Error('Please upload your ID document photo.');
+    }
+    const selfieImageUrl = String(form.get('selfieImageUrl') || '').trim();
     const response = await api<{ submission: ArtisanKycSubmission }>('/artisans/kyc', {
       method: 'POST',
       token,
@@ -1683,8 +1718,8 @@ export function ArtisanProfileSettings({
         legalName: form.get('legalName'),
         documentType: form.get('documentType'),
         documentNumber: form.get('documentNumber'),
-        documentImageUrl: form.get('documentImageUrl'),
-        selfieImageUrl: form.get('selfieImageUrl') || undefined,
+        documentImageUrl,
+        selfieImageUrl: selfieImageUrl || undefined,
         address: form.get('address'),
         city: form.get('city'),
       }),
@@ -1715,6 +1750,7 @@ export function ArtisanProfileSettings({
   const settingsSections: { id: ProfileSettingsSection; label: string }[] = [
     { id: 'profile', label: 'Profile' },
     { id: 'photos', label: 'Photos' },
+    { id: 'availability', label: 'Availability' },
     { id: 'kyc', label: 'KYC' },
     { id: 'bank', label: 'Bank' },
   ];
@@ -1774,6 +1810,7 @@ export function ArtisanProfileSettings({
 
       <div className="artisan-settings-stack">
         <form
+          key={profileFormKey}
           id="settings-profile"
           className={`artisan-settings-card ${panelClass('profile')}`}
           onSubmit={(event) => {
@@ -1797,11 +1834,28 @@ export function ArtisanProfileSettings({
           </div>
           <label>Full Name<input name="displayName" defaultValue={profile?.displayName || ''} required /></label>
           <label>Email Address<input defaultValue={firebaseUser?.email || ''} disabled /></label>
-          <label>Phone Number<input placeholder="+234" disabled /></label>
+          <label>
+            Phone number
+            <input
+              defaultValue={firebaseUser?.phoneNumber || ''}
+              disabled
+              title="Phone is synced from your sign-in account"
+            />
+            <small className="muted">Managed through your login provider (Firebase).</small>
+          </label>
           <label>Location<input name="city" defaultValue={profile?.city || 'Lagos'} required /></label>
           <label>Area<input name="area" defaultValue={profile?.area || ''} /></label>
           <div className="settings-actions">
-            <button type="button" className="secondary-button">Cancel</button>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => {
+                setProfileFormKey((value) => value + 1);
+                void hydrateSettings();
+              }}
+            >
+              Cancel
+            </button>
             <button disabled={busy}>Save Changes</button>
           </div>
         </form>
@@ -1816,7 +1870,12 @@ export function ArtisanProfileSettings({
           uploadPortfolioFile={uploadPortfolioFile}
           uploadPortfolioFiles={uploadPortfolioFiles}
           removePortfolioImage={removePortfolioImage}
+          reorderPortfolioImage={reorderPortfolioImage}
         />
+        </div>
+
+        <div id="settings-availability" className={panelClass('availability')}>
+          <ArtisanAvailabilityEditor token={token} busy={busy} runAction={runAction} />
         </div>
 
         <form
@@ -1846,8 +1905,25 @@ export function ArtisanProfileSettings({
             </select>
           </label>
           <label>Document Number<input name="documentNumber" defaultValue={kycSubmission?.documentNumber || ''} required /></label>
-          <label>Document Image URL<input name="documentImageUrl" defaultValue={kycSubmission?.documentImageUrl || ''} required /></label>
-          <label>Selfie Image URL<input name="selfieImageUrl" defaultValue={kycSubmission?.selfieImageUrl || ''} /></label>
+          <KycImageUploadField
+            label="Document photo"
+            name="documentImageUrl"
+            hint="Upload a clear photo of your ID (JPG/PNG, max 5MB)."
+            currentUrl={kycSubmission?.documentImageUrl}
+            busy={busy}
+            runAction={runAction}
+            onUpload={(file) => uploadKycImage(token, file)}
+            required={!kycSubmission?.documentImageUrl}
+          />
+          <KycImageUploadField
+            label="Selfie (optional)"
+            name="selfieImageUrl"
+            hint="Optional selfie holding your ID."
+            currentUrl={kycSubmission?.selfieImageUrl}
+            busy={busy}
+            runAction={runAction}
+            onUpload={(file) => uploadKycImage(token, file)}
+          />
           <label>Residential Address<input name="address" defaultValue={kycSubmission?.address || ''} required /></label>
           <label>City<input name="city" defaultValue={kycSubmission?.city || profile?.city || 'Lagos'} required /></label>
           <button disabled={busy}>Save KYC details</button>
