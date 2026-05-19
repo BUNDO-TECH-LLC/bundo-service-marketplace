@@ -17,13 +17,26 @@ async function filterByNotificationPreferences(
   }
 
   const userIds = [...new Set(inputs.map((input) => input.userId))];
-  const users = await db.user.findMany({
-    where: { firebaseUid: { in: userIds } },
-    select: { firebaseUid: true, notificationPreferences: true },
-  });
-  const prefMap = new Map(
-    users.map((user) => [user.firebaseUid, getUserNotificationPreferences(user)])
-  );
+  let prefMap = new Map<string, ReturnType<typeof getUserNotificationPreferences>>();
+
+  try {
+    const users = await db.user.findMany({
+      where: { firebaseUid: { in: userIds } },
+      select: { firebaseUid: true, notificationPreferences: true },
+    });
+    prefMap = new Map(
+      users.map((user) => [user.firebaseUid, getUserNotificationPreferences(user)])
+    );
+  } catch (error: unknown) {
+    const code =
+      typeof error === 'object' && error && 'code' in error
+        ? String((error as { code?: string }).code)
+        : '';
+    // Pre-migration databases without notification_preferences still deliver notifications.
+    if (code !== 'P2022') {
+      throw error;
+    }
+  }
 
   return inputs.filter((input) => {
     const prefs = prefMap.get(input.userId);
