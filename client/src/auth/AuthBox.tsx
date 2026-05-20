@@ -27,7 +27,7 @@ import { EmailInboxHint } from '../components/EmailInboxHint';
 import { sendBundoEmailVerification } from '../lib/authEmailVerification';
 import { LegalLinks } from '../components/LegalLinks';
 import { PasswordInput } from '../components/PasswordInput';
-import { IconHelp, IconSettings } from '../components/TopbarNavIcons';
+import { IconHelp, IconProfile, IconReviews, IconSettings } from '../components/TopbarNavIcons';
 
 function AuthDrawer({
   open,
@@ -490,7 +490,7 @@ export function AuthBox({
         <button
           className="account-chip"
           type="button"
-          aria-label="Open account menu"
+          aria-label={`Account menu for ${displayName}`}
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((open) => !open)}
         >
@@ -499,25 +499,49 @@ export function AuthBox({
         </button>
 
         {menuOpen && (
-          <div className="account-menu">
+          <div className="account-menu" role="menu">
             <div className="account-menu-head">
               <span className="account-avatar large">{initial}</span>
               <div>
                 <strong>{displayName}</strong>
                 <small>{firebaseUser.email || me?.email || roleLabel}</small>
-                <em>{roleLabel}</em>
+                {role !== 'ARTISAN' && <em>{roleLabel}</em>}
               </div>
             </div>
 
             {role === 'ARTISAN' ? (
               <>
-                <button onClick={() => goToWorkspace('overview')}>Dashboard</button>
-                <button onClick={() => goToWorkspace('profile')}>Your profile</button>
-                <button onClick={() => goToWorkspace('offers')}>Manage offers</button>
-                <button onClick={() => goToWorkspace('bookings')}>Booking requests</button>
-                <button onClick={() => goToWorkspace('messages')}>Messages</button>
-                <button onClick={() => goToWorkspace('reviews')}>Reviews</button>
-                <button onClick={() => goToWorkspace('notifications')}>Notifications</button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="account-menu-item-with-icon"
+                  onClick={() => goToWorkspace('profile')}
+                >
+                  <IconProfile />
+                  <span>Profile</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="account-menu-item-with-icon"
+                  onClick={() => goToWorkspace('reviews')}
+                >
+                  <IconReviews />
+                  <span>Reviews</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="account-menu-item-with-icon"
+                  onClick={() => goToWorkspace('settings')}
+                >
+                  <IconSettings />
+                  <span>Settings</span>
+                </button>
+                <button type="button" role="menuitem" className="account-menu-item-with-icon" onClick={() => goTo('help')}>
+                  <IconHelp />
+                  <span>Help</span>
+                </button>
               </>
             ) : role === 'ADMIN' ? (
               <>
@@ -535,22 +559,28 @@ export function AuthBox({
               </>
             )}
 
-            <button type="button" className="account-menu-item-with-icon" onClick={() => goTo('help')}>
-              <IconHelp />
-              <span>Help</span>
-            </button>
+            {role !== 'ARTISAN' && (
+              <>
+                <button type="button" role="menuitem" className="account-menu-item-with-icon" onClick={() => goTo('help')}>
+                  <IconHelp />
+                  <span>Help</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="account-menu-item-with-icon"
+                  onClick={() => {
+                    goToWorkspace('settings');
+                  }}
+                >
+                  <IconSettings />
+                  <span>Settings</span>
+                </button>
+              </>
+            )}
             <button
               type="button"
-              className="account-menu-item-with-icon"
-              onClick={() => {
-                goToWorkspace('settings');
-              }}
-            >
-              <IconSettings />
-              <span>Settings</span>
-            </button>
-            <button
-              type="button"
+              role="menuitem"
               className="danger-menu-item"
               onClick={() => {
                 setMenuOpen(false);

@@ -210,6 +210,7 @@ export function MainLayout() {
       {ctx.usesArtisanWorkspaceHeader && (
         <ArtisanAppHeader
           displayName={userDisplayName(ctx.firebaseUser, ctx.me)}
+          email={ctx.firebaseUser?.email || ctx.me?.email}
           active={ctx.artisanHeaderActive}
           notificationUnreadCount={ctx.notifications.filter((notification) => !notification.readAt).length}
           onDashboard={() => {
@@ -235,6 +236,9 @@ export function MainLayout() {
           }}
           onSettings={() => {
             ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'settings' }));
+          }}
+          onHelp={() => {
+            ctx.navigate('/help', { state: nextHelpOpenState(ctx.location) });
           }}
           onSignOut={() => {
             ctx.setNotice('Signed out');

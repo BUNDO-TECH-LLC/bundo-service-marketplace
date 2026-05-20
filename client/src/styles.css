@@ -373,9 +373,7 @@ canvas {
 }
 
 .artisan-header-signout {
-  display: none;
-  padding: 8px 12px;
-  font-size: 14px;
+  display: none !important;
 }
 
 .artisan-header-end {
@@ -480,35 +478,38 @@ canvas {
   }
 }
 
-.artisan-user-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  max-width: 140px;
-  padding: 0;
-  color: var(--ink);
-  font-size: 14px;
-  font-weight: 700;
-  background: transparent;
+.artisan-account-summary {
+  position: relative;
 }
 
-.artisan-user-chip-avatar {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 999px;
+.artisan-app-header .artisan-account-summary .account-chip {
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: #f6f4f1;
+}
+
+.artisan-app-header .artisan-account-summary .account-chip:hover,
+.artisan-app-header .artisan-account-summary .account-chip[aria-expanded='true'],
+.artisan-app-header .artisan-account-summary .account-chip.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.artisan-app-header .artisan-account-summary .account-avatar {
+  width: 34px;
+  height: 34px;
   color: #fff;
   background: #111;
   font-size: 14px;
   font-weight: 800;
 }
 
-.artisan-user-chip-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.artisan-account-menu .account-menu-item-with-icon.active {
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .topbar-search {
@@ -7472,22 +7473,9 @@ footer h4 {
     display: none;
   }
 
-  .artisan-user-chip-name {
-    display: none !important;
-  }
-
-  .artisan-user-chip {
-    gap: 0;
-    width: 36px;
-    max-width: 36px;
-    min-width: 36px;
-    height: 36px;
-    justify-content: center;
-  }
-
-  .artisan-user-chip-avatar {
-    width: 36px;
-    height: 36px;
+  .artisan-app-header .artisan-account-summary .account-chip {
+    width: 40px;
+    height: 40px;
   }
 
   .artisan-header-end {

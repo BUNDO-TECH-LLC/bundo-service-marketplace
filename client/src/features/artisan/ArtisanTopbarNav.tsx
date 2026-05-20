@@ -5,9 +5,6 @@ import {
   IconMessages,
   IconNotifications,
   IconOffers,
-  IconProfile,
-  IconReviews,
-  IconSettings,
   TopbarNavButton,
 } from '../../components/TopbarNavIcons';
 
@@ -17,11 +14,8 @@ type ArtisanTopbarNavProps = {
   onDashboard: () => void;
   onJobs: () => void;
   onMessages: () => void;
-  onReviews: () => void;
   onOffers: () => void;
   onNotifications: () => void;
-  onProfile: () => void;
-  onSettings: () => void;
   onNavigate: (action: () => void) => void;
 };
 
@@ -31,11 +25,8 @@ export function ArtisanTopbarNav({
   onDashboard,
   onJobs,
   onMessages,
-  onReviews,
   onOffers,
   onNotifications,
-  onProfile,
-  onSettings,
   onNavigate,
 }: ArtisanTopbarNavProps) {
   const hasUnreadNotifications = notificationUnreadCount > 0;
@@ -61,12 +52,6 @@ export function ArtisanTopbarNav({
         onClick={() => onNavigate(onMessages)}
       />
       <TopbarNavButton
-        label="Reviews"
-        active={active === 'Reviews'}
-        icon={<IconReviews />}
-        onClick={() => onNavigate(onReviews)}
-      />
-      <TopbarNavButton
         label="Offers"
         active={active === 'Offers'}
         icon={<IconOffers />}
@@ -78,18 +63,6 @@ export function ArtisanTopbarNav({
         icon={<IconNotifications />}
         showBadge={hasUnreadNotifications}
         onClick={() => onNavigate(onNotifications)}
-      />
-      <TopbarNavButton
-        label="Profile"
-        active={active === 'Profile'}
-        icon={<IconProfile />}
-        onClick={() => onNavigate(onProfile)}
-      />
-      <TopbarNavButton
-        label="Settings"
-        active={active === 'Settings'}
-        icon={<IconSettings />}
-        onClick={() => onNavigate(onSettings)}
       />
     </nav>
   );
