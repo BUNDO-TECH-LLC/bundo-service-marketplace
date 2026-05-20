@@ -137,19 +137,17 @@ export default function WorkspacePage() {
       )}
 
       {me && workspaceSection === 'offers' && me.role === 'ARTISAN' && (
-        <div className="dashboard-grid">
-          <ArtisanOffersPanel
-            token={ctx.token}
-            categories={ctx.categoryOptions}
-            offerings={ctx.myOfferings}
-            busy={ctx.busy}
-            runAction={ctx.withNotice}
-            refresh={async () => {
-              await ctx.loadPublicData();
-              await ctx.loadPrivateData();
-            }}
-          />
-        </div>
+        <ArtisanOffersPanel
+          token={ctx.token}
+          categories={ctx.categoryOptions}
+          offerings={ctx.myOfferings}
+          busy={ctx.busy}
+          runAction={ctx.withNotice}
+          refresh={async () => {
+            await ctx.loadPublicData();
+            await ctx.loadPrivateData();
+          }}
+        />
       )}
 
       {me && workspaceSection === 'offers' && me.role !== 'ARTISAN' && (

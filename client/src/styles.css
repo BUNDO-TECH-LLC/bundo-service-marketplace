@@ -3442,6 +3442,7 @@ footer h4 {
 .artisan-jobs-page,
 .artisan-job-detail-page,
 .artisan-reviews-page,
+.artisan-offers-page,
 .artisan-profile-settings-page {
   display: grid;
   gap: 28px;
@@ -3646,6 +3647,298 @@ footer h4 {
   max-width: 820px;
   margin: 0 auto;
   width: 100%;
+}
+
+.artisan-offers-page {
+  max-width: 920px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.artisan-offers-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: clamp(16px, 3vw, 24px);
+  background: #fff;
+}
+
+.artisan-offers-hero-main {
+  min-width: 0;
+}
+
+.artisan-offers-hero h1 {
+  margin: 4px 0 8px;
+  font-size: clamp(24px, 4vw, 32px);
+  font-weight: 500;
+  line-height: 1.15;
+}
+
+.artisan-offers-hero .muted {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.artisan-offers-add-toggle {
+  flex-shrink: 0;
+  width: auto;
+  min-width: 132px;
+  min-height: 44px;
+  padding: 12px 18px;
+  white-space: nowrap;
+}
+
+.artisan-offers-note {
+  margin: -8px 0 0;
+  padding: 12px 14px;
+  border: 1px solid rgb(255 106 0 / 18%);
+  border-radius: 10px;
+  color: var(--ink);
+  background: var(--accent-soft);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.artisan-offers-form {
+  display: grid;
+  gap: 20px;
+}
+
+.artisan-offers-form-head h2 {
+  margin: 4px 0 0;
+  font-size: clamp(20px, 3.5vw, 24px);
+  font-weight: 500;
+}
+
+.artisan-offers-form-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.artisan-offers-form-grid label {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.artisan-offers-form-grid label.full {
+  grid-column: 1 / -1;
+}
+
+.artisan-offers-form-grid input,
+.artisan-offers-form-grid select,
+.artisan-offers-form-grid textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fff;
+  font: inherit;
+}
+
+.artisan-offers-form-grid textarea {
+  min-height: 96px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.artisan-offers-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.artisan-offers-form-actions button {
+  width: auto;
+  min-width: 132px;
+  min-height: 44px;
+}
+
+.artisan-offers-list {
+  display: grid;
+  gap: 16px;
+}
+
+.artisan-offers-list-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.artisan-offers-list-head h2 {
+  margin: 0;
+  font-size: clamp(20px, 3.5vw, 24px);
+  font-weight: 500;
+}
+
+.artisan-offers-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 999px;
+  color: var(--accent-dark);
+  background: var(--accent-soft);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.artisan-offers-empty {
+  display: grid;
+  gap: 10px;
+  text-align: left;
+}
+
+.artisan-offers-empty h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.artisan-offers-empty button {
+  width: auto;
+  min-height: 44px;
+  margin-top: 8px;
+}
+
+.artisan-offers-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+}
+
+.artisan-offer-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  background: #fff;
+}
+
+.artisan-offer-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.artisan-offer-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.artisan-offer-status.is-live {
+  color: #236236;
+  background: var(--success-soft);
+}
+
+.artisan-offer-status.is-draft {
+  color: #8a5a00;
+  background: #fff7e8;
+}
+
+.artisan-offer-card h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.artisan-offer-category {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.artisan-offer-price {
+  margin: 0;
+  color: var(--accent-dark);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.artisan-offer-description {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.artisan-offer-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.artisan-offer-card-actions .text-button {
+  min-height: 44px;
+  padding: 8px 0;
+}
+
+.danger-text {
+  color: var(--color-danger);
+}
+
+.danger-text:hover {
+  color: #8f1f1f;
+}
+
+.artisan-offer-edit-form {
+  display: grid;
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .artisan-offers-hero {
+    flex-direction: column;
+  }
+
+  .artisan-offers-add-toggle,
+  .artisan-offers-form-actions button,
+  .artisan-offers-empty button {
+    width: 100%;
+  }
+
+  .artisan-offers-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .artisan-offers-form-grid label.full {
+    grid-column: auto;
+  }
+
+  .artisan-offers-form-actions {
+    flex-direction: column-reverse;
+  }
+
+  .artisan-offer-card-top {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .artisan-offer-card-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 .page.workspace-page.artisan-workspace-page {
