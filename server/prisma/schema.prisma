@@ -88,6 +88,12 @@ enum NotificationType {
   ADMIN
 }
 
+enum ConversationInboxState {
+  ACTIVE
+  SPAM
+  ARCHIVED
+}
+
 model User {
   firebaseUid        String         @id @map("firebase_uid")
   email              String?        @unique
@@ -367,19 +373,35 @@ model ArtisanKycSubmission {
 }
 
 model Conversation {
-  id          String         @id @default(uuid())
-  customerId  String         @map("customer_id")
-  artisanId   String         @map("artisan_id")
-  createdAt   DateTime       @default(now()) @map("created_at")
-  updatedAt   DateTime       @updatedAt @map("updated_at")
+  id             String                  @id @default(uuid())
+  customerId     String                  @map("customer_id")
+  artisanId      String                  @map("artisan_id")
+  customerInbox  ConversationInboxState  @default(ACTIVE) @map("customer_inbox")
+  artisanInbox   ConversationInboxState  @default(ACTIVE) @map("artisan_inbox")
+  createdAt      DateTime                @default(now()) @map("created_at")
+  updatedAt      DateTime                @updatedAt @map("updated_at")
 
-  customer    User           @relation("CustomerConversations", fields: [customerId], references: [firebaseUid])
-  artisan     ArtisanProfile @relation(fields: [artisanId], references: [id])
-  messages    Message[]
-  adminNotes  AdminNote[]
+  customer     User             @relation("CustomerConversations", fields: [customerId], references: [firebaseUid])
+  artisan      ArtisanProfile   @relation(fields: [artisanId], references: [id])
+  messages     Message[]
+  adminNotes   AdminNote[]
+  chatReports  ChatUserReport[]
 
   @@unique([customerId, artisanId])
   @@map("conversations")
+}
+
+model ChatUserReport {
+  id               String       @id @default(uuid())
+  conversationId   String       @map("conversation_id")
+  reporterId       String       @map("reporter_id")
+  reportedUserId   String       @map("reported_user_id")
+  detail           String?
+  createdAt        DateTime     @default(now()) @map("created_at")
+
+  conversation     Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@map("chat_user_reports")
 }
 
 model Message {

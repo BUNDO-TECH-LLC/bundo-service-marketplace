@@ -9,6 +9,8 @@ import {
   createMessage,
   getConversationMessages,
   getConversationsForUser,
+  reportUserInConversation,
+  updateMyConversationInboxState,
 } from './chat.service';
 
 const router = Router();
@@ -123,6 +125,65 @@ router.get(
       message: 'Conversations fetched',
       conversations,
     });
+  })
+);
+
+router.patch(
+  '/conversations/:id/inbox',
+  verifyFirebaseToken,
+  asyncHandler(async (req, res) => {
+    const raw = req.body?.inbox;
+    const allowed = ['ACTIVE', 'SPAM', 'ARCHIVED'] as const;
+    if (typeof raw !== 'string' || !allowed.includes(raw as (typeof allowed)[number])) {
+      throw new ValidationError('inbox must be ACTIVE, SPAM, or ARCHIVED');
+    }
+
+    const result = await updateMyConversationInboxState({
+      conversationId: String(req.params.id),
+      firebaseUid: (req as any).user.firebaseUid,
+      role: (req as any).user.role,
+      inbox: raw as 'ACTIVE' | 'SPAM' | 'ARCHIVED',
+    });
+
+    throwOnServiceStatus(result.status, {
+      missing_conversation: new NotFoundError('Conversation'),
+      forbidden: new ForbiddenError('You can only update your own conversations'),
+    });
+
+    res.json({ message: 'Conversation inbox updated' });
+  })
+);
+
+router.post(
+  '/conversations/:id/report',
+  verifyFirebaseToken,
+  asyncHandler(async (req, res) => {
+    const reportedUserId = req.body?.reportedUserId;
+    const detail = req.body?.detail;
+
+    if (typeof reportedUserId !== 'string' || !reportedUserId.trim()) {
+      throw new ValidationError('reportedUserId is required');
+    }
+
+    if (detail !== undefined && typeof detail !== 'string') {
+      throw new ValidationError('detail must be a string when provided');
+    }
+
+    const result = await reportUserInConversation({
+      conversationId: String(req.params.id),
+      reporterId: (req as any).user.firebaseUid,
+      role: (req as any).user.role,
+      reportedUserId: reportedUserId.trim(),
+      detail: typeof detail === 'string' ? detail : null,
+    });
+
+    throwOnServiceStatus(result.status, {
+      missing_conversation: new NotFoundError('Conversation'),
+      forbidden: new ForbiddenError('You can only report from your own conversations'),
+      invalid_reported_user: new ValidationError('You can only report the other person in this chat'),
+    });
+
+    res.status(201).json({ message: 'Report submitted. Our team may review this conversation.' });
   })
 );
 

@@ -3,8 +3,14 @@ import { api } from '../lib/api';
 import { formatMessageTime } from '../lib/formatting';
 import { ChatComposer, type ChatComposerPayload } from '../components/ChatComposer';
 import { uploadChatImage } from '../lib/chatUpload';
+import { ChatThreadOverflowMenu } from '../components/ChatThreadOverflowMenu';
+import { useAppRoot } from '../app/appRootContext';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import type { ActionRunner } from '../appTypes';
 import type { Conversation, Message } from '../types';
+
+/** Matches `.messenger-shell` responsive breakpoint in `styles.css`. */
+const MESSENGER_MOBILE_BREAKPOINT = '(max-width: 900px)';
 
 export function ChatPanel({
   token,
@@ -21,9 +27,13 @@ export function ChatPanel({
   runAction: ActionRunner;
   refresh: () => Promise<void>;
 }) {
+  const { openArtisanProfile, me } = useAppRoot();
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [filter, setFilter] = useState<'all' | 'incoming'>('all');
+  const narrowMessenger = useMediaQuery(MESSENGER_MOBILE_BREAKPOINT);
+  const mobileInboxMode = narrowMessenger && !activeConversation;
+  const mobileThreadMode = narrowMessenger && activeConversation;
 
   const incomingConversations = useMemo(
     () =>
@@ -48,6 +58,11 @@ export function ChatPanel({
 
   async function openConversation(conversationId: string) {
     await fetchMessages(conversationId);
+  }
+
+  function backToInbox() {
+    setActiveConversation(null);
+    setMessages([]);
   }
 
   useEffect(() => {
@@ -93,8 +108,26 @@ export function ChatPanel({
     return latest?.body || (latest?.imageUrl ? 'Photo attachment' : 'Booking conversation ready');
   }
 
+  const viewerRole = me?.role;
+  const canUseChatActions = viewerRole === 'CUSTOMER' || viewerRole === 'ARTISAN';
+  const otherPartyFirebaseUid =
+    activeConversation && canUseChatActions
+      ? viewerRole === 'CUSTOMER'
+        ? activeConversation.artisan?.userId ?? ''
+        : activeConversation.customerId
+      : '';
+
+  async function afterInboxChange() {
+    await refresh();
+    backToInbox();
+  }
+
   return (
-    <article className="panel-card messages-panel">
+    <article
+      className={`panel-card messages-panel${mobileInboxMode ? ' messages-panel--mobile-inbox' : ''}${
+        mobileThreadMode ? ' messages-panel--mobile-thread' : ''
+      }`}
+    >
       <div className="messages-head">
         <div>
           <p className="eyebrow">Messages</p>
@@ -111,7 +144,11 @@ export function ChatPanel({
         </div>
       </div>
 
-      <div className="messenger-shell">
+      <div
+        className={`messenger-shell${mobileInboxMode ? ' messenger-shell--mobile-inbox' : ''}${
+          mobileThreadMode ? ' messenger-shell--mobile-thread' : ''
+        }`}
+      >
         <aside className="conversation-rail">
           {visibleConversations.length === 0 && (
             <div className="conversation-empty">
@@ -151,16 +188,40 @@ export function ChatPanel({
 
           {activeConversation && (
             <>
-              <header className="chatbox-head">
-                <span className="conversation-avatar">{conversationInitial(activeConversation)}</span>
-                <div>
-                  <h3>{conversationTitle(activeConversation)}</h3>
-                  <p>
-                    {activeConversation.artisan?.city ||
-                      activeConversation.customer?.email ||
-                      'Bundo conversation'}
-                  </p>
+              <header className={`chatbox-head${narrowMessenger ? ' chatbox-head--mobile' : ''}`}>
+                <div className="chatbox-head-main">
+                  {narrowMessenger && (
+                    <button type="button" className="chat-back-button" onClick={backToInbox} aria-label="Back to inbox">
+                      ← Back
+                    </button>
+                  )}
+                  <span className="conversation-avatar">{conversationInitial(activeConversation)}</span>
+                  <div>
+                    <h3>{conversationTitle(activeConversation)}</h3>
+                    <p>
+                      {activeConversation.artisan?.city ||
+                        activeConversation.customer?.email ||
+                        'Bundo conversation'}
+                    </p>
+                  </div>
                 </div>
+                {canUseChatActions && otherPartyFirebaseUid && (
+                  <ChatThreadOverflowMenu
+                    token={token}
+                    conversationId={activeConversation.id}
+                    viewerRole={viewerRole}
+                    artisanProfileId={activeConversation.artisanId}
+                    otherPartyFirebaseUid={otherPartyFirebaseUid}
+                    customerContact={{
+                      email: activeConversation.customer?.email,
+                      phone: activeConversation.customer?.phone,
+                    }}
+                    busy={busy}
+                    runAction={runAction}
+                    onViewArtisanProfile={() => void openArtisanProfile(activeConversation.artisanId)}
+                    onAfterInboxChange={afterInboxChange}
+                  />
+                )}
               </header>
 
               <div className="chat-message-list">

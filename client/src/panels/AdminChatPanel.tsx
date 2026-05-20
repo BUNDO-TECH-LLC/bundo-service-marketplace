@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { ChatComposer, type ChatComposerPayload } from '../components/ChatComposer';
 import { uploadChatImage } from '../lib/chatUpload';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import type { ActionRunner } from '../appTypes';
 import type { Conversation } from '../types';
+
+const ADMIN_CHAT_MOBILE_BREAKPOINT = '(max-width: 900px)';
 
 export function AdminChatPanel({
   token,
@@ -23,6 +26,9 @@ export function AdminChatPanel({
   onConversationOpened?: () => void;
 }) {
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
+  const narrowChat = useMediaQuery(ADMIN_CHAT_MOBILE_BREAKPOINT);
+  const mobileInboxMode = narrowChat && !activeConversation;
+  const mobileThreadMode = narrowChat && activeConversation;
 
   async function openConversation(conversationId: string) {
     const response = await api<{ conversation: Conversation }>(`/admin/conversations/${conversationId}`, { token });
@@ -75,14 +81,18 @@ export function AdminChatPanel({
   }
 
   return (
-    <section className="admin-chat">
-      <section className="section-head compact">
+    <section
+      className={`admin-chat${mobileInboxMode ? ' admin-chat--mobile-inbox' : ''}${
+        mobileThreadMode ? ' admin-chat--mobile-thread' : ''
+      }`}
+    >
+      <section className="section-head compact admin-chat-intro">
         <p className="eyebrow">Support</p>
         <h2>Conversation access</h2>
         <p>Admins can inspect customer/artisan chats, reply as Bundo support, and leave private operational notes.</p>
       </section>
-      <div className="dashboard-grid">
-        <article className="panel-card">
+      <div className="dashboard-grid admin-chat-grid">
+        <article className="panel-card admin-chat-inbox">
           <h2>All conversations</h2>
           {conversations.length === 0 && <p>No conversations yet.</p>}
           {conversations.map((conversation) => (
@@ -93,7 +103,12 @@ export function AdminChatPanel({
           ))}
         </article>
 
-        <article className="panel-card wide-panel">
+        <article className="panel-card wide-panel admin-chat-thread">
+          {narrowChat && activeConversation && (
+            <button type="button" className="chat-back-button chat-back-button--block" onClick={() => setActiveConversation(null)} aria-label="Back to all conversations">
+              ← Back
+            </button>
+          )}
           <h2>Thread and notes</h2>
           {!activeConversation && <p>Select a conversation to review messages and notes.</p>}
           {activeConversation && (
