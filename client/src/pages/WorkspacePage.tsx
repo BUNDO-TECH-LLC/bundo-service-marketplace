@@ -6,7 +6,7 @@ import { ArtisanOffersPanel, ArtisanProfileSettings, ArtisanReviewsPanel } from 
 import { api } from '../lib/api';
 import type { ApiUser } from '../types';
 import { artisanVerificationPhase } from '../lib/artisanVerification';
-import { buildAppPath } from '../lib/appPaths';
+import { buildAppPath, buildArtisanBookingPath } from '../lib/appPaths';
 import { firebaseReady } from '../lib/firebase';
 import type { Artisan, ArtisanKycSubmission } from '../types';
 import { BookingsPage } from '../panels/BookingsPanel';
@@ -211,10 +211,8 @@ export default function WorkspacePage() {
               runAction={ctx.withNotice}
               refresh={() => ctx.loadPrivateData()}
               openBookings={() => ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'bookings' }))}
-              openMessages={() => ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'messages' }))}
-              openReviews={() => ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'reviews' }))}
               openProfile={() => ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'profile' }))}
-              openOffers={() => ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'offers' }))}
+              openBookingDetail={(bookingId) => ctx.navigate(buildArtisanBookingPath(bookingId))}
             />
           ) : (
             <LoggedInHome

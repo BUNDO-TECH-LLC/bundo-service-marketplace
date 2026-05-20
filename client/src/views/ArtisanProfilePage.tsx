@@ -5,6 +5,7 @@ import { userDisplayName } from '../lib/userDisplayName';
 import type { ActionRunner, BookingSuccessState } from '../appTypes';
 import type { Artisan, Booking, Review, Role } from '../types';
 import { EmptyState } from '../components/EmptyState';
+import { ProfilePortfolioGallery } from '../components/ProfilePortfolioGallery';
 
 export function ArtisanProfilePage({
   artisan,
@@ -119,16 +120,16 @@ export function ArtisanProfilePage({
           </section>
 
           <section id="portfolio" className="profile-section">
-            <h2>Portfolio</h2>
-            <div className="portfolio-grid">
-              {(artisan.portfolioImages || []).length > 0
-                ? artisan.portfolioImages?.slice(0, 8).map((image) => (
-                    <img key={image.id} src={image.url} alt={`${artisan.displayName} portfolio`} />
-                  ))
-                : Array.from({ length: 8 }).map((_, index) => (
-                    <div className="portfolio-placeholder" key={index} />
-                  ))}
+            <div className="profile-section-head">
+              <h2>Portfolio</h2>
+              {(artisan.portfolioImages?.length ?? 0) > 0 && (
+                <span className="profile-portfolio-count">{artisan.portfolioImages?.length} photos</span>
+              )}
             </div>
+            <ProfilePortfolioGallery
+              images={artisan.portfolioImages ?? []}
+              artisanName={artisan.displayName}
+            />
           </section>
 
           <section id="pricing" className="profile-section">

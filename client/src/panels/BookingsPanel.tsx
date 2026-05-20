@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { LeaveReviewDialog } from '../components/LeaveReviewDialog';
 import { PromptDialog } from '../components/PromptDialog';
 import { api } from '../lib/api';
@@ -61,7 +62,6 @@ function ArtisanJobsPage({
   updateBookingStatus: (bookingId: string, status: Booking['status']) => Promise<void>;
 }) {
   if (selectedBooking) {
-    const isAccepted = selectedBooking.status === 'ACCEPTED';
     const customerName = bookingContactName(selectedBooking);
     const serviceName = selectedBooking.offering?.title || 'Basic inspection';
 
@@ -69,10 +69,9 @@ function ArtisanJobsPage({
       <section className="artisan-job-detail-page">
         <div className="artisan-job-detail-head">
           <div>
-            <h2>Active bookings</h2>
+            <h2>Job details</h2>
             <p>
-              {isAccepted ? 'Accepted' : statusLabel(selectedBooking.status)} · Booking #
-              {selectedBooking.id.slice(0, 6)}
+              {statusLabel(selectedBooking.status)} · Booking #{selectedBooking.id.slice(0, 6).toUpperCase()}
             </p>
           </div>
           <span className={`booking-status ${selectedBooking.status.toLowerCase()}`}>
@@ -218,6 +217,7 @@ export function BookingsPage({
   refresh: () => Promise<void>;
   openMessages: () => void;
 }) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [filter, setFilter] = useState<'ALL' | Booking['status']>('ALL');
   const tabs: Array<{ label: string; value: 'ALL' | Booking['status'] }> = [
     { label: 'All', value: 'ALL' },
@@ -227,8 +227,35 @@ export function BookingsPage({
     { label: 'Declined', value: 'DECLINED' },
   ];
   const visibleBookings = filter === 'ALL' ? bookings : bookings.filter((booking) => booking.status === filter);
-  const [selectedArtisanBookingId, setSelectedArtisanBookingId] = useState<string | null>(null);
+  const jobIdFromUrl = searchParams.get('job');
+  const [selectedArtisanBookingId, setSelectedArtisanBookingId] = useState<string | null>(() => jobIdFromUrl);
   const selectedArtisanBooking = bookings.find((booking) => booking.id === selectedArtisanBookingId) || null;
+
+  useEffect(() => {
+    if (mode !== 'artisan') {
+      return;
+    }
+    if (!jobIdFromUrl) {
+      setSelectedArtisanBookingId(null);
+      return;
+    }
+    if (bookings.some((booking) => booking.id === jobIdFromUrl)) {
+      setSelectedArtisanBookingId(jobIdFromUrl);
+      return;
+    }
+    setSelectedArtisanBookingId(null);
+    setSearchParams({}, { replace: true });
+  }, [mode, jobIdFromUrl, bookings, setSearchParams]);
+
+  function selectArtisanBooking(bookingId: string | null) {
+    setSelectedArtisanBookingId(bookingId);
+    if (bookingId) {
+      setSearchParams({ job: bookingId }, { replace: true });
+      return;
+    }
+    setSearchParams({}, { replace: true });
+  }
+
   const [reviewBooking, setReviewBooking] = useState<Booking | null>(null);
   const [reschedulePrompt, setReschedulePrompt] = useState<null | {
     booking: Booking;
@@ -336,7 +363,7 @@ export function BookingsPage({
         tabs={tabs}
         busy={busy}
         setFilter={setFilter}
-        selectBooking={setSelectedArtisanBookingId}
+        selectBooking={selectArtisanBooking}
         openMessages={openMessages}
         updateBookingStatus={(bookingId, status) =>
           runAction(() => updateBookingStatus(bookingId, status), `Booking ${status.toLowerCase()}`)

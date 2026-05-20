@@ -64,6 +64,10 @@ export function buildAppPath(input: {
   }
 }
 
+export function buildArtisanBookingPath(bookingId: string): string {
+  return `/workspace/bookings?job=${encodeURIComponent(bookingId)}`;
+}
+
 function isWorkspaceSection(value: string): value is WorkspaceSection {
   return VALID_WORKSPACE_SECTIONS.includes(value as WorkspaceSection);
 }

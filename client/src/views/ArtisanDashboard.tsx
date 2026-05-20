@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { api } from '../lib/api';
-import { bookingDate } from '../lib/bookingDisplay';
+import { bookingContactName, bookingDate, bookingLocation, statusLabel } from '../lib/bookingDisplay';
 import { summarizeArtisanEarnings } from '../lib/artisanEarnings';
-import { dayLabels, formatMessageTime, money } from '../lib/formatting';
+import { dayLabels, money } from '../lib/formatting';
 import { userDisplayName } from '../lib/userDisplayName';
 import type { ActionRunner } from '../appTypes';
 import type { Artisan, ArtisanKycSubmission, AvailabilitySlot, Booking, PortfolioImage } from '../types';
@@ -18,10 +18,8 @@ export function ArtisanDashboard({
   runAction,
   refresh,
   openBookings,
-  openMessages,
-  openReviews,
   openProfile,
-  openOffers,
+  openBookingDetail,
 }: {
   token: string;
   bookings: Booking[];
@@ -30,10 +28,8 @@ export function ArtisanDashboard({
   runAction: ActionRunner;
   refresh: () => Promise<void>;
   openBookings: () => void;
-  openMessages: () => void;
-  openReviews: () => void;
   openProfile: () => void;
-  openOffers: () => void;
+  openBookingDetail: (bookingId: string) => void;
 }) {
   const [profile, setProfile] = useState<Artisan | null>(null);
   const [portfolioImages, setPortfolioImages] = useState<PortfolioImage[]>([]);
@@ -41,7 +37,8 @@ export function ArtisanDashboard({
   const [kycSubmission, setKycSubmission] = useState<ArtisanKycSubmission | null>(null);
   const displayName = profile?.displayName || firebaseUser?.displayName || userDisplayName(firebaseUser, null) || 'Artisan';
   const requestedBookings = bookings.filter((booking) => booking.status === 'REQUESTED');
-  const activeBookings = bookings.filter((booking) => ['ACCEPTED', 'COMPLETED'].includes(booking.status));
+  const activeJobs = bookings.filter((booking) => ['ACCEPTED', 'ONGOING'].includes(booking.status));
+  const completedThisWeek = bookings.filter((booking) => booking.status === 'COMPLETED').length;
   const isApproved = profile?.verifyStatus === 'APPROVED' && kycSubmission?.status === 'APPROVED';
   const earnings = summarizeArtisanEarnings(bookings);
 
@@ -74,19 +71,23 @@ export function ArtisanDashboard({
   }
 
   return (
-    <>
-      <section className="artisan-dashboard-hero">
-        <div>
-          <h1>Good morning, {displayName.split(' ')[0]}</h1>
-          <p className="muted">
-            {isApproved
-              ? 'Your profile is approved. Manage jobs, service offers, messages, and reviews from here.'
-              : 'Your profile is still being reviewed. Update your public profile or complete verification in Settings.'}
-          </p>
+    <section className="artisan-dashboard-page">
+      <header className="artisan-dashboard-hero">
+        <div className="artisan-dashboard-hero-top">
+          <div>
+            <p className="eyebrow">Dashboard</p>
+            <h1>Good morning, {displayName.split(' ')[0]}</h1>
+            <p className="muted">
+              {isApproved
+                ? 'Review new requests, track active jobs, and keep your profile up to date.'
+                : 'Your profile is still being reviewed. You can still prepare offers and respond when bookings arrive.'}
+            </p>
+          </div>
+          <span className={`booking-status ${isApproved ? 'completed' : 'pending'}`}>
+            {isApproved ? 'Approved' : kycSubmission?.status?.toLowerCase().replace(/_/g, ' ') || 'Pending review'}
+          </span>
         </div>
-        <span className={`booking-status ${isApproved ? 'completed' : 'pending'}`}>
-          {isApproved ? 'Approved' : kycSubmission?.status?.toLowerCase().replace(/_/g, ' ') || 'Pending review'}
-        </span>
+
         {isApproved && portfolioImages.length < 3 && (
           <div className="payment-note artisan-photo-nudge">
             <strong>Add photos to your profile</strong>
@@ -99,52 +100,126 @@ export function ArtisanDashboard({
             </span>
           </div>
         )}
+
         <div className="artisan-stat-grid">
           <StatCard label="Total bookings" value={bookings.length} hint="All time" />
           <StatCard label="Ratings" value={`${profile?.avgRating || 0}/5.0`} hint={`${profile?.ratingCount || 0} reviews`} />
-          <StatCard label="Active jobs" value={activeBookings.length} hint="This week" />
-          <StatCard label="New requests" value={requestedBookings.length} hint="Needs your response" />
+          <StatCard label="Active jobs" value={activeJobs.length} hint="In progress" />
+          <StatCard label="New requests" value={requestedBookings.length} hint="Needs response" />
         </div>
-      </section>
+      </header>
 
-      <section className="artisan-dashboard-grid">
-        <div className="artisan-request-stack">
-          <div className="logged-section-head">
-            <h2>New Requests</h2>
-            <button type="button" onClick={openBookings}>view all</button>
-          </div>
-          {requestedBookings.length === 0 && <EmptyState title="No new requests" body="New booking requests will appear here." />}
-          {requestedBookings.slice(0, 2).map((booking) => (
-            <article className="artisan-request-card" key={booking.id}>
-              <span className="recommended-avatar">{(booking.customerUser?.email || 'C').slice(0, 1).toUpperCase()}</span>
-              <div>
-                <h3>{booking.customerUser?.email?.split('@')[0] || 'Customer'}</h3>
-                <small>{booking.offering?.title || 'Service request'}</small>
-                <p>{bookingDate(booking.scheduledAt)} · {booking.artisan?.area || profile?.area || 'Lagos'}</p>
-                <div className="actions">
-                  <button
-                    className="secondary-button"
-                    disabled={busy}
-                    onClick={() => runAction(() => updateBookingStatus(booking.id, 'DECLINED'), 'Booking request declined')}
-                  >
-                    Decline
-                  </button>
-                  <button
-                    disabled={busy}
-                    onClick={() => runAction(() => updateBookingStatus(booking.id, 'ACCEPTED'), 'Booking request accepted')}
-                  >
-                    Accept
-                  </button>
-                </div>
+      <div className="artisan-dashboard-grid">
+        <div className="artisan-dashboard-main">
+          <section className="artisan-dashboard-section">
+            <div className="logged-section-head">
+              <h2>New requests</h2>
+              {requestedBookings.length > 0 && (
+                <button type="button" className="text-button" onClick={openBookings}>
+                  View all
+                </button>
+              )}
+            </div>
+            {requestedBookings.length === 0 ? (
+              <EmptyState title="No new requests" body="New booking requests will appear here." />
+            ) : (
+              <div className="artisan-dashboard-card-stack">
+                {requestedBookings.slice(0, 3).map((booking) => (
+                  <article className="artisan-request-card" key={booking.id}>
+                    <span className="recommended-avatar">
+                      {(booking.customerUser?.email || 'C').slice(0, 1).toUpperCase()}
+                    </span>
+                    <div>
+                      <div className="artisan-request-card-head">
+                        <div>
+                          <h3>{bookingContactName(booking)}</h3>
+                          <small>{booking.offering?.title || 'Service request'}</small>
+                        </div>
+                        <span className="booking-status requested">{statusLabel(booking.status)}</span>
+                      </div>
+                      <p>
+                        {bookingDate(booking.scheduledAt)} · {bookingLocation(booking)}
+                      </p>
+                      <div className="actions">
+                        <button
+                          type="button"
+                          className="text-button"
+                          onClick={() => openBookingDetail(booking.id)}
+                        >
+                          View details
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          disabled={busy}
+                          onClick={() => runAction(() => updateBookingStatus(booking.id, 'DECLINED'), 'Booking request declined')}
+                        >
+                          Decline
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => runAction(() => updateBookingStatus(booking.id, 'ACCEPTED'), 'Booking request accepted')}
+                        >
+                          Accept
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                ))}
               </div>
-            </article>
-          ))}
+            )}
+          </section>
+
+          <section className="artisan-dashboard-section">
+            <div className="logged-section-head">
+              <h2>Active jobs</h2>
+              {activeJobs.length > 0 && (
+                <button type="button" className="text-button" onClick={openBookings}>
+                  View all jobs
+                </button>
+              )}
+            </div>
+            {activeJobs.length === 0 ? (
+              <EmptyState title="No active jobs" body="Accepted and in-progress jobs will show up here." />
+            ) : (
+              <div className="artisan-dashboard-card-stack">
+                {activeJobs.slice(0, 4).map((booking) => (
+                  <article className="artisan-job-preview-card" key={booking.id}>
+                    <div className="artisan-job-preview-main">
+                      <span className="recommended-avatar">
+                        {bookingContactName(booking).slice(0, 1).toUpperCase()}
+                      </span>
+                      <div>
+                        <h3>{booking.offering?.title || 'Service booking'}</h3>
+                        <p>{bookingContactName(booking)}</p>
+                        <p className="muted">
+                          {bookingDate(booking.scheduledAt)} · {bookingLocation(booking)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="artisan-job-preview-actions">
+                      <span className={`booking-status ${booking.status.toLowerCase()}`}>
+                        {statusLabel(booking.status)}
+                      </span>
+                      <button type="button" onClick={() => openBookingDetail(booking.id)}>
+                        View details
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
+
         <aside className="artisan-side-stack">
           <article className="artisan-soft-card">
             <div className="logged-section-head">
               <h2>Availability</h2>
-              <button type="button" onClick={openProfile}>Edit</button>
+              <button type="button" className="text-button" onClick={openProfile}>
+                Edit
+              </button>
             </div>
             <div className="availability-dots">
               {dayLabels.slice(1).concat(dayLabels[0]).map((day, index) => {
@@ -157,11 +232,18 @@ export function ArtisanDashboard({
               })}
             </div>
           </article>
+
           <article className="artisan-soft-card">
             <h2>This week</h2>
             <dl className="summary-list">
-              <div><dt>Jobs Completed</dt><dd>{bookings.filter((booking) => booking.status === 'COMPLETED').length}</dd></div>
-              <div><dt>Jobs Upcoming</dt><dd>{activeBookings.length}</dd></div>
+              <div>
+                <dt>Jobs completed</dt>
+                <dd>{completedThisWeek}</dd>
+              </div>
+              <div>
+                <dt>Jobs upcoming</dt>
+                <dd>{activeJobs.length}</dd>
+              </div>
               <div>
                 <dt>Earnings</dt>
                 <dd>
@@ -173,15 +255,8 @@ export function ArtisanDashboard({
               </div>
             </dl>
           </article>
-          <article className="artisan-soft-card quick-links">
-            <h2>Quick links</h2>
-            <button onClick={openProfile}>Edit public profile</button>
-            <button onClick={openOffers}>Service offers</button>
-            <button onClick={openMessages}>Messages</button>
-            <button onClick={openReviews}>Reviews</button>
-          </article>
         </aside>
-      </section>
-    </>
+      </div>
+    </section>
   );
 }
