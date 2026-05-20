@@ -8,7 +8,7 @@ import {
 } from '../../lib/bookingStatus';
 import { Pagination, paginationArgs } from '../../utils/pagination';
 import { getArtisanProfileByUserId } from '../artisans/artisans.service';
-import { workspaceLink } from '../../lib/appLinks';
+import { workspaceBookingLink } from '../../lib/appLinks';
 import { createNotifications } from '../notifications/notifications.service';
 
 function toMinutes(value: string) {
@@ -143,14 +143,14 @@ export const createBooking = async (input: {
         type: NotificationType.BOOKING,
         title: 'Booking requested',
         body: `Your booking for ${booking.offering?.title || 'a service'} has been sent.`,
-        link: workspaceLink('bookings'),
+        link: workspaceBookingLink(booking.id),
       },
       {
         userId: artisan.userId,
         type: NotificationType.BOOKING,
         title: 'New booking request',
         body: `You received a new booking request for ${booking.offering?.title || 'a service'}.`,
-        link: workspaceLink('bookings'),
+        link: workspaceBookingLink(booking.id),
       },
     ]);
   }
@@ -403,14 +403,14 @@ export const cancelBookingForCustomer = async (input: {
         type: NotificationType.BOOKING,
         title: 'Booking cancelled',
         body: `Your booking for ${updated.offering?.title || 'a service'} has been cancelled.`,
-        link: workspaceLink('bookings'),
+        link: workspaceBookingLink(booking.id),
       },
       {
         userId: updated.artisan.userId,
         type: NotificationType.BOOKING,
         title: 'Booking cancelled by customer',
         body: `The customer cancelled ${updated.offering?.title || 'a service'}.`,
-        link: workspaceLink('bookings'),
+        link: workspaceBookingLink(booking.id),
       },
     ]);
   }
@@ -502,7 +502,7 @@ export const updateBookingStatusForArtisan = async (input: {
       type: NotificationType.BOOKING,
       title: notification.title,
       body: notification.body,
-      link: workspaceLink('bookings'),
+      link: workspaceBookingLink(updated.id),
     },
   ]);
 
@@ -624,7 +624,7 @@ export const rescheduleBooking = async (input: {
         body: isCustomer
           ? `You moved ${serviceName} to ${updated.scheduledAt?.toLocaleString()}.`
           : `${updated.artisan.displayName || 'Your artisan'} moved ${serviceName} to ${updated.scheduledAt?.toLocaleString()}.`,
-        link: workspaceLink('bookings'),
+        link: workspaceBookingLink(booking.id),
       },
       {
         userId: updated.artisan.userId,
@@ -633,7 +633,7 @@ export const rescheduleBooking = async (input: {
         body: isCustomer
           ? `The customer moved ${serviceName} to ${updated.scheduledAt?.toLocaleString()}.`
           : `You moved ${serviceName} to ${updated.scheduledAt?.toLocaleString()}.`,
-        link: workspaceLink('bookings'),
+        link: workspaceBookingLink(booking.id),
       },
     ]);
   }

@@ -19,7 +19,7 @@ import {
   canTransitionBookingStatus,
 } from '../../lib/bookingStatus';
 import { Pagination, paginationArgs } from '../../utils/pagination';
-import { workspaceLink } from '../../lib/appLinks';
+import { workspaceBookingLink, workspaceLink } from '../../lib/appLinks';
 import { createNotification } from '../notifications/notifications.service';
 
 export const getAdminStats = async () => {
@@ -575,7 +575,7 @@ export const updateAdminBookingStatus = async (input: {
           type: NotificationType.BOOKING,
           title: copy.title,
           body: copy.body,
-          link: workspaceLink('bookings'),
+          link: workspaceBookingLink(updated.id),
         })
       )
     );

@@ -17,10 +17,11 @@ const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
   const title = payload.notification?.title || 'Bundo update';
+  const link = payload.data?.link?.trim();
   const options = {
     body: payload.notification?.body || 'You have a new notification',
     data: {
-      url: '/workspace/notifications',
+      url: link && link.startsWith('/') ? link : '/workspace/notifications',
     },
   };
 

@@ -164,9 +164,6 @@ export default function WorkspacePage() {
           busy={ctx.busy}
           runAction={ctx.withNotice}
           refresh={() => ctx.loadPrivateData()}
-          pushStatus={ctx.pushStatus}
-          pushEnabled={Boolean(ctx.pushToken)}
-          enablePushAlerts={ctx.enablePushAlerts}
           onNavigate={(path) => ctx.navigate(path)}
         />
       )}
@@ -197,6 +194,9 @@ export default function WorkspacePage() {
           }}
           onNavigate={(path) => ctx.navigate(path)}
           onNotice={ctx.setNotice}
+          pushStatus={ctx.pushStatus}
+          pushEnabled={Boolean(ctx.pushToken)}
+          enablePushAlerts={ctx.enablePushAlerts}
         />
       )}
 

@@ -14,7 +14,7 @@ import {
 import { userDisplayName } from '../../lib/userDisplayName';
 import { ArtisanKycSection } from '../artisan/ArtisanKycSection';
 import { ArtisanPayoutSection } from '../artisan/ArtisanPayoutSection';
-import type { AccountSettingsSection, ActionRunner } from '../../appTypes';
+import type { AccountSettingsSection, ActionRunner, PushStatus } from '../../appTypes';
 import type { ApiUser, Artisan, NotificationPreferences } from '../../types';
 
 const defaultPrefs: NotificationPreferences = {
@@ -89,6 +89,9 @@ export function AccountSettingsHub({
   refresh,
   onNavigate,
   onNotice,
+  pushStatus,
+  pushEnabled = false,
+  enablePushAlerts,
 }: {
   token: string;
   me: ApiUser;
@@ -98,6 +101,9 @@ export function AccountSettingsHub({
   refresh: () => Promise<void>;
   onNavigate: (path: string) => void;
   onNotice: (message: string) => void;
+  pushStatus?: PushStatus;
+  pushEnabled?: boolean;
+  enablePushAlerts?: () => Promise<void>;
 }) {
   const isArtisan = me.role === 'ARTISAN';
   const [activeSection, setActiveSection] = useState<AccountSettingsSection>(isArtisan ? 'verification' : 'personal');
@@ -430,8 +436,8 @@ export function AccountSettingsHub({
             <h2>{isArtisan ? 'Job & message alerts' : 'Manage notifications'}</h2>
             <p className="muted">
               {isArtisan
-                ? 'Choose which job and account events send in-app and email alerts to you.'
-                : 'Control which events generate in-app and email alerts.'}
+                ? 'Choose which job and account events send in-app alerts. Browser push is optional below.'
+                : 'Control which events generate in-app alerts. Browser push is optional below.'}
             </p>
             <label className="terms-row">
               <input
@@ -468,6 +474,29 @@ export function AccountSettingsHub({
             <button type="button" disabled={busy} onClick={() => void runAction(savePreferences, 'Notification preferences saved')}>
               Save notification preferences
             </button>
+
+            {enablePushAlerts && (
+              <div className="account-settings-push-block">
+                <h3>Browser push alerts</h3>
+                <p className="muted">
+                  {pushEnabled
+                    ? 'This browser can show alerts when you are away from Bundo.'
+                    : pushStatus === 'denied'
+                      ? 'Notifications are blocked in your browser settings for this site.'
+                      : pushStatus === 'missing-config'
+                        ? 'Push alerts need Firebase web push configuration before they can be enabled.'
+                        : 'Optional heads-up for new activity without keeping Bundo open.'}
+                </p>
+                <button
+                  type="button"
+                  className={pushEnabled ? 'secondary-button' : undefined}
+                  disabled={busy || pushEnabled || pushStatus === 'denied' || pushStatus === 'missing-config'}
+                  onClick={() => void runAction(enablePushAlerts, pushEnabled ? '' : 'Push alerts enabled')}
+                >
+                  {pushEnabled ? 'Push alerts enabled' : 'Enable push alerts'}
+                </button>
+              </div>
+            )}
           </article>
 
           <article id="account-settings-password" className={`panel-card ${panelClass('password')}`}>

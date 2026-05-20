@@ -21,6 +21,10 @@ export function workspaceLink(section: WorkspaceLinkSection = 'overview') {
   return `/workspace/${section}`;
 }
 
+export function workspaceBookingLink(bookingId: string) {
+  return `/workspace/bookings?job=${encodeURIComponent(bookingId)}`;
+}
+
 export function adminLink(section: AdminLinkSection = 'overview') {
   return `/admin/${section}`;
 }
