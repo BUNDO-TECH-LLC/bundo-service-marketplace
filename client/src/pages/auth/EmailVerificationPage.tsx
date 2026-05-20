@@ -73,7 +73,10 @@ export function EmailVerificationPage() {
 
     navigate('/loading', {
       state: {
-        redirectTo: state.accountKind === 'ARTISAN' ? appRoutes.artisanDashboard : appRoutes.customerDashboard,
+        redirectTo:
+          state.accountKind === 'ARTISAN'
+            ? appRoutes.artisanOnboardingBasicInfo
+            : appRoutes.customerDashboard,
       },
     });
   } finally {

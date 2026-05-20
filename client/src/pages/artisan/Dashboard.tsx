@@ -10,6 +10,11 @@ import { ArtisanReviewsPage } from './ArtisanReviewsPage';
 import { ArtisanToolsPage } from './ArtisanToolsPage';
 import type { ActionRunner, PushStatus, WorkspaceSection } from '../../appTypes';
 import { auth } from '../../lib/firebase';
+import {
+  fetchOnboardingStatus,
+  getFirstIncompleteStepPath,
+  isOnboardingComplete,
+} from '../../lib/artisanOnboarding';
 import { resolveApiSession } from '../../lib/authSession';
 import { api } from '../../lib/api';
 import {
@@ -23,7 +28,11 @@ import {
   buildArtisanDashboardPath,
 } from '../../routes/paths';
 
-export default function ArtisanDashboardPage() {
+type ArtisanDashboardPageProps = {
+  requireAuth?: boolean;
+};
+
+export default function ArtisanDashboardPage({ requireAuth = true }: ArtisanDashboardPageProps) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
@@ -42,6 +51,18 @@ export default function ArtisanDashboardPage() {
   const section = (searchParams.get('section') as WorkspaceSection) || 'overview';
 
   useEffect(() => {
+    if (!requireAuth) {
+      setMe({
+        firebaseUid: 'dev-artisan',
+        email: 'artisan@example.com',
+        phone: null,
+        role: 'ARTISAN',
+        status: 'ACTIVE',
+      });
+      setToken('dev-token');
+      return undefined;
+    }
+
     if (!auth) {
       navigate(appRoutes.login, { replace: true });
       return undefined;
@@ -68,24 +89,40 @@ export default function ArtisanDashboardPage() {
           return;
         }
 
+        const onboardingStatus = await fetchOnboardingStatus(session.token);
+
+        if (!isOnboardingComplete(onboardingStatus)) {
+          navigate(getFirstIncompleteStepPath(onboardingStatus), { replace: true });
+          return;
+        }
+
         setToken(session.token);
         setMe(session.user);
       } catch {
         navigate(appRoutes.login, { replace: true });
       }
     });
-  }, [navigate]);
+  }, [navigate, requireAuth]);
 
   useEffect(() => {
     if (!token || !me) {
       return;
     }
 
+    if (!requireAuth) {
+      void api<{ categories: Category[] }>('/categories')
+        .then((response) => {
+          setCategories(response.categories);
+        })
+        .catch(() => undefined);
+      return;
+    }
+
     void refresh();
-  }, [token, me?.firebaseUid]);
+  }, [requireAuth, token, me?.firebaseUid]);
 
   useEffect(() => {
-    if (!token) {
+    if (!requireAuth || !token || token === 'dev-token') {
       return;
     }
 
@@ -100,7 +137,7 @@ export default function ArtisanDashboardPage() {
       .catch(() => {
         setPushStatus('unsupported');
       });
-  }, [token]);
+  }, [requireAuth, token]);
 
   const runAction: ActionRunner = async (action, done = 'Done') => {
     setBusy(true);
@@ -168,7 +205,7 @@ export default function ArtisanDashboardPage() {
   }
 
   async function logout() {
-    if (auth) {
+    if (requireAuth && auth) {
       await signOut(auth);
     }
 
@@ -194,6 +231,15 @@ export default function ArtisanDashboardPage() {
 
   return (
     <div className="app-screen-gutter min-h-screen bg-[var(--color-paper)] py-6">
+      {!requireAuth ? (
+        <div
+          className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+          role="status"
+        >
+          <strong className="font-bold">Dev preview</strong> — layout only. Sign in as an artisan for live
+          workspace data.
+        </div>
+      ) : null}
       <header className="mb-8 flex flex-wrap items-center justify-between gap-4 rounded-[24px] border border-[var(--color-line)] bg-[var(--color-paper)] p-4">
         <button className="inline-flex items-center gap-3 bg-transparent text-[var(--color-ink)]" type="button" onClick={() => navigate(appRoutes.artisanDashboard)}>
           <img className="h-11 w-11 rounded-xl object-cover" src={bundoLogo} alt="Bundo logo" />
@@ -214,7 +260,9 @@ export default function ArtisanDashboardPage() {
         </nav>
 
         <div className="flex flex-wrap items-center gap-3">
-          <span className="text-sm text-[var(--color-text-muted)]">{firebaseUser?.email || 'artisan'}</span>
+          <span className="text-sm text-[var(--color-text-muted)]">
+            {firebaseUser?.email || me?.email || 'artisan'}
+          </span>
           <button className="secondary-button" type="button" onClick={() => void logout()}>
             Log out
           </button>

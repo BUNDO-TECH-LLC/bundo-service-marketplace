@@ -2,12 +2,21 @@ import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { dayLabels, money } from '../../lib/formatting';
 import type { ActionRunner } from '../../appTypes';
+import {
+  createAvailabilitySlot,
+  deleteAvailabilitySlot,
+  fetchMyAvailabilitySlots,
+} from '../../lib/availabilitySlots';
+import {
+  deletePortfolioImage,
+  fetchMyPortfolioImages,
+  uploadPortfolioImage,
+} from '../../lib/portfolioUpload';
 import type {
   Artisan,
   ArtisanKycSubmission,
   AvailabilitySlot,
   Category,
-  CloudinarySignedUpload,
   Offering,
   PayoutBank,
   PortfolioImage,
@@ -60,8 +69,8 @@ export function ArtisanToolsPage({
 
     Promise.all([
       api<{ profile: Artisan }>('/artisans/me', { token }).catch(() => ({ profile: null as unknown as Artisan })),
-      api<{ images: PortfolioImage[] }>('/artisans/portfolio-images/me', { token }).catch(() => ({ images: [] })),
-      api<{ slots: AvailabilitySlot[] }>('/artisans/availability-slots/me', { token }).catch(() => ({ slots: [] })),
+      fetchMyPortfolioImages(token).catch(() => [] as PortfolioImage[]),
+      fetchMyAvailabilitySlots(token).catch(() => [] as AvailabilitySlot[]),
       api<{ account: ProviderPayoutAccount | null }>('/artisans/payout-account', { token }),
       api<{ banks: PayoutBank[] }>('/payments/banks', { token }),
       api<{ submission: ArtisanKycSubmission | null }>('/artisans/kyc', { token }),
@@ -72,8 +81,8 @@ export function ArtisanToolsPage({
         }
 
         setProfile(profileResponse.profile || null);
-        setPortfolioImages(imageResponse.images);
-        setAvailabilitySlots(slotResponse.slots);
+        setPortfolioImages(imageResponse);
+        setAvailabilitySlots(slotResponse);
         setPayoutAccount(accountResponse.account);
         setBanks(bankResponse.banks);
         setKycSubmission(kycResponse.submission);
@@ -99,15 +108,15 @@ export function ArtisanToolsPage({
   async function hydrateWorkspace() {
     const [profileResponse, imageResponse, slotResponse, accountResponse, kycResponse] = await Promise.all([
       api<{ profile: Artisan }>('/artisans/me', { token }).catch(() => ({ profile: null as unknown as Artisan })),
-      api<{ images: PortfolioImage[] }>('/artisans/portfolio-images/me', { token }).catch(() => ({ images: [] })),
-      api<{ slots: AvailabilitySlot[] }>('/artisans/availability-slots/me', { token }).catch(() => ({ slots: [] })),
+      fetchMyPortfolioImages(token).catch(() => [] as PortfolioImage[]),
+      fetchMyAvailabilitySlots(token).catch(() => [] as AvailabilitySlot[]),
       api<{ account: ProviderPayoutAccount | null }>('/artisans/payout-account', { token }),
       api<{ submission: ArtisanKycSubmission | null }>('/artisans/kyc', { token }),
     ]);
 
     setProfile(profileResponse.profile || null);
-    setPortfolioImages(imageResponse.images);
-    setAvailabilitySlots(slotResponse.slots);
+    setPortfolioImages(imageResponse);
+    setAvailabilitySlots(slotResponse);
     setPayoutAccount(accountResponse.account);
     setKycSubmission(kycResponse.submission);
   }
@@ -172,14 +181,10 @@ export function ArtisanToolsPage({
   async function addAvailability(formElement: HTMLFormElement) {
     const form = new FormData(formElement);
 
-    await api('/artisans/availability-slots', {
-      method: 'POST',
-      token,
-      body: JSON.stringify({
-        dayOfWeek: Number(form.get('dayOfWeek')),
-        startTime: form.get('startTime'),
-        endTime: form.get('endTime'),
-      }),
+    await createAvailabilitySlot(token, {
+      dayOfWeek: Number(form.get('dayOfWeek')),
+      startTime: String(form.get('startTime')),
+      endTime: String(form.get('endTime')),
     });
 
     await hydrateWorkspace();
@@ -199,77 +204,23 @@ export function ArtisanToolsPage({
   }
 
   async function removeAvailability(slotId: string) {
-    await api(`/artisans/availability-slots/${slotId}`, {
-      method: 'DELETE',
-      token,
-    });
-
+    await deleteAvailabilitySlot(token, slotId);
     await hydrateWorkspace();
   }
 
   async function uploadPortfolioFile(file: File) {
-    if (!file.type.startsWith('image/')) {
-      throw new Error('Please choose an image file.');
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      throw new Error('Each image must be 5MB or smaller.');
-    }
-
     setUploadingPortfolio(true);
 
     try {
-      const signatureResponse = await api<{ upload: CloudinarySignedUpload }>(
-        '/artisans/portfolio-images/sign-upload',
-        {
-          method: 'POST',
-          token,
-        }
-      );
-
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('api_key', signatureResponse.upload.apiKey);
-      formData.append('timestamp', String(signatureResponse.upload.timestamp));
-      formData.append('folder', signatureResponse.upload.folder);
-      formData.append('signature', signatureResponse.upload.signature);
-
-      const uploadResponse = await fetch(
-        `https://api.cloudinary.com/v1_1/${signatureResponse.upload.cloudName}/image/upload`,
-        {
-          method: 'POST',
-          body: formData,
-        }
-      );
-
-      const uploadData = await uploadResponse.json();
-
-      if (!uploadResponse.ok) {
-        throw new Error(uploadData?.error?.message || 'Could not upload image');
-      }
-
-      await api('/artisans/portfolio-images', {
-        method: 'POST',
-        token,
-        body: JSON.stringify({
-          cloudinaryId: uploadData.public_id,
-          url: uploadData.secure_url,
-          displayOrder: portfolioImages.length,
-        }),
-      });
-
+      await uploadPortfolioImage(token, file, portfolioImages.length);
       await hydrateWorkspace();
     } finally {
       setUploadingPortfolio(false);
     }
   }
 
-  async function removePortfolioImage(imageId: string) {
-    await api(`/artisans/portfolio-images/${imageId}`, {
-      method: 'DELETE',
-      token,
-    });
-
+  async function removePortfolioImageById(imageId: string) {
+    await deletePortfolioImage(token, imageId);
     await hydrateWorkspace();
   }
 
@@ -463,7 +414,7 @@ export function ArtisanToolsPage({
                   <button
                     className="secondary-button"
                     disabled={busy || uploadingPortfolio}
-                    onClick={() => void runAction(() => removePortfolioImage(image.id), 'Portfolio image removed')}
+                    onClick={() => void runAction(() => removePortfolioImageById(image.id), 'Portfolio image removed')}
                   >
                     Remove
                   </button>

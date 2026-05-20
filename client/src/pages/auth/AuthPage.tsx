@@ -10,6 +10,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthLayout } from '../../layouts/AuthLayout';
 import { SignupRolePicker } from '../../components/auth/SignupRolePicker';
 import { api } from '../../lib/api';
+import { resolveArtisanPostAuthPath } from '../../lib/artisanOnboarding';
 import { resolveApiSession } from '../../lib/authSession';
 import { auth, firebaseReady } from '../../lib/firebase';
 import { appRoutes } from '../../routes/paths';
@@ -144,7 +145,7 @@ export function AuthPage({ mode }: AuthPageProps) {
           session.user.role === 'ADMIN'
             ? appRoutes.admin
             : session.user.role === 'ARTISAN'
-              ? appRoutes.artisanDashboard
+              ? await resolveArtisanPostAuthPath(session.token)
               : appRoutes.customerDashboard;
 
         showLoadingThenNavigate(destination);

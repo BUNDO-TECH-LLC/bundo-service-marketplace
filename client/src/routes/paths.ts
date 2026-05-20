@@ -15,6 +15,17 @@ export const appRoutes = {
   customerMessages: '/customer/messages',
   customerWorkspace: '/customer/workspace',
   artisanDashboard: '/artisan/dashboard',
+  artisanOnboarding: '/artisan/onboarding',
+  artisanOnboardingBasicInfo: '/artisan/onboarding/basic-info',
+  artisanOnboardingPricing: '/artisan/onboarding/pricing',
+  artisanOnboardingPortfolio: '/artisan/onboarding/portfolio',
+  artisanOnboardingAvailability: '/artisan/onboarding/availability',
+  devArtisanOnboarding: '/dev/artisan/onboarding',
+  devArtisanOnboardingBasicInfo: '/dev/artisan/onboarding/basic-info',
+  devArtisanOnboardingPricing: '/dev/artisan/onboarding/pricing',
+  devArtisanOnboardingPortfolio: '/dev/artisan/onboarding/portfolio',
+  devArtisanOnboardingAvailability: '/dev/artisan/onboarding/availability',
+  devArtisanDashboard: '/dev/artisan/dashboard',
   admin: '/admin',
 } as const;
 
