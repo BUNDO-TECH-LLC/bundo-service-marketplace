@@ -478,38 +478,149 @@ canvas {
   }
 }
 
-.artisan-account-summary {
+/* Unified profile dropdown (client + artisan workspace) */
+.profile-account-menu-root {
   position: relative;
 }
 
-.artisan-app-header .artisan-account-summary .account-chip {
-  width: 42px;
+.profile-account-menu-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 10px;
+  padding-left: 6px;
+}
+
+.profile-account-menu-chevron {
+  flex-shrink: 0;
+  margin-left: 2px;
+  opacity: 0.55;
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+
+.profile-account-menu-trigger:hover .profile-account-menu-chevron,
+.profile-account-menu-trigger.is-open .profile-account-menu-chevron {
+  opacity: 0.9;
+}
+
+.profile-account-menu-chevron--open {
+  transform: rotate(180deg);
+}
+
+.profile-account-dropdown-body {
+  padding: 8px;
+}
+
+.profile-account-menu-group + .profile-account-menu-group {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.profile-account-menu-section-title {
+  margin: 4px 8px 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.profile-account-menu-group-items {
+  display: grid;
+  gap: 2px;
+}
+
+.profile-account-menu-text-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  border-radius: 8px;
+  padding: 12px 12px;
+  color: var(--ink);
+  background: var(--color-white);
+  text-align: left;
+  font-weight: 600;
+}
+
+.profile-account-dropdown .account-menu-item-with-icon {
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.profile-account-dropdown .account-menu-item-with-icon.active {
+  color: var(--accent-dark);
+  background: var(--accent-soft);
+}
+
+.profile-account-dropdown .danger-menu-item {
+  margin-top: 0;
+  border-top: 0;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.profile-account-dropdown .danger-menu-item:hover {
+  background: rgb(220 38 38 / 8%);
+}
+
+.topbar-mobile-account-embed {
+  width: 100%;
+}
+
+.profile-account-menu-inline {
+  width: 100%;
+}
+
+.account-menu.profile-account-dropdown--inline {
+  position: static;
+  top: auto;
+  right: auto;
+  left: auto;
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
+.account-menu.profile-account-dropdown--inline::before {
+  display: none;
+}
+
+.account-menu-head.profile-account-dropdown-head--inline {
+  background: var(--color-white);
+}
+
+.artisan-app-header .profile-account-menu-trigger {
+  width: auto;
+  min-width: auto;
   height: 42px;
   border: 1px solid var(--line);
   color: var(--ink);
   background: #f6f4f1;
 }
 
-.artisan-app-header .artisan-account-summary .account-chip:hover,
-.artisan-app-header .artisan-account-summary .account-chip[aria-expanded='true'],
-.artisan-app-header .artisan-account-summary .account-chip.active {
+.artisan-app-header .profile-account-menu-trigger:hover,
+.artisan-app-header .profile-account-menu-trigger[aria-expanded='true'],
+.artisan-app-header .profile-account-menu-trigger.active {
   border-color: var(--accent);
   color: var(--accent);
   background: var(--accent-soft);
 }
 
-.artisan-app-header .artisan-account-summary .account-avatar {
+.artisan-app-header .profile-account-menu-trigger .account-avatar {
   width: 34px;
   height: 34px;
   color: #fff;
   background: #111;
   font-size: 14px;
   font-weight: 800;
-}
-
-.artisan-account-menu .account-menu-item-with-icon.active {
-  color: var(--accent);
-  background: var(--accent-soft);
 }
 
 .topbar-search {
@@ -607,6 +718,27 @@ canvas {
   background: var(--overlay-white-hover);
 }
 
+.auth-summary .profile-account-menu-trigger.account-chip {
+  display: inline-flex;
+  width: auto;
+  min-height: 42px;
+  padding: 0 10px 0 6px;
+  place-items: center;
+  gap: 6px;
+  border-radius: 999px;
+}
+
+.signed-in-topbar .auth-summary .profile-account-menu-trigger.account-chip {
+  color: var(--ink);
+  background: #f6f4f1;
+}
+
+.signed-in-topbar .auth-summary .profile-account-menu-trigger.account-chip:hover,
+.signed-in-topbar .auth-summary .profile-account-menu-trigger.account-chip.is-open {
+  color: var(--accent-dark);
+  background: var(--accent-soft);
+}
+
 .account-avatar {
   display: grid;
   width: 34px;
@@ -653,6 +785,15 @@ canvas {
   color: var(--ink);
   background: var(--color-white);
   box-shadow: 0 20px 48px var(--shadow-medium);
+}
+
+.account-menu.profile-account-dropdown {
+  width: min(300px, calc(100vw - 32px));
+  padding: 0;
+  border-radius: 12px;
+  box-shadow:
+    0 4px 6px rgb(15 23 42 / 6%),
+    0 20px 48px rgb(15 23 42 / 12%);
 }
 
 .account-menu::before {
@@ -704,6 +845,12 @@ canvas {
   font-style: normal;
   font-weight: 900;
   text-transform: uppercase;
+}
+
+.account-menu-head.profile-account-dropdown-head {
+  padding: 14px 14px 16px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--accent-soft, #fff4eb) 0%, var(--color-white) 100%);
 }
 
 .account-menu button {
@@ -7455,6 +7602,12 @@ footer h4 {
     gap: 0;
   }
 
+  .artisan-app-header .artisan-header-collapse .profile-account-menu-inline {
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
+
   .artisan-header-mobile-actions {
     display: grid;
     gap: 10px;
@@ -7473,9 +7626,8 @@ footer h4 {
     display: none;
   }
 
-  .artisan-app-header .artisan-account-summary .account-chip {
-    width: 40px;
-    height: 40px;
+  .artisan-app-header .profile-account-menu-trigger {
+    min-height: 40px;
   }
 
   .artisan-header-end {
@@ -7715,6 +7867,30 @@ footer h4 {
 
   .account-menu::before {
     display: none;
+  }
+
+  .account-menu.profile-account-dropdown--inline {
+    position: static !important;
+    top: auto !important;
+    right: auto !important;
+    left: auto !important;
+    width: 100% !important;
+    max-height: none !important;
+    margin-top: 0;
+  }
+
+  .topbar-mobile-account-embed {
+    margin-top: 10px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
+
+  .profile-account-menu-inline {
+    width: 100%;
+  }
+
+  .account-menu-head.profile-account-dropdown-head--inline {
+    background: var(--color-white);
   }
 
   .section-title-row,

@@ -27,7 +27,20 @@ import { EmailInboxHint } from '../components/EmailInboxHint';
 import { sendBundoEmailVerification } from '../lib/authEmailVerification';
 import { LegalLinks } from '../components/LegalLinks';
 import { PasswordInput } from '../components/PasswordInput';
-import { IconHelp, IconProfile, IconReviews, IconSettings } from '../components/TopbarNavIcons';
+import {
+  IconAdmin,
+  IconBookings,
+  IconDashboard,
+  IconHelp,
+  IconMessages,
+  IconNotifications,
+  IconProfile,
+  IconReviews,
+  IconSettings,
+} from '../components/TopbarNavIcons';
+import { ProfileAccountMenu } from '../components/ProfileAccountMenu';
+import { useElementById } from '../hooks/useElementById';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 
 function AuthDrawer({
   open,
@@ -112,6 +125,11 @@ export function AuthBox({
   const [preferredRole, setPreferredRole] = useState<SignupRole | null>(null);
   const [pendingAuthUser, setPendingAuthUser] = useState<User | null>(null);
   const [pendingEmailVerificationUser, setPendingEmailVerificationUser] = useState<User | null>(null);
+
+  const narrowViewport = useMediaQuery('(max-width: 768px)');
+  const topbarPanelEl = useElementById(
+    firebaseUser && me?.role && narrowViewport ? 'topbar-mobile-panel' : null
+  );
 
   useEffect(() => {
     if (!authPromptSignal) return;
@@ -465,7 +483,6 @@ export function AuthBox({
 
   if (firebaseUser && me) {
     const displayName = userDisplayName(firebaseUser, me);
-    const initial = displayName.slice(0, 1).toUpperCase();
     const role = me?.role || null;
     const roleLabel = role ? role.toLowerCase() : 'setup account';
 
@@ -485,115 +502,148 @@ export function AuthBox({
       }
     };
 
+    const roleHint =
+      role === 'ARTISAN'
+        ? null
+        : role === 'CUSTOMER'
+          ? 'Client'
+          : role === 'ADMIN'
+            ? 'Admin'
+            : roleLabel;
+
+    const logoutAction = () => {
+      onNavigate('home');
+      onNotice('Signed out');
+      if (auth) {
+        void signOut(auth);
+      }
+    };
+
+    const customerGroups = [
+      {
+        title: 'Workspace',
+        items: [
+          {
+            id: 'dashboard',
+            label: 'Dashboard',
+            icon: <IconDashboard />,
+            onSelect: () => goTo('home'),
+          },
+          {
+            id: 'bookings',
+            label: 'My bookings',
+            icon: <IconBookings />,
+            onSelect: () => goToWorkspace('bookings'),
+          },
+          {
+            id: 'messages',
+            label: 'Messages',
+            icon: <IconMessages />,
+            onSelect: () => goToWorkspace('messages'),
+          },
+          {
+            id: 'notifications',
+            label: 'Notifications',
+            icon: <IconNotifications />,
+            onSelect: () => goToWorkspace('notifications'),
+          },
+        ],
+      },
+      {
+        title: 'Support',
+        items: [
+          { id: 'help', label: 'Help', icon: <IconHelp />, onSelect: () => goTo('help') },
+          { id: 'settings', label: 'Settings', icon: <IconSettings />, onSelect: () => goToWorkspace('settings') },
+        ],
+      },
+      {
+        items: [{ id: 'logout', label: 'Log out', danger: true, onSelect: logoutAction }],
+      },
+    ];
+
+    const artisanGroups = [
+      {
+        title: 'Your business',
+        items: [
+          { id: 'profile', label: 'Profile', icon: <IconProfile />, onSelect: () => goToWorkspace('profile') },
+          { id: 'reviews', label: 'Reviews', icon: <IconReviews />, onSelect: () => goToWorkspace('reviews') },
+          { id: 'settings', label: 'Settings', icon: <IconSettings />, onSelect: () => goToWorkspace('settings') },
+        ],
+      },
+      {
+        title: 'Support',
+        items: [{ id: 'help', label: 'Help', icon: <IconHelp />, onSelect: () => goTo('help') }],
+      },
+      {
+        items: [{ id: 'logout', label: 'Log out', danger: true, onSelect: logoutAction }],
+      },
+    ];
+
+    const adminGroups = [
+      {
+        title: 'Admin',
+        items: [
+          { id: 'admin', label: 'Admin center', icon: <IconAdmin />, onSelect: () => goTo('admin') },
+          { id: 'dashboard', label: 'Dashboard', icon: <IconDashboard />, onSelect: () => goToWorkspace('overview') },
+          {
+            id: 'support',
+            label: 'Support chats',
+            icon: <IconMessages />,
+            onSelect: () => goTo('admin', 'Support chats are in the admin conversation panel'),
+          },
+          {
+            id: 'notifications',
+            label: 'Notifications',
+            icon: <IconNotifications />,
+            onSelect: () => goToWorkspace('notifications'),
+          },
+        ],
+      },
+      {
+        title: 'Support',
+        items: [
+          { id: 'help', label: 'Help', icon: <IconHelp />, onSelect: () => goTo('help') },
+          { id: 'settings', label: 'Settings', icon: <IconSettings />, onSelect: () => goToWorkspace('settings') },
+        ],
+      },
+      {
+        items: [{ id: 'logout', label: 'Log out', danger: true, onSelect: logoutAction }],
+      },
+    ];
+
+    const menuGroups = role === 'ARTISAN' ? artisanGroups : role === 'ADMIN' ? adminGroups : customerGroups;
+
+    if (narrowViewport && me.role) {
+      if (!topbarPanelEl) {
+        // Avoid flashing the desktop avatar popover before #topbar-mobile-panel is resolved (layout).
+        return null;
+      }
+      return createPortal(
+        <div className="topbar-mobile-account-embed">
+          <ProfileAccountMenu
+            layout="inline"
+            displayName={displayName}
+            email={firebaseUser.email || me?.email}
+            roleHint={roleHint}
+            groups={menuGroups}
+            onItemActivated={onOpenAuth}
+          />
+        </div>,
+        topbarPanelEl
+      );
+    }
+
     return (
-      <div className="auth-summary">
-        <button
-          className="account-chip"
-          type="button"
-          aria-label={`Account menu for ${displayName}`}
-          aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((open) => !open)}
-        >
-          <span className="account-avatar">{initial}</span>
-          {unreadCount > 0 && <span className="account-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
-        </button>
-
-        {menuOpen && (
-          <div className="account-menu" role="menu">
-            <div className="account-menu-head">
-              <span className="account-avatar large">{initial}</span>
-              <div>
-                <strong>{displayName}</strong>
-                <small>{firebaseUser.email || me?.email || roleLabel}</small>
-                {role !== 'ARTISAN' && <em>{roleLabel}</em>}
-              </div>
-            </div>
-
-            {role === 'ARTISAN' ? (
-              <>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="account-menu-item-with-icon"
-                  onClick={() => goToWorkspace('profile')}
-                >
-                  <IconProfile />
-                  <span>Profile</span>
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="account-menu-item-with-icon"
-                  onClick={() => goToWorkspace('reviews')}
-                >
-                  <IconReviews />
-                  <span>Reviews</span>
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="account-menu-item-with-icon"
-                  onClick={() => goToWorkspace('settings')}
-                >
-                  <IconSettings />
-                  <span>Settings</span>
-                </button>
-                <button type="button" role="menuitem" className="account-menu-item-with-icon" onClick={() => goTo('help')}>
-                  <IconHelp />
-                  <span>Help</span>
-                </button>
-              </>
-            ) : role === 'ADMIN' ? (
-              <>
-                <button onClick={() => goTo('admin')}>Admin center</button>
-                <button onClick={() => goToWorkspace('overview')}>Dashboard</button>
-                <button onClick={() => goTo('admin', 'Support chats are in the admin conversation panel')}>Support chats</button>
-                <button onClick={() => goToWorkspace('notifications')}>Notifications</button>
-              </>
-            ) : (
-              <>
-                <button onClick={() => goTo('home')}>Dashboard</button>
-                <button onClick={() => goToWorkspace('bookings')}>My bookings</button>
-                <button onClick={() => goToWorkspace('messages')}>Messages</button>
-                <button onClick={() => goToWorkspace('notifications')}>Notifications</button>
-              </>
-            )}
-
-            {role !== 'ARTISAN' && (
-              <>
-                <button type="button" role="menuitem" className="account-menu-item-with-icon" onClick={() => goTo('help')}>
-                  <IconHelp />
-                  <span>Help</span>
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="account-menu-item-with-icon"
-                  onClick={() => {
-                    goToWorkspace('settings');
-                  }}
-                >
-                  <IconSettings />
-                  <span>Settings</span>
-                </button>
-              </>
-            )}
-            <button
-              type="button"
-              role="menuitem"
-              className="danger-menu-item"
-              onClick={() => {
-                setMenuOpen(false);
-                onNavigate('home');
-                onNotice('Signed out');
-                auth && signOut(auth);
-              }}
-            >
-              Log out
-            </button>
-          </div>
-        )}
-      </div>
+      <ProfileAccountMenu
+        displayName={displayName}
+        email={firebaseUser.email || me?.email}
+        roleHint={roleHint}
+        unreadCount={unreadCount}
+        open={menuOpen}
+        onOpenChange={setMenuOpen}
+        groups={menuGroups}
+        onItemActivated={onOpenAuth}
+      />
     );
   }
 

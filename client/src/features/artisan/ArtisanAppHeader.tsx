@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ArtisanHeaderActive } from '../../appTypes';
 import bundoLogo from '../../assets/bundo-logo.png';
 import { IconHelp, IconProfile, IconReviews, IconSettings } from '../../components/TopbarNavIcons';
+import { ProfileAccountMenu } from '../../components/ProfileAccountMenu';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { ArtisanTopbarNav } from './ArtisanTopbarNav';
 
 const ACCOUNT_MENU_SECTIONS: ArtisanHeaderActive[] = ['Profile', 'Reviews', 'Settings'];
@@ -37,10 +39,9 @@ export function ArtisanAppHeader({
   onHelp: () => void;
   onSignOut?: () => void;
 }) {
+  const narrowViewport = useMediaQuery('(max-width: 768px)');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
-  const accountRef = useRef<HTMLDivElement>(null);
-  const initial = displayName.slice(0, 1).toUpperCase();
   const accountSectionActive = ACCOUNT_MENU_SECTIONS.includes(active);
 
   const closeMenus = () => {
@@ -54,7 +55,7 @@ export function ArtisanAppHeader({
   };
 
   useEffect(() => {
-    if (!mobileNavOpen && !accountMenuOpen) return;
+    if (!mobileNavOpen) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -64,20 +65,57 @@ export function ArtisanAppHeader({
 
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [mobileNavOpen, accountMenuOpen]);
+  }, [mobileNavOpen]);
 
-  useEffect(() => {
-    if (!accountMenuOpen) return;
-
-    const onPointerDown = (event: MouseEvent) => {
-      if (accountRef.current && !accountRef.current.contains(event.target as Node)) {
-        setAccountMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', onPointerDown);
-    return () => document.removeEventListener('mousedown', onPointerDown);
-  }, [accountMenuOpen]);
+  const profileGroups = [
+    {
+      title: 'Your business',
+      items: [
+        {
+          id: 'profile',
+          label: 'Profile',
+          icon: <IconProfile />,
+          onSelect: () => runNav(onProfile),
+          active: active === 'Profile',
+        },
+        {
+          id: 'reviews',
+          label: 'Reviews',
+          icon: <IconReviews />,
+          onSelect: () => runNav(onReviews),
+          active: active === 'Reviews',
+        },
+        {
+          id: 'settings',
+          label: 'Settings',
+          icon: <IconSettings />,
+          onSelect: () => runNav(onSettings),
+          active: active === 'Settings',
+        },
+      ],
+    },
+    {
+      title: 'Support',
+      items: [{ id: 'help', label: 'Help', icon: <IconHelp />, onSelect: () => runNav(onHelp) }],
+    },
+    ...(onSignOut
+      ? [
+          {
+            items: [
+              {
+                id: 'logout',
+                label: 'Log out',
+                danger: true,
+                onSelect: () => {
+                  closeMenus();
+                  onSignOut();
+                },
+              },
+            ],
+          },
+        ]
+      : []),
+  ];
 
   return (
     <header
@@ -99,6 +137,16 @@ export function ArtisanAppHeader({
           onNotifications={onNotifications}
           onNavigate={runNav}
         />
+        {narrowViewport && (
+          <ProfileAccountMenu
+            layout="inline"
+            displayName={displayName}
+            email={email}
+            roleHint={null}
+            groups={profileGroups}
+            onItemActivated={() => setMobileNavOpen(false)}
+          />
+        )}
       </div>
 
       <div className="artisan-header-end">
@@ -116,77 +164,22 @@ export function ArtisanAppHeader({
           <span className="artisan-header-menu-toggle-bars" aria-hidden="true" />
         </button>
 
-        <div className="artisan-account-summary auth-summary" ref={accountRef}>
-          <button
-            type="button"
-            className={`account-chip${accountSectionActive ? ' active' : ''}`}
-            aria-label="Open account menu"
-            aria-expanded={accountMenuOpen}
-            onClick={() => {
-              setMobileNavOpen(false);
-              setAccountMenuOpen((open) => !open);
+        {!narrowViewport && (
+          <ProfileAccountMenu
+            className="artisan-account-profile-menu"
+            displayName={displayName}
+            email={email}
+            roleHint={null}
+            unreadCount={notificationUnreadCount}
+            open={accountMenuOpen}
+            onOpenChange={(next) => {
+              if (next) setMobileNavOpen(false);
+              setAccountMenuOpen(next);
             }}
-          >
-            <span className="account-avatar">{initial}</span>
-          </button>
-
-          {accountMenuOpen && (
-            <div className="account-menu artisan-account-menu" role="menu">
-              <div className="account-menu-head">
-                <span className="account-avatar large">{initial}</span>
-                <div>
-                  <strong>{displayName}</strong>
-                  <small>{email || 'Artisan account'}</small>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                role="menuitem"
-                className={`account-menu-item-with-icon${active === 'Profile' ? ' active' : ''}`}
-                onClick={() => runNav(onProfile)}
-              >
-                <IconProfile />
-                <span>Profile</span>
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className={`account-menu-item-with-icon${active === 'Reviews' ? ' active' : ''}`}
-                onClick={() => runNav(onReviews)}
-              >
-                <IconReviews />
-                <span>Reviews</span>
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className={`account-menu-item-with-icon${active === 'Settings' ? ' active' : ''}`}
-                onClick={() => runNav(onSettings)}
-              >
-                <IconSettings />
-                <span>Settings</span>
-              </button>
-              <button type="button" role="menuitem" className="account-menu-item-with-icon" onClick={() => runNav(onHelp)}>
-                <IconHelp />
-                <span>Help</span>
-              </button>
-              {onSignOut && (
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="danger-menu-item"
-                  onClick={() => {
-                    closeMenus();
-                    onSignOut();
-                  }}
-                >
-                  Log out
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+            chipActive={accountSectionActive}
+            groups={profileGroups}
+          />
+        )}
       </div>
 
       {mobileNavOpen && (
