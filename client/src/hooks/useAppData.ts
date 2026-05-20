@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { api } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 import { paymentSuccessFromVerify, type VerifyPaymentResponse } from '../lib/paymentReturn';
 import type {
   AdminArtisanRecord,
@@ -30,7 +30,23 @@ type MarketplaceFilterState = {
   searchLng: number | null;
 };
 
-export function useAppData(filters: MarketplaceFilterState) {
+export type UseAppDataOptions = {
+  /** Called when GET /conversations fails (except 401). Stops silent empty inbox when the API errors. */
+  notifyConversationError?: (message: string) => void;
+};
+
+function conversationsFallback(
+  err: unknown,
+  notifyConversationError?: (message: string) => void
+): { conversations: Conversation[] } {
+  if (notifyConversationError && err instanceof ApiError && err.status !== 401) {
+    notifyConversationError(err.message);
+  }
+  return { conversations: [] };
+}
+
+export function useAppData(filters: MarketplaceFilterState, options?: UseAppDataOptions) {
+  const notifyConversationError = options?.notifyConversationError;
   const [categories, setCategories] = useState<Category[]>([]);
   const [artisans, setArtisans] = useState<Artisan[]>([]);
   const [publicOfferings, setPublicOfferings] = useState<Offering[]>([]);
@@ -102,9 +118,9 @@ export function useAppData(filters: MarketplaceFilterState) {
         api<{ bookings: Booking[] }>('/bookings/customer?page=1&limit=10', { token: authToken }).catch(() => ({
           bookings: [],
         })),
-        api<{ conversations: Conversation[] }>('/conversations', { token: authToken }).catch(() => ({
-          conversations: [],
-        })),
+        api<{ conversations: Conversation[] }>('/conversations', { token: authToken }).catch((err) =>
+          conversationsFallback(err, notifyConversationError)
+        ),
         api<{ notifications: Notification[] }>('/notifications', { token: authToken }).catch(() => ({
           notifications: [],
         })),
@@ -121,9 +137,9 @@ export function useAppData(filters: MarketplaceFilterState) {
           bookings: [],
         })),
         api<{ offerings: Offering[] }>('/offerings/me', { token: authToken }).catch(() => ({ offerings: [] })),
-        api<{ conversations: Conversation[] }>('/conversations', { token: authToken }).catch(() => ({
-          conversations: [],
-        })),
+        api<{ conversations: Conversation[] }>('/conversations', { token: authToken }).catch((err) =>
+          conversationsFallback(err, notifyConversationError)
+        ),
         api<{ notifications: Notification[] }>('/notifications', { token: authToken }).catch(() => ({
           notifications: [],
         })),
@@ -160,7 +176,7 @@ export function useAppData(filters: MarketplaceFilterState) {
       setAdminArtisans(artisanRes.artisans);
       setAdminCategories(categoryRes.categories);
     }
-  }, []);
+  }, [notifyConversationError]);
 
   const clearPrivateData = useCallback(() => {
     setBookings([]);

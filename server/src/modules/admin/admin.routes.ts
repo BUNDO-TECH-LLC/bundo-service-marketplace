@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../../middlewares/errorHandler';
 import { httpError } from '../../utils/errors';
+import { respondIfChatSchemaError } from '../../utils/handleChatSchemaError';
 import { BookingStatus, KycStatus, Prisma, Role, UserStatus, VerifyStatus } from '@prisma/client';
 import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
 import { requireRole } from '../../middlewares/requireRole';
@@ -646,20 +647,25 @@ router.get('/bookings/:id', asyncHandler(async (req, res) => {
 }));
 
 router.get('/conversations', asyncHandler(async (req, res) => {
-  const pagination = getPagination(req);
-  const [conversations, total] = await Promise.all([
-    getAdminConversations(pagination),
-    countAdminConversations(),
-  ]);
+  try {
+    const pagination = getPagination(req);
+    const [conversations, total] = await Promise.all([
+      getAdminConversations(pagination),
+      countAdminConversations(),
+    ]);
 
-  res.json({
-    message: 'Admin conversations fetched',
-    conversations,
-    meta: {
-      ...paginationMeta(pagination),
-      total,
-    },
-  });
+    res.json({
+      message: 'Admin conversations fetched',
+      conversations,
+      meta: {
+        ...paginationMeta(pagination),
+        total,
+      },
+    });
+  } catch (error: unknown) {
+    if (respondIfChatSchemaError(error, res)) return;
+    throw error;
+  }
 }));
 
 router.get('/conversations/:id', asyncHandler(async (req, res) => {

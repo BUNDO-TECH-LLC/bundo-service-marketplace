@@ -17,7 +17,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const location = useLocation();
   const { busy, notice, setNotice, withNotice } = useActionRunner();
   const marketplaceFilters = useMarketplaceFilters();
-  const appData = useAppData(marketplaceFilters);
+  const appData = useAppData(marketplaceFilters, { notifyConversationError: (msg) => setNotice(msg) });
   const [bookingSuccess, setBookingSuccess] = useState<BookingSuccessState | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState<PaymentSuccessState | null>(null);
   const processedPaymentReferenceRef = useRef<string | null>(null);
