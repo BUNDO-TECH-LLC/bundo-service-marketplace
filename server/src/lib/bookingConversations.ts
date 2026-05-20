@@ -64,6 +64,7 @@ export async function appendBookingLifecycleMessage(input: {
         artisanId: input.artisanId,
       },
     },
+    select: { id: true },
   });
 
   if (!conversation) {

@@ -9,6 +9,7 @@ import {
   NotFoundError,
   ValidationError,
 } from '../../utils/errors';
+import { respondIfChatSchemaError } from '../../utils/handleChatSchemaError';
 import { throwOnServiceStatus } from '../../utils/resultErrors';
 import { getPagination, paginationMeta } from '../../utils/pagination';
 import { createBookingDispute } from '../payments/payments.service';
@@ -32,45 +33,50 @@ router.post(
   verifyFirebaseToken,
   requireRole(Role.CUSTOMER),
   asyncHandler(async (req, res) => {
-    const { offeringId, scheduledAt, note } = req.body;
+    try {
+      const { offeringId, scheduledAt, note } = req.body;
 
-    if (!offeringId || typeof offeringId !== 'string') {
-      throw new ValidationError('offeringId is required');
-    }
-
-    let scheduledDate: Date | undefined;
-
-    if (scheduledAt !== undefined) {
-      if (typeof scheduledAt !== 'string') {
-        throw new ValidationError('scheduledAt must be a date string');
+      if (!offeringId || typeof offeringId !== 'string') {
+        throw new ValidationError('offeringId is required');
       }
 
-      scheduledDate = new Date(scheduledAt);
+      let scheduledDate: Date | undefined;
 
-      if (Number.isNaN(scheduledDate.getTime())) {
-        throw new ValidationError('scheduledAt must be a valid date');
+      if (scheduledAt !== undefined) {
+        if (typeof scheduledAt !== 'string') {
+          throw new ValidationError('scheduledAt must be a date string');
+        }
+
+        scheduledDate = new Date(scheduledAt);
+
+        if (Number.isNaN(scheduledDate.getTime())) {
+          throw new ValidationError('scheduledAt must be a valid date');
+        }
       }
+
+      if (note !== undefined && typeof note !== 'string') {
+        throw new ValidationError('note must be a string');
+      }
+
+      const booking = await createBooking({
+        customerId: (req as any).user.firebaseUid,
+        offeringId,
+        ...(scheduledDate !== undefined ? { scheduledAt: scheduledDate } : {}),
+        ...(typeof note === 'string' ? { note } : {}),
+      });
+
+      if (!booking) {
+        throw new NotFoundError('Offering');
+      }
+
+      res.status(201).json({
+        message: 'Booking requested',
+        booking,
+      });
+    } catch (error: unknown) {
+      if (respondIfChatSchemaError(error, res)) return;
+      throw error;
     }
-
-    if (note !== undefined && typeof note !== 'string') {
-      throw new ValidationError('note must be a string');
-    }
-
-    const booking = await createBooking({
-      customerId: (req as any).user.firebaseUid,
-      offeringId,
-      ...(scheduledDate !== undefined ? { scheduledAt: scheduledDate } : {}),
-      ...(typeof note === 'string' ? { note } : {}),
-    });
-
-    if (!booking) {
-      throw new NotFoundError('Offering');
-    }
-
-    res.status(201).json({
-      message: 'Booking requested',
-      booking,
-    });
   })
 );
 
@@ -262,44 +268,49 @@ router.patch(
   verifyFirebaseToken,
   requireRole(Role.ARTISAN),
   asyncHandler(async (req, res) => {
-    const { status } = req.body;
-    const allowedStatuses = [
-      BookingStatus.ACCEPTED,
-      BookingStatus.ONGOING,
-      BookingStatus.DECLINED,
-      BookingStatus.COMPLETED,
-      BookingStatus.CANCELLED,
-    ];
+    try {
+      const { status } = req.body;
+      const allowedStatuses = [
+        BookingStatus.ACCEPTED,
+        BookingStatus.ONGOING,
+        BookingStatus.DECLINED,
+        BookingStatus.COMPLETED,
+        BookingStatus.CANCELLED,
+      ];
 
-    if (!allowedStatuses.includes(status)) {
-      throw new ValidationError(
-        'status must be ACCEPTED, ONGOING, DECLINED, COMPLETED, or CANCELLED'
-      );
+      if (!allowedStatuses.includes(status)) {
+        throw new ValidationError(
+          'status must be ACCEPTED, ONGOING, DECLINED, COMPLETED, or CANCELLED'
+        );
+      }
+
+      const result = await updateBookingStatusForArtisan({
+        bookingId: String(req.params.id),
+        artisanUserId: (req as any).user.firebaseUid,
+        status,
+      });
+
+      throwOnServiceStatus(result.status, {
+        missing_artisan: new NotFoundError('Artisan profile'),
+        missing_booking: new NotFoundError('Booking'),
+        forbidden: new ForbiddenError('You can only update bookings for your own artisan profile'),
+        invalid_transition: new ConflictError(
+          `Cannot move booking from ${result.from} to ${status}`
+        ),
+        payment_required: new ConflictError(
+          'Customer payment must be secured through Paystack before the service can start or be marked completed',
+          'PAYMENT_REQUIRED'
+        ),
+      });
+
+      res.json({
+        message: 'Booking status updated',
+        booking: result.booking,
+      });
+    } catch (error: unknown) {
+      if (respondIfChatSchemaError(error, res)) return;
+      throw error;
     }
-
-    const result = await updateBookingStatusForArtisan({
-      bookingId: String(req.params.id),
-      artisanUserId: (req as any).user.firebaseUid,
-      status,
-    });
-
-    throwOnServiceStatus(result.status, {
-      missing_artisan: new NotFoundError('Artisan profile'),
-      missing_booking: new NotFoundError('Booking'),
-      forbidden: new ForbiddenError('You can only update bookings for your own artisan profile'),
-      invalid_transition: new ConflictError(
-        `Cannot move booking from ${result.from} to ${status}`
-      ),
-      payment_required: new ConflictError(
-        'Customer payment must be secured through Paystack before the service can start or be marked completed',
-        'PAYMENT_REQUIRED'
-      ),
-    });
-
-    res.json({
-      message: 'Booking status updated',
-      booking: result.booking,
-    });
   })
 );
 
