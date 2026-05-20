@@ -35,7 +35,7 @@ import {
   updatePortfolioImageForArtisan,
 } from './artisans.service';
 import { env } from '../../config/env';
-import { buildCloudinaryUploadSignature } from '../../utils/cloudinarySignature';
+import { createCloudinarySignedUpload } from '../../utils/cloudinaryUploadConfig';
 
 const router = Router();
 
@@ -119,22 +119,11 @@ router.post(
   verifyFirebaseToken,
   requireRole(Role.ARTISAN),
   asyncHandler(async (_req, res) => {
-    const timestamp = Math.floor(Date.now() / 1000);
-    const folder = 'bundo/artisan-kyc';
-    const signature = buildCloudinaryUploadSignature(
-      { folder, timestamp },
-      env.CLOUDINARY_API_SECRET
-    );
+    const upload = await createCloudinarySignedUpload('bundo/artisan-kyc');
 
     res.json({
       message: 'KYC upload signature created',
-      upload: {
-        cloudName: env.CLOUDINARY_CLOUD_NAME,
-        apiKey: env.CLOUDINARY_API_KEY,
-        timestamp,
-        folder,
-        signature,
-      },
+      upload,
     });
   })
 );
@@ -144,22 +133,11 @@ router.post(
   verifyFirebaseToken,
   requireRole(Role.ARTISAN),
   asyncHandler(async (_req, res) => {
-    const timestamp = Math.floor(Date.now() / 1000);
-    const folder = 'bundo/artisan-portfolio';
-    const signature = buildCloudinaryUploadSignature(
-      { folder, timestamp },
-      env.CLOUDINARY_API_SECRET
-    );
+    const upload = await createCloudinarySignedUpload('bundo/artisan-portfolio');
 
     res.json({
       message: 'Upload signature created',
-      upload: {
-        cloudName: env.CLOUDINARY_CLOUD_NAME,
-        apiKey: env.CLOUDINARY_API_KEY,
-        timestamp,
-        folder,
-        signature,
-      },
+      upload,
     });
   })
 );

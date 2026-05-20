@@ -13,6 +13,20 @@ import { z } from 'zod';
 
 const trim = (value: unknown) => (typeof value === 'string' ? value.trim() : value);
 
+const stripQuotes = (value: unknown) => {
+  if (typeof value !== 'string') {
+    return value;
+  }
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+};
+
 const emptyToUndefined = (value: unknown) => {
   const trimmed = trim(value);
   if (trimmed === '' || trimmed === undefined || trimmed === null) {
@@ -54,9 +68,9 @@ const envSchema = z
     FIREBASE_PRIVATE_KEY: z.preprocess(trim, z.string().min(1)),
     FIREBASE_CLIENT_EMAIL: z.preprocess(trim, z.string().email()),
 
-    CLOUDINARY_CLOUD_NAME: z.preprocess(trim, z.string().min(1)),
-    CLOUDINARY_API_KEY: z.preprocess(trim, z.string().min(1)),
-    CLOUDINARY_API_SECRET: z.preprocess(trim, z.string().min(1)),
+    CLOUDINARY_CLOUD_NAME: z.preprocess(stripQuotes, z.string().min(1)),
+    CLOUDINARY_API_KEY: z.preprocess(stripQuotes, z.string().min(1)),
+    CLOUDINARY_API_SECRET: z.preprocess(stripQuotes, z.string().min(1)),
 
     PAYSTACK_SECRET_KEY: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
     PAYSTACK_CALLBACK_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),

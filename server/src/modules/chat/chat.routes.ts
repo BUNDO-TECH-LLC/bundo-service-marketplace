@@ -1,11 +1,10 @@
 import { Router } from 'express';
 import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
-import { env } from '../../config/env';
 import { asyncHandler } from '../../middlewares/errorHandler';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../utils/errors';
 import { respondIfChatSchemaError } from '../../utils/handleChatSchemaError';
 import { throwOnServiceStatus } from '../../utils/resultErrors';
-import { buildCloudinaryUploadSignature } from '../../utils/cloudinarySignature';
+import { createCloudinarySignedUpload } from '../../utils/cloudinaryUploadConfig';
 import {
   createMessage,
   getConversationMessages,
@@ -43,22 +42,11 @@ router.post(
   '/messages/sign-upload',
   verifyFirebaseToken,
   asyncHandler(async (_req, res) => {
-    const timestamp = Math.floor(Date.now() / 1000);
-    const folder = 'bundo/chat-images';
-    const signature = buildCloudinaryUploadSignature(
-      { folder, timestamp },
-      env.CLOUDINARY_API_SECRET
-    );
+    const upload = await createCloudinarySignedUpload('bundo/chat-images');
 
     res.json({
       message: 'Upload signature created',
-      upload: {
-        cloudName: env.CLOUDINARY_CLOUD_NAME,
-        apiKey: env.CLOUDINARY_API_KEY,
-        timestamp,
-        folder,
-        signature,
-      },
+      upload,
     });
   })
 );

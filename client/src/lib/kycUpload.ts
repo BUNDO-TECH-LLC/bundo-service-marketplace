@@ -1,4 +1,5 @@
 import { api } from './api';
+import { formatCloudinaryUploadError } from './cloudinaryUploadError';
 import { assertAcceptableImageFile } from './imageFile';
 import type { CloudinarySignedUpload } from '../types';
 
@@ -33,7 +34,13 @@ export async function uploadKycImage(token: string, file: File): Promise<string>
   };
 
   if (!uploadResponse.ok) {
-    throw new Error(uploadData?.error?.message || 'Could not upload document to storage');
+    throw new Error(
+      formatCloudinaryUploadError(
+        signatureResponse.upload.cloudName,
+        uploadData,
+        'Could not upload document to storage'
+      )
+    );
   }
 
   if (!uploadData.secure_url) {

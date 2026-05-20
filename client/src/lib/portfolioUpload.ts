@@ -1,4 +1,5 @@
 import { api } from './api';
+import { formatCloudinaryUploadError } from './cloudinaryUploadError';
 import { assertAcceptableImageFile } from './imageFile';
 import type { CloudinarySignedUpload, PortfolioImage } from '../types';
 
@@ -38,7 +39,13 @@ export async function uploadPortfolioImage(
   };
 
   if (!uploadResponse.ok) {
-    throw new Error(uploadData?.error?.message || 'Could not upload image to storage');
+    throw new Error(
+      formatCloudinaryUploadError(
+        signatureResponse.upload.cloudName,
+        uploadData,
+        'Could not upload image to storage'
+      )
+    );
   }
 
   if (!uploadData.public_id || !uploadData.secure_url) {

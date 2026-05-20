@@ -19,6 +19,7 @@ import { serializeUser } from './modules/users/users.service';
 import logger from './utils/logger';
 import db from './db/client';
 import { appErrorHandler } from './middlewares/errorHandler';
+import { getCloudinaryHealth } from './utils/cloudinaryUploadConfig';
 
 export function createApp() {
   const app = express();
@@ -156,10 +157,25 @@ export function createApp() {
   app.get('/ready', async (_req, res) => {
     try {
       await db.$queryRaw`SELECT 1`;
+      const cloudinary = await getCloudinaryHealth();
+
+      if (!cloudinary.ok) {
+        res.status(503).json({
+          status: 'not_ready',
+          service: 'bundo-api',
+          cloudinary,
+        });
+        return;
+      }
+
       res.json({
         status: 'ready',
         service: 'bundo-api',
         timestamp: new Date().toISOString(),
+        cloudinary: {
+          ok: true,
+          cloudName: cloudinary.cloudName,
+        },
       });
     } catch {
       res.status(503).json({
