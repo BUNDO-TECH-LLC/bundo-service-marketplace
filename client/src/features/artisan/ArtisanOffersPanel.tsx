@@ -25,7 +25,7 @@ export function ArtisanOffersPanel({
   const kycStatus = kycSubmission?.status ?? 'NOT_SUBMITTED';
   const artisanApproved = profile?.verifyStatus === 'APPROVED' && kycStatus === 'APPROVED';
   const reviewMessage = !profile
-    ? 'Create your artisan profile in Profile settings before listing services.'
+    ? 'Create your artisan profile before listing services.'
     : kycStatus === 'APPROVED' && profile.verifyStatus !== 'APPROVED'
       ? 'Your KYC is approved. Admin approval for your artisan profile is still pending.'
       : kycStatus === 'APPROVED'

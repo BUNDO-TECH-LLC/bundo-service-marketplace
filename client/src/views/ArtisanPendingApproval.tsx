@@ -59,7 +59,7 @@ export function ArtisanPendingApproval({
         </h1>
         <p className="artisan-pending-lead">
           {variant === 'rejected'
-            ? 'You can update your profile and KYC details, then submit again for review.'
+            ? 'You can update your public profile or resubmit verification in Settings, then wait for review.'
             : variant === 'changes_requested'
               ? 'Our team reviewed your submission and left notes. Update your details and resubmit so we can finish verification.'
               : 'Your artisan profile is complete and with our verification team. You will get an in-app notification as soon as you are approved.'}

@@ -12,6 +12,8 @@ import {
   type BundoLocale,
 } from '../../lib/localePreference';
 import { userDisplayName } from '../../lib/userDisplayName';
+import { ArtisanKycSection } from '../artisan/ArtisanKycSection';
+import { ArtisanPayoutSection } from '../artisan/ArtisanPayoutSection';
 import type { AccountSettingsSection, ActionRunner } from '../../appTypes';
 import type { ApiUser, Artisan, NotificationPreferences } from '../../types';
 
@@ -21,17 +23,22 @@ const defaultPrefs: NotificationPreferences = {
   marketing: false,
 };
 
-const SETTINGS_NAV: { id: AccountSettingsSection; label: string; artisanOnly?: boolean; adminHidden?: boolean }[] =
-  [
-    { id: 'personal', label: 'Personal details' },
-    { id: 'business', label: 'Business details', artisanOnly: true },
-    { id: 'phone', label: 'Change phone number' },
-    { id: 'email', label: 'Change email' },
-    { id: 'language', label: 'Change language' },
-    { id: 'notifications', label: 'Manage notifications' },
-    { id: 'password', label: 'Change password' },
-    { id: 'delete', label: 'Delete my account permanently', adminHidden: true },
-  ];
+const SETTINGS_NAV: {
+  id: AccountSettingsSection;
+  label: string;
+  artisanOnly?: boolean;
+  adminHidden?: boolean;
+}[] = [
+  { id: 'personal', label: 'Personal details' },
+  { id: 'verification', label: 'Identity verification (KYC)', artisanOnly: true },
+  { id: 'payouts', label: 'Payout bank account', artisanOnly: true },
+  { id: 'phone', label: 'Change phone number' },
+  { id: 'email', label: 'Change email' },
+  { id: 'language', label: 'Change language' },
+  { id: 'notifications', label: 'Manage notifications' },
+  { id: 'password', label: 'Change password' },
+  { id: 'delete', label: 'Delete my account permanently', adminHidden: true },
+];
 
 function isAccountSettingsSection(value: string): value is AccountSettingsSection {
   return SETTINGS_NAV.some((item) => item.id === value);
@@ -39,7 +46,8 @@ function isAccountSettingsSection(value: string): value is AccountSettingsSectio
 
 const SETTINGS_NAV_SHORT: Record<AccountSettingsSection, string> = {
   personal: 'Personal',
-  business: 'Business',
+  verification: 'KYC',
+  payouts: 'Bank',
   phone: 'Phone',
   email: 'Email',
   language: 'Language',
@@ -49,7 +57,8 @@ const SETTINGS_NAV_SHORT: Record<AccountSettingsSection, string> = {
 };
 
 const ARTISAN_SETTINGS_ORDER: AccountSettingsSection[] = [
-  'business',
+  'verification',
+  'payouts',
   'personal',
   'phone',
   'email',
@@ -61,7 +70,8 @@ const ARTISAN_SETTINGS_ORDER: AccountSettingsSection[] = [
 
 const ARTISAN_SETTINGS_LABELS: Record<AccountSettingsSection, string> = {
   personal: 'Personal details',
-  business: 'Business & verification',
+  verification: 'Identity verification',
+  payouts: 'Payout bank account',
   phone: 'Contact phone',
   email: 'Login email',
   language: 'Language',
@@ -90,7 +100,7 @@ export function AccountSettingsHub({
   onNotice: (message: string) => void;
 }) {
   const isArtisan = me.role === 'ARTISAN';
-  const [activeSection, setActiveSection] = useState<AccountSettingsSection>(isArtisan ? 'business' : 'personal');
+  const [activeSection, setActiveSection] = useState<AccountSettingsSection>(isArtisan ? 'verification' : 'personal');
   const [fullName, setFullName] = useState(userDisplayName(firebaseUser, me));
   const [phone, setPhone] = useState(me.phone || '');
   const [newEmail, setNewEmail] = useState('');
@@ -263,13 +273,20 @@ export function AccountSettingsHub({
           <h1>Settings</h1>
           <p className="muted">
             {isArtisan
-              ? 'Manage your business identity on Bundo, how customers reach you, security, and alerts for new jobs.'
+              ? 'Verification, payouts, contact details, security, and alerts for your artisan account.'
               : 'Manage your personal information, security, and notification preferences.'}
           </p>
           {isArtisan && artisanProfile && (
             <p className="account-settings-artisan-identity">
               <strong>{artisanProfile.displayName}</strong>
               <span className="account-settings-artisan-status">{artisanProfile.verifyStatus.toLowerCase()}</span>
+              <button
+                type="button"
+                className="text-button account-settings-profile-link"
+                onClick={() => onNavigate(buildAppPath({ view: 'workspace', workspaceSection: 'profile' }))}
+              >
+                Edit public profile
+              </button>
             </p>
           )}
         </div>
@@ -296,6 +313,24 @@ export function AccountSettingsHub({
         </p>
 
         <div className="account-settings-panels">
+          {me.role === 'ARTISAN' && (
+            <article id="account-settings-verification" className={`panel-card form-card ${panelClass('verification')}`}>
+              <ArtisanKycSection
+                token={token}
+                busy={busy}
+                runAction={runAction}
+                refresh={refresh}
+                profileCity={artisanProfile?.city}
+              />
+            </article>
+          )}
+
+          {me.role === 'ARTISAN' && (
+            <article id="account-settings-payouts" className={`panel-card form-card ${panelClass('payouts')}`}>
+              <ArtisanPayoutSection token={token} busy={busy} runAction={runAction} />
+            </article>
+          )}
+
           <article id="account-settings-personal" className={`panel-card form-card ${panelClass('personal')}`}>
             <h2>Personal details</h2>
             <p className="muted">
@@ -326,43 +361,6 @@ export function AccountSettingsHub({
               </button>
             </form>
           </article>
-
-          {me.role === 'ARTISAN' && (
-            <article id="account-settings-business" className={`panel-card ${panelClass('business')}`}>
-              <h2>Business & verification</h2>
-              <p className="muted">
-                Your public listing, service area, portfolio photos, KYC, and payout bank account are managed in profile
-                settings. Use this section for a quick summary.
-              </p>
-              {artisanProfile ? (
-                <div className="account-settings-summary">
-                  <p>
-                    <span className="account-settings-summary-label">Business name</span>
-                    <strong>{artisanProfile.displayName}</strong>
-                  </p>
-                  <p>
-                    <span className="account-settings-summary-label">Location</span>
-                    <strong>
-                      {[artisanProfile.area, artisanProfile.city].filter(Boolean).join(', ') || artisanProfile.city}
-                    </strong>
-                  </p>
-                  <p>
-                    <span className="account-settings-summary-label">Verification</span>
-                    <strong>{artisanProfile.verifyStatus.toLowerCase()}</strong>
-                  </p>
-                </div>
-              ) : (
-                <p className="muted">Loading business profile…</p>
-              )}
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={() => onNavigate(buildAppPath({ view: 'workspace', workspaceSection: 'profile' }))}
-              >
-                Open business profile settings
-              </button>
-            </article>
-          )}
 
           <article id="account-settings-phone" className={`panel-card form-card ${panelClass('phone')}`}>
             <h2>{isArtisan ? 'Contact phone' : 'Change phone number'}</h2>

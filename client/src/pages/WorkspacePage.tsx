@@ -178,10 +178,10 @@ export default function WorkspacePage() {
       {me && workspaceSection === 'profile' && me.role === 'ARTISAN' && (
         <ArtisanProfileSettings
           token={ctx.token}
-          firebaseUser={ctx.firebaseUser}
           busy={ctx.busy}
           runAction={ctx.withNotice}
           refresh={() => ctx.loadPrivateData()}
+          onNavigate={(path) => ctx.navigate(path)}
         />
       )}
 

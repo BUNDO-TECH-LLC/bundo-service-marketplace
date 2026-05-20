@@ -3724,7 +3724,62 @@ footer h4 {
   background: var(--accent-soft);
 }
 
+.artisan-profile-nav-label-short {
+  display: none;
+}
+
+.artisan-profile-mobile-heading {
+  display: none;
+}
+
+.artisan-profile-preview-button {
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+
+.artisan-profile-settings-link,
+.account-settings-profile-link {
+  padding: 0;
+  font-size: inherit;
+  font-weight: 700;
+}
+
+.artisan-settings-card textarea {
+  min-height: 120px;
+  resize: vertical;
+  border: 1px solid #d4d0d0;
+  border-radius: 8px;
+  padding: 15px;
+  background: #fff;
+  font: inherit;
+  line-height: 1.5;
+}
+
 @media (max-width: 768px) {
+  .artisan-settings-hero {
+    flex-direction: column;
+  }
+
+  .artisan-profile-preview-button {
+    width: 100%;
+  }
+
+  .artisan-profile-nav-label-full {
+    display: none;
+  }
+
+  .artisan-profile-nav-label-short {
+    display: inline;
+  }
+
+  .artisan-profile-mobile-heading {
+    display: block;
+    margin: 0;
+    color: var(--ink);
+    font-size: 18px;
+    font-weight: 700;
+  }
+
   .artisan-settings-panel:not(.is-active) {
     display: none !important;
   }

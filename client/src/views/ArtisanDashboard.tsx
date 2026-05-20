@@ -81,7 +81,7 @@ export function ArtisanDashboard({
           <p className="muted">
             {isApproved
               ? 'Your profile is approved. Manage jobs, service offers, messages, and reviews from here.'
-              : 'Your profile is still being reviewed. Complete profile settings while admin approval is pending.'}
+              : 'Your profile is still being reviewed. Update your public profile or complete verification in Settings.'}
           </p>
         </div>
         <span className={`booking-status ${isApproved ? 'completed' : 'pending'}`}>
@@ -93,7 +93,7 @@ export function ArtisanDashboard({
             <span>
               Profiles with work samples get more bookings. Add photos from{' '}
               <button type="button" className="text-button" onClick={openProfile}>
-                Profile settings
+                your profile
               </button>
               .
             </span>
@@ -175,7 +175,7 @@ export function ArtisanDashboard({
           </article>
           <article className="artisan-soft-card quick-links">
             <h2>Quick links</h2>
-            <button onClick={openProfile}>Profile settings</button>
+            <button onClick={openProfile}>Edit public profile</button>
             <button onClick={openOffers}>Service offers</button>
             <button onClick={openMessages}>Messages</button>
             <button onClick={openReviews}>Reviews</button>

@@ -12,7 +12,8 @@ export type WorkspaceSection =
   | 'settings';
 export type AccountSettingsSection =
   | 'personal'
-  | 'business'
+  | 'verification'
+  | 'payouts'
   | 'phone'
   | 'email'
   | 'language'
