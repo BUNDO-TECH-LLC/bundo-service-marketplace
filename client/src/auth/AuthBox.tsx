@@ -9,7 +9,7 @@ import {
 } from 'firebase/auth';
 import { api } from '../lib/api';
 import { auth, firebaseReady } from '../lib/firebase';
-import { artisanOnboardingEntryPath, markArtisanApplicant } from '../lib/artisanApplication';
+import { ARTISAN_ONBOARDING_PATH, markArtisanApplicant } from '../lib/artisanApplication';
 import type { AuthDrawerPrompt } from '../lib/authDrawerPrompt';
 import { checkEmailDeliverability, validateEmailAddress } from '../lib/emailValidation';
 import {
@@ -135,7 +135,7 @@ export function AuthBox({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [authStep, setAuthStep] = useState<'role' | 'artisan-confirm' | 'account'>('account');
+  const [authStep, setAuthStep] = useState<'role' | 'account'>('account');
   const [preferredRole, setPreferredRole] = useState<SignupRole | null>(null);
   const [pendingAuthUser, setPendingAuthUser] = useState<User | null>(null);
 
@@ -426,11 +426,6 @@ export function AuthBox({
       return;
     }
 
-    setAuthStep(role === 'ARTISAN' ? 'artisan-confirm' : 'account');
-    onNotice('');
-  }
-
-  function confirmArtisanRole() {
     setAuthStep('account');
     onNotice('');
   }
@@ -457,7 +452,7 @@ export function AuthBox({
     setConfirmPassword('');
     setPendingAuthUser(null);
     setMode('signup');
-    setAuthStep(role === 'ARTISAN' ? 'artisan-confirm' : role ? 'account' : 'role');
+    setAuthStep(role ? 'account' : 'role');
     setDrawerOpen(true);
     onNotice('');
   }
@@ -499,7 +494,7 @@ export function AuthBox({
       if (firebaseUser && me) {
         markArtisanApplicant(me.firebaseUid);
         if (onNavigatePath) {
-          onNavigatePath(artisanOnboardingEntryPath(me.firebaseUid));
+          onNavigatePath(ARTISAN_ONBOARDING_PATH);
         } else {
           onNavigate('home');
         }
@@ -773,32 +768,7 @@ export function AuthBox({
               </p>
             )}
 
-            {mode === 'signup' && authStep === 'artisan-confirm' ? (
-              <>
-                <p className="eyebrow">Artisan account</p>
-                <h2>Confirm you want to offer services</h2>
-                <p className="drawer-copy">
-                  You are signing up as a <strong>service provider</strong>, not as a client. After you create your
-                  login, we will take you straight into artisan onboarding—profile, offerings, verification, and admin
-                  review—before you can receive bookings.
-                </p>
-                <div className="auth-status-card">
-                  <strong>What happens next</strong>
-                  <span>
-                    Create your account, see a short confirmation screen, then complete setup. Full artisan workspace
-                    access unlocks after verification is approved.
-                  </span>
-                </div>
-                <div className="auth-action-stack">
-                  <button type="button" onClick={confirmArtisanRole}>
-                    Continue — create artisan account
-                  </button>
-                  <button type="button" className="mode-switch" onClick={() => setAuthStep('role')}>
-                    Choose a different account type
-                  </button>
-                </div>
-              </>
-            ) : mode === 'signup' && authStep === 'role' ? (
+            {mode === 'signup' && authStep === 'role' ? (
               <>
                 <p className="eyebrow">Create your account</p>
                 <h2>How will you use Bundo?</h2>
@@ -861,7 +831,7 @@ export function AuthBox({
                     : mode === 'login'
                       ? 'Continue with Google or your email to pick up your marketplace workflow.'
                       : preferredRole === 'ARTISAN'
-                        ? 'Add your login details, then complete profile setup, verification, offerings, and admin review from your workspace.'
+                        ? 'Add your login details. After signup you go straight to artisan onboarding to set up your profile, offerings, and verification.'
                         : 'Add your login details, then browse, message, book, and manage service requests from your dashboard.'}
                 </p>
 
@@ -870,7 +840,7 @@ export function AuthBox({
                     <span>{preferredRole === 'ARTISAN' ? 'Artisan account' : 'Client account'}</span>
                     <button
                       type="button"
-                      onClick={() => setAuthStep(preferredRole === 'ARTISAN' ? 'artisan-confirm' : 'role')}
+                      onClick={() => setAuthStep('role')}
                     >
                       Change
                     </button>

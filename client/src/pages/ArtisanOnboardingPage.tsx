@@ -1,11 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import { ArtisanLanding } from '../features/artisan/ArtisanLanding';
 import { buildAppPath } from '../lib/appPaths';
-import {
-  ARTISAN_ONBOARDING_WELCOME_PATH,
-  hasSeenArtisanWelcome,
-  isArtisanApplicantSession,
-} from '../lib/artisanApplication';
+import { isArtisanApplicantSession } from '../lib/artisanApplication';
 import { useAppRoot } from '../app/appRootContext';
 
 export default function ArtisanOnboardingPage() {
@@ -23,10 +19,6 @@ export default function ArtisanOnboardingPage() {
 
   if (ctx.me.role === 'CUSTOMER' && !isApplicant) {
     return <Navigate to="/" replace />;
-  }
-
-  if (isApplicant && !hasSeenArtisanWelcome(ctx.me.firebaseUid)) {
-    return <Navigate to={ARTISAN_ONBOARDING_WELCOME_PATH} replace />;
   }
 
   return (

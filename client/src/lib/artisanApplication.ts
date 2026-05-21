@@ -1,9 +1,8 @@
 const ARTISAN_APPLICANT_SESSION_KEY = 'bundo:artisan-applicant';
 const ARTISAN_APPLICANT_USER_PREFIX = 'bundo:artisan-applicant:';
-const ARTISAN_WELCOME_SEEN_PREFIX = 'bundo:artisan-welcome-seen:';
-
 export const ARTISAN_ONBOARDING_PATH = '/artisan/onboarding';
-export const ARTISAN_ONBOARDING_WELCOME_PATH = '/artisan/onboarding/welcome';
+/** @deprecated Welcome step removed — applicants go straight to onboarding. */
+export const ARTISAN_ONBOARDING_WELCOME_PATH = ARTISAN_ONBOARDING_PATH;
 
 export function markArtisanApplicant(firebaseUid?: string | null) {
   window.sessionStorage.setItem(ARTISAN_APPLICANT_SESSION_KEY, '1');
@@ -16,7 +15,6 @@ export function clearArtisanApplicant(firebaseUid?: string | null) {
   window.sessionStorage.removeItem(ARTISAN_APPLICANT_SESSION_KEY);
   if (firebaseUid) {
     window.localStorage.removeItem(`${ARTISAN_APPLICANT_USER_PREFIX}${firebaseUid}`);
-    window.localStorage.removeItem(`${ARTISAN_WELCOME_SEEN_PREFIX}${firebaseUid}`);
   }
 }
 
@@ -32,22 +30,6 @@ export function isArtisanApplicantSession(firebaseUid?: string | null): boolean 
   return false;
 }
 
-export function markArtisanWelcomeSeen(firebaseUid: string) {
-  window.localStorage.setItem(`${ARTISAN_WELCOME_SEEN_PREFIX}${firebaseUid}`, '1');
-}
-
-export function hasSeenArtisanWelcome(firebaseUid: string | null | undefined) {
-  if (!firebaseUid) {
-    return false;
-  }
-
-  return window.localStorage.getItem(`${ARTISAN_WELCOME_SEEN_PREFIX}${firebaseUid}`) === '1';
-}
-
-export function artisanOnboardingEntryPath(firebaseUid: string | null | undefined) {
-  if (!firebaseUid || hasSeenArtisanWelcome(firebaseUid)) {
-    return ARTISAN_ONBOARDING_PATH;
-  }
-
-  return ARTISAN_ONBOARDING_WELCOME_PATH;
+export function artisanOnboardingEntryPath(_firebaseUid?: string | null) {
+  return ARTISAN_ONBOARDING_PATH;
 }

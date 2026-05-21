@@ -5,7 +5,7 @@ import { AuthLayout } from '../../layouts/AuthLayout';
 import { ApiError } from '../../lib/api';
 import { EmailInboxHint } from '../../components/EmailInboxHint';
 import { sendBundoEmailVerification } from '../../lib/authEmailVerification';
-import { artisanOnboardingEntryPath, markArtisanApplicant } from '../../lib/artisanApplication';
+import { ARTISAN_ONBOARDING_PATH, markArtisanApplicant } from '../../lib/artisanApplication';
 import { buildAuthDrawerSearch } from '../../lib/authDrawerPrompt';
 import { readPendingSignupPhone, resolveSignupIntent } from '../../lib/authSignupStorage';
 import { finalizeAuthSession } from '../../lib/authSessionFlow';
@@ -146,7 +146,7 @@ export function EmailVerificationPage() {
 
     if (signupIntent === 'ARTISAN') {
       markArtisanApplicant(session.user.firebaseUid);
-      navigate(artisanOnboardingEntryPath(session.user.firebaseUid), { replace: true });
+      navigate(ARTISAN_ONBOARDING_PATH, { replace: true });
       return;
     }
 

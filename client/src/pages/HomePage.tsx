@@ -4,7 +4,7 @@ import { AppPromo, Footer, Hero, ServicesSection, WhySection } from '../features
 import { MarketplacePreview } from '../features/marketplace';
 import { buildAppPath } from '../lib/appPaths';
 import {
-  artisanOnboardingEntryPath,
+  ARTISAN_ONBOARDING_PATH,
   clearArtisanApplicant,
   isArtisanApplicantSession,
   markArtisanApplicant,
@@ -22,7 +22,7 @@ export default function HomePage() {
     }
 
     if (ctx.me.role === 'CUSTOMER' && isArtisanApplicantSession(ctx.me.firebaseUid)) {
-      ctx.navigate(artisanOnboardingEntryPath(ctx.me.firebaseUid), { replace: true });
+      ctx.navigate(ARTISAN_ONBOARDING_PATH, { replace: true });
     }
   }, [ctx.me, ctx.navigate]);
 
@@ -75,7 +75,7 @@ export default function HomePage() {
           }
           markArtisanApplicant(ctx.me.firebaseUid);
           ctx.setNotice('Continue with artisan onboarding.');
-          ctx.navigate(artisanOnboardingEntryPath(ctx.me.firebaseUid));
+          ctx.navigate(ARTISAN_ONBOARDING_PATH);
         }}
       />
     );
