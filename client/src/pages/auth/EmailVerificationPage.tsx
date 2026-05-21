@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppRoot } from '../../app/appRootContext';
 import { AuthLayout } from '../../layouts/AuthLayout';
@@ -7,6 +7,10 @@ import { EmailInboxHint } from '../../components/EmailInboxHint';
 import { sendBundoEmailVerification } from '../../lib/authEmailVerification';
 import { readPendingSignupRole } from '../../lib/authSignupStorage';
 import { finalizeAuthSession } from '../../lib/authSessionFlow';
+import {
+  completeFirebaseEmailAction,
+  stripFirebaseEmailActionParams,
+} from '../../lib/firebaseEmailAction';
 import { auth } from '../../lib/firebase';
 import type { ApiUser } from '../../types';
 
@@ -30,8 +34,48 @@ export function EmailVerificationPage() {
 
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [linkApplied, setLinkApplied] = useState(false);
 
   const email = state.email || auth?.currentUser?.email || 'your email';
+
+  useEffect(() => {
+    if (!auth?.currentUser) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const result = await completeFirebaseEmailAction(auth, location.search);
+        if (cancelled || !result.handled) {
+          return;
+        }
+
+        setLinkApplied(true);
+        if (result.verified) {
+          setMessage('Email verified from your link. Tap the button below to continue into Bundo.');
+        } else {
+          setMessage('We received your verification link. Tap the button below to finish signing in.');
+        }
+
+        const cleaned = stripFirebaseEmailActionParams(location.search);
+        navigate({ pathname: location.pathname, search: cleaned }, { replace: true });
+      } catch (error) {
+        if (!cancelled) {
+          setMessage(
+            error instanceof Error
+              ? error.message
+              : 'Could not complete verification from the email link.'
+          );
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [location.pathname, location.search, navigate]);
 
   function maskEmail(email: string) {
     if (!email.includes('@')) return email;
@@ -120,6 +164,18 @@ export function EmailVerificationPage() {
       </>
     }
   >
+      {message && (
+        <p
+          className={`m-0 rounded-md p-3 text-sm leading-[1.45] ${
+            linkApplied
+              ? 'bg-[var(--color-success-wash,#e8f5ee)] text-[var(--color-ink-muted)]'
+              : 'bg-[var(--color-danger-wash)] font-extrabold text-[var(--color-danger-dark)]'
+          }`}
+          role="status"
+        >
+          {message}
+        </p>
+      )}
       <EmailInboxHint email={typeof email === 'string' ? email : undefined} />
       <div className="grid gap-[18px]">
         <button

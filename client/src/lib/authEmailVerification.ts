@@ -7,7 +7,7 @@ function verificationContinueUrl() {
     return undefined;
   }
 
-  return `${window.location.origin}/`;
+  return `${window.location.origin}/verify-email`;
 }
 
 export function emailVerificationActionCodeSettings(): ActionCodeSettings | undefined {
@@ -16,7 +16,7 @@ export function emailVerificationActionCodeSettings(): ActionCodeSettings | unde
     return undefined;
   }
 
-  return { url };
+  return { url, handleCodeInApp: false };
 }
 
 function formatVerificationSendError(error: unknown): string {
@@ -37,6 +37,14 @@ function formatVerificationSendError(error: unknown): string {
   }
 }
 
+function isContinueUriError(error: unknown) {
+  const code =
+    error && typeof error === 'object' && 'code' in error
+      ? String((error as { code?: string }).code)
+      : '';
+  return code === 'auth/unauthorized-continue-uri' || code === 'auth/invalid-continue-uri';
+}
+
 export async function sendBundoEmailVerification(user: User) {
   try {
     const settings = emailVerificationActionCodeSettings();
@@ -47,6 +55,15 @@ export async function sendBundoEmailVerification(user: User) {
 
     await sendEmailVerification(user);
   } catch (error) {
+    if (isContinueUriError(error)) {
+      try {
+        await sendEmailVerification(user);
+        return;
+      } catch (fallbackError) {
+        throw new Error(formatVerificationSendError(fallbackError));
+      }
+    }
+
     throw new Error(formatVerificationSendError(error));
   }
 }
@@ -57,7 +74,7 @@ export function passwordResetActionCodeSettings(): ActionCodeSettings | undefine
     return undefined;
   }
 
-  return { url: `${window.location.origin}/login` };
+  return { url: `${window.location.origin}/login`, handleCodeInApp: false };
 }
 
 export async function sendBundoPasswordResetEmail(email: string) {
@@ -66,10 +83,20 @@ export async function sendBundoPasswordResetEmail(email: string) {
   }
 
   const settings = passwordResetActionCodeSettings();
-  if (settings) {
-    await sendPasswordResetEmail(auth, email.trim(), settings);
-    return;
-  }
 
-  await sendPasswordResetEmail(auth, email.trim());
+  try {
+    if (settings) {
+      await sendPasswordResetEmail(auth, email.trim(), settings);
+      return;
+    }
+
+    await sendPasswordResetEmail(auth, email.trim());
+  } catch (error) {
+    if (isContinueUriError(error)) {
+      await sendPasswordResetEmail(auth, email.trim());
+      return;
+    }
+
+    throw error;
+  }
 }

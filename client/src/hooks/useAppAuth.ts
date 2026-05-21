@@ -142,10 +142,16 @@ export function useAppAuth({
           authBootstrapCompletedRef.current = false;
           window.clearTimeout(authInitTimer);
           if (!isAuthPathname(window.location.pathname)) {
-            navigateRef.current('/verify-email', {
-              replace: true,
-              state: { email: user.email ?? '' },
-            });
+            navigateRef.current(
+              {
+                pathname: '/verify-email',
+                search: window.location.search,
+              },
+              {
+                replace: true,
+                state: { email: user.email ?? '' },
+              }
+            );
           }
           if (!isStale()) {
             setAuthChecked(true);
