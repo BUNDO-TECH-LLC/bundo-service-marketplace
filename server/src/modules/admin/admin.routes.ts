@@ -720,7 +720,10 @@ router.post('/conversations/:id/notes', asyncHandler(async (req, res) => {
     throw httpError(404, 'Conversation not found');
   }
 
-  throw httpError(201, 'Admin note created');
+  res.status(201).json({
+    message: 'Admin note created',
+    note: result.note,
+  });
 }));
 
 router.post('/conversations/:id/messages', asyncHandler(async (req, res) => {
@@ -758,7 +761,10 @@ router.post('/conversations/:id/messages', asyncHandler(async (req, res) => {
     throw httpError(404, 'Conversation not found');
   }
 
-  throw httpError(201, 'Admin message sent');
+  res.status(201).json({
+    message: 'Admin message sent',
+    chatMessage: result.message,
+  });
 }));
 
 router.get('/reviews', asyncHandler(async (req, res) => {

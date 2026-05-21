@@ -7,6 +7,29 @@ import type { ApiUser, Role } from '../types';
 
 type AccountKind = Extract<Role, 'CUSTOMER' | 'ARTISAN'>;
 
+function formatGoogleAuthError(error: unknown): string {
+  const code =
+    error && typeof error === 'object' && 'code' in error
+      ? String((error as { code?: string }).code)
+      : '';
+
+  switch (code) {
+    case 'auth/popup-blocked':
+      return 'Your browser blocked the Google sign-in popup. Allow popups for this site and try again.';
+    case 'auth/popup-closed-by-user':
+    case 'auth/cancelled-popup-request':
+      return 'Google sign-in was cancelled. Try again when you are ready.';
+    case 'auth/operation-not-allowed':
+      return 'Google sign-in is not enabled for this Firebase project. Enable Google under Authentication → Sign-in method.';
+    case 'auth/unauthorized-domain':
+      return 'This website is not authorized for Google sign-in. Add your domain in Firebase → Authentication → Settings → Authorized domains.';
+    case 'auth/account-exists-with-different-credential':
+      return 'An account already exists with this email using email/password. Sign in with email instead.';
+    default:
+      return error instanceof Error ? error.message : 'Could not continue with Google.';
+  }
+}
+
 export async function signInWithGooglePopup() {
   if (!auth) {
     throw new Error('Firebase is not configured for this environment.');
@@ -14,7 +37,12 @@ export async function signInWithGooglePopup() {
 
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
-  return signInWithPopup(auth, provider);
+
+  try {
+    return await signInWithPopup(auth, provider);
+  } catch (error) {
+    throw new Error(formatGoogleAuthError(error));
+  }
 }
 
 export async function finalizeAuthSession(

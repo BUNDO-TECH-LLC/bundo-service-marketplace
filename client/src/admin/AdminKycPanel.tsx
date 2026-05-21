@@ -43,13 +43,9 @@ export function AdminKycPanel({
 
   return (
     <section className="admin-panel admin-kyc-panel">
-      <header className="admin-panel-head">
-        <div>
-          <p className="eyebrow">Compliance</p>
-          <h2>Artisan KYC review</h2>
-          <p>Review submitted identity details before scaling artisan approvals and payouts.</p>
-        </div>
-      </header>
+      <p className="admin-panel-lead muted">
+        Review identity submissions before approving artisans and releasing payouts.
+      </p>
 
       <PromptDialog
         open={reviewPrompt !== null}

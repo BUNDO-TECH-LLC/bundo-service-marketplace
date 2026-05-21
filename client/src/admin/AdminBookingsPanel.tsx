@@ -202,13 +202,11 @@ export function AdminBookingsPanel({
   }
 
   return (
-    <section className="admin-jobs">
-      <header className="admin-panel-head">
+    <section className="admin-jobs admin-panel">
+      <header className="admin-panel-head admin-panel-head--compact">
         <div>
-          <p className="eyebrow">Jobs</p>
-          <h2>Booking lifecycle and support</h2>
-          <p>
-            Showing {loadedCount} of {totalCount} jobs. Assign a moderator, update status, chat, and resolve payouts from each row.
+          <p className="muted">
+            Showing {loadedCount} of {totalCount} jobs. Assign moderators, update status, chat, and resolve payouts.
           </p>
         </div>
       </header>
@@ -468,7 +466,7 @@ export function AdminBookingsPanel({
                     </button>
                   )}
                   {openDispute && (
-                    <>
+                    <div className="admin-dispute-actions">
                       <button
                         type="button"
                         className="primary-action"
@@ -485,8 +483,32 @@ export function AdminBookingsPanel({
                       >
                         Full refund
                       </button>
-                    </>
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        disabled={busy}
+                        onClick={() => startDisputeResolution(openDispute.id, 'REFUND_PARTIAL')}
+                      >
+                        Partial refund
+                      </button>
+                    </div>
                   )}
+                  {!openDispute &&
+                    ['REQUESTED', 'ACCEPTED', 'ONGOING'].includes(booking.status) && (
+                      <button
+                        type="button"
+                        className="admin-danger-button"
+                        disabled={busy}
+                        onClick={() =>
+                          runAction(
+                            () => updateStatus(booking.id, 'CANCELLED'),
+                            'Job cancelled'
+                          )
+                        }
+                      >
+                        Cancel job
+                      </button>
+                    )}
                   {canRelease && (
                     <button
                       type="button"

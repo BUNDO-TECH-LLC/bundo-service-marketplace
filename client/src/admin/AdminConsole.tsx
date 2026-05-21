@@ -9,6 +9,7 @@ import { AdminOverviewPanel } from './AdminOverviewPanel';
 import { AdminLedgerPanel } from './AdminLedgerPanel';
 import { AdminProfilesPanel } from './AdminProfilesPanel';
 import { AdminReviewsPanel } from './AdminReviewsPanel';
+import { adminNavBadge } from './adminNavBadges';
 
 export function AdminConsole({
   section,
@@ -52,16 +53,15 @@ export function AdminConsole({
     id: AdminSection;
     label: string;
     description: string;
-    count?: number;
   }> = [
-    { id: 'overview', label: 'Overview', description: 'Signals and open work' },
-    { id: 'profiles', label: 'Profiles', description: 'Users and artisans', count: users.length + artisans.length },
-    { id: 'jobs', label: 'Jobs', description: 'Lifecycle, chat, payouts', count: bookingsTotal ?? bookings.length },
-    { id: 'messages', label: 'Messages', description: 'Threads and notes', count: conversations.length },
-    { id: 'verification', label: 'Verification', description: 'KYC and approvals', count: submissions.length },
-    { id: 'catalog', label: 'Catalog', description: 'Service categories', count: categories.length },
-    { id: 'reviews', label: 'Reviews', description: 'Moderate customer reviews' },
-    { id: 'finance', label: 'Finance', description: 'Ledger & settlement trail' },
+    { id: 'overview', label: 'Overview', description: 'Platform snapshot' },
+    { id: 'profiles', label: 'Profiles', description: 'Users & artisans' },
+    { id: 'jobs', label: 'Jobs', description: 'Lifecycle & payouts' },
+    { id: 'messages', label: 'Messages', description: 'Support threads' },
+    { id: 'verification', label: 'Verification', description: 'KYC queue' },
+    { id: 'catalog', label: 'Catalog', description: 'Categories' },
+    { id: 'reviews', label: 'Reviews', description: 'Moderation' },
+    { id: 'finance', label: 'Finance', description: 'Ledger trail' },
   ];
 
   const activeSection = sections.find((item) => item.id === section) ?? sections[0];
@@ -86,6 +86,10 @@ export function AdminConsole({
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [mobileNavOpen]);
 
+  useEffect(() => {
+    closeMobileNav();
+  }, [section]);
+
   return (
     <section className={`admin-shell ${mobileNavOpen ? 'admin-shell--nav-open' : ''}`}>
       <header className="admin-mobile-bar">
@@ -99,10 +103,10 @@ export function AdminConsole({
           <span className="artisan-header-menu-toggle-bars" aria-hidden="true" />
         </button>
         <div className="admin-mobile-bar-copy">
-          <p className="eyebrow">Admin</p>
+          <p className="eyebrow">Admin console</p>
           <strong>{activeSection.label}</strong>
         </div>
-        <button type="button" className="text-button" onClick={onSignOut}>
+        <button type="button" className="text-button admin-mobile-signout" onClick={onSignOut}>
           Log out
         </button>
       </header>
@@ -118,9 +122,9 @@ export function AdminConsole({
 
       <aside className="admin-sidebar" aria-label="Admin navigation">
         <div className="admin-sidebar-head">
-          <p className="eyebrow">Admin console</p>
-          <h1>Bundo operations</h1>
-          <p>Manage trust, supply, support, and marketplace activity from one place.</p>
+          <p className="eyebrow">Bundo</p>
+          <h1>Operations</h1>
+          <p>Trust, jobs, support, and marketplace activity.</p>
         </div>
         <div className="admin-operator-card">
           <span>Signed in as</span>
@@ -130,33 +134,48 @@ export function AdminConsole({
           </button>
         </div>
         <nav className="admin-nav" aria-label="Admin sections">
-          {sections.map((item) => (
-            <button
-              key={item.id}
-              className={section === item.id ? 'active' : ''}
-              type="button"
-              onClick={() => goToSection(item.id)}
-            >
-              <span>{item.label}</span>
-              <small>{item.description}</small>
-              {typeof item.count === 'number' ? <strong>{item.count}</strong> : null}
-            </button>
-          ))}
+          {sections.map((item) => {
+            const badge = adminNavBadge(item.id, stats);
+            return (
+              <button
+                key={item.id}
+                className={section === item.id ? 'active' : ''}
+                type="button"
+                onClick={() => goToSection(item.id)}
+              >
+                <span className="admin-nav-label">{item.label}</span>
+                <small>{item.description}</small>
+                {badge ? (
+                  <span
+                    className={`admin-nav-badge${badge.urgent ? ' urgent' : ''}`}
+                    aria-label={`${badge.count} items need attention`}
+                  >
+                    {badge.count > 99 ? '99+' : badge.count}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
         </nav>
       </aside>
 
       <section className="admin-main">
-        {section === 'overview' && (
-          <AdminOverviewPanel
-            stats={stats}
-            users={users}
-            artisans={artisans}
-            bookings={bookings}
-            conversations={conversations}
-            submissions={submissions}
-            setSection={setSection}
-          />
-        )}
+        <header className="admin-main-head">
+          <div>
+            <p className="eyebrow">{activeSection.description}</p>
+            <h2>{activeSection.label}</h2>
+          </div>
+          <button
+            type="button"
+            className="secondary-button admin-refresh-button"
+            disabled={busy}
+            onClick={() => void runAction(refresh, 'Admin data refreshed')}
+          >
+            Refresh
+          </button>
+        </header>
+
+        {section === 'overview' && <AdminOverviewPanel stats={stats} setSection={setSection} />}
         {section === 'profiles' && (
           <AdminProfilesPanel
             token={token}

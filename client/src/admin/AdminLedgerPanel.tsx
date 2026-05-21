@@ -38,13 +38,7 @@ export function AdminLedgerPanel({ token }: { token: string }) {
 
   return (
     <section className="admin-panel admin-ledger-panel">
-      <header className="admin-panel-head">
-        <div>
-          <p className="eyebrow">Finance</p>
-          <h2>Ledger & settlement trail</h2>
-          <p>Recent platform ledger movements for payouts, fees, and refunds.</p>
-        </div>
-      </header>
+      <p className="admin-panel-lead muted">Recent ledger movements for payouts, fees, and refunds.</p>
 
       {loading && <p className="muted">Loading ledger…</p>}
       {!loading && entries.length === 0 && (

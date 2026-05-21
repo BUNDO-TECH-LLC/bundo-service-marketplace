@@ -1,15 +1,19 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
+  type User,
 } from 'firebase/auth';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppRoot } from '../../app/appRootContext';
 import { AuthLayout } from '../../layouts/AuthLayout';
-import { api } from '../../lib/api';
 import { sendBundoEmailVerification } from '../../lib/authEmailVerification';
+import {
+  needsEmailVerification,
+  savePendingSignupRole,
+} from '../../lib/authSignupStorage';
 import { finalizeAuthSession, signInWithGooglePopup } from '../../lib/authSessionFlow';
 import { auth, firebaseReady } from '../../lib/firebase';
 import type { ApiUser, Role } from '../../types';
@@ -41,7 +45,7 @@ function destinationForRole(role: ApiUser['role']) {
 export function AuthPage({ mode }: AuthPageProps) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { isAuthed, me } = useAppRoot();
+  const ctx = useAppRoot();
 
   const initialRole = searchParams.get('role') === 'artisan' ? 'ARTISAN' : 'CUSTOMER';
 
@@ -53,61 +57,60 @@ export function AuthPage({ mode }: AuthPageProps) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [pendingRedirect, setPendingRedirect] = useState(false);
 
   const title = mode === 'login' ? 'Welcome back!' : 'Create an account';
   const action = mode === 'login' ? 'Log in' : 'Get Started';
 
-  useEffect(() => {
-    if (!pendingRedirect || !isAuthed || !me?.role) {
+  async function completeSignedInSession(
+    firebaseUser: User,
+    options: {
+      mode: AuthMode;
+      intendedRole?: AccountKind;
+      phone?: string;
+    }
+  ) {
+    const { session, destination } = await finalizeAuthSession(firebaseUser, options);
+    ctx.acknowledgeSession(session.token, session.user);
+    await ctx.loadPrivateData(session.token, session.user).catch(() => undefined);
+
+    if (!session.user.role) {
+      ctx.setNotice('Choose client or artisan to finish setting up your Bundo account.');
+      navigate('/', { replace: true });
       return;
     }
 
-    navigate(destinationForRole(me.role), { replace: true });
-    setPendingRedirect(false);
-    setSubmitting(false);
-  }, [isAuthed, me?.role, me, navigate, pendingRedirect]);
-
-  useEffect(() => {
-    if (!pendingRedirect) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      setPendingRedirect(false);
-      setSubmitting(false);
-      setError('Sign-in is taking too long. Make sure the API is running, then try again.');
-    }, 15_000);
-
-    return () => window.clearTimeout(timer);
-  }, [pendingRedirect]);
+    navigate(destinationForRole(session.user.role) || destination, { replace: true });
+  }
 
   async function continueWithGoogle() {
     if (!auth) return;
 
     setError('');
+
+    if (mode === 'signup' && !phone.trim()) {
+      setError('Enter your phone number before continuing with Google.');
+      return;
+    }
+
     setSubmitting(true);
 
     try {
       const credential = await signInWithGooglePopup();
-      await finalizeAuthSession(credential.user, {
+
+      if (mode === 'signup') {
+        savePendingSignupRole(credential.user.email, accountKind);
+      }
+
+      await completeSignedInSession(credential.user, {
         mode,
         intendedRole: mode === 'signup' ? accountKind : undefined,
         phone: mode === 'signup' ? phone : undefined,
       });
-      setPendingRedirect(true);
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'Could not continue with Google.');
+    } finally {
       setSubmitting(false);
     }
-  }
-
-  async function ensureRole(token: string, role: AccountKind) {
-    await api('/users/role', {
-      method: 'PATCH',
-      token,
-      body: JSON.stringify({ role }),
-    });
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -126,8 +129,22 @@ export function AuthPage({ mode }: AuthPageProps) {
 
     try {
       if (mode === 'login') {
-        await signInWithEmailAndPassword(auth, email, password);
-        setPendingRedirect(true);
+        const credential = await signInWithEmailAndPassword(auth, email, password);
+        await credential.user.reload();
+
+        if (needsEmailVerification(credential.user)) {
+          savePendingSignupRole(credential.user.email, accountKind);
+          await sendBundoEmailVerification(credential.user);
+          navigate('/verify-email', {
+            state: {
+              email: credential.user.email || email,
+              accountKind,
+            },
+          });
+          return;
+        }
+
+        await completeSignedInSession(credential.user, { mode: 'login' });
         return;
       }
 
@@ -137,37 +154,24 @@ export function AuthPage({ mode }: AuthPageProps) {
         await updateProfile(credential.user, { displayName: fullName.trim() });
       }
 
+      savePendingSignupRole(credential.user.email, accountKind);
       await sendBundoEmailVerification(credential.user);
 
-      const { session } = await finalizeAuthSession(credential.user, {
-        mode: 'signup',
-        intendedRole: accountKind,
-        phone,
-      });
-      await ensureRole(session.token, accountKind);
-
-      if (phone.trim()) {
-        await api('/users/phone', {
-          method: 'PATCH',
-          token: session.token,
-          body: JSON.stringify({ phone: phone.trim() }),
-        });
-      }
-
-      setSubmitting(false);
       navigate('/verify-email', {
         state: {
           email,
           accountKind,
+          phone: phone.trim() || undefined,
         },
       });
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'Authentication failed.');
+    } finally {
       setSubmitting(false);
     }
   }
 
-  const alreadySignedIn = isAuthed && Boolean(me?.role);
+  const alreadySignedIn = ctx.isAuthed && Boolean(ctx.me?.role);
 
   return (
     <AuthLayout
@@ -197,17 +201,17 @@ export function AuthPage({ mode }: AuthPageProps) {
         </p>
       )}
 
-      {alreadySignedIn && me?.role && (
+      {alreadySignedIn && ctx.me?.role && (
         <div className="grid gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-soft)] p-4 text-sm">
           <p className="m-0 text-[var(--color-ink-soft)]">
-            You are already signed in as <strong>{me.email}</strong>. Continue to your dashboard or sign out to use
+            You are already signed in as <strong>{ctx.me.email}</strong>. Continue to your dashboard or sign out to use
             another account.
           </p>
           <div className="grid gap-2 sm:grid-cols-2">
             <button
               type="button"
               className="min-h-11 rounded-xl bg-[var(--color-accent-button)] px-4 py-2 font-bold text-[var(--color-white)]"
-              onClick={() => navigate(destinationForRole(me.role), { replace: true })}
+              onClick={() => navigate(destinationForRole(ctx.me!.role), { replace: true })}
             >
               Continue to dashboard
             </button>

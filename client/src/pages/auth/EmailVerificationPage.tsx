@@ -1,20 +1,31 @@
 import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useAppRoot } from '../../app/appRootContext';
 import { AuthLayout } from '../../layouts/AuthLayout';
-import { api, ApiError } from '../../lib/api';
-import { resolveApiSession } from '../../lib/authSession';
+import { ApiError } from '../../lib/api';
 import { EmailInboxHint } from '../../components/EmailInboxHint';
 import { sendBundoEmailVerification } from '../../lib/authEmailVerification';
+import { readPendingSignupRole } from '../../lib/authSignupStorage';
+import { finalizeAuthSession } from '../../lib/authSessionFlow';
 import { auth } from '../../lib/firebase';
+import type { ApiUser } from '../../types';
 
 type VerificationState = {
   email?: string;
   accountKind?: 'CUSTOMER' | 'ARTISAN';
+  phone?: string;
 };
+
+function destinationForRole(role: ApiUser['role']) {
+  if (role === 'ARTISAN') return '/';
+  if (role === 'ADMIN') return '/admin/overview';
+  return '/workspace/overview';
+}
 
 export function EmailVerificationPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const ctx = useAppRoot();
   const state = (location.state || {}) as VerificationState;
 
   const [message, setMessage] = useState('');
@@ -73,22 +84,19 @@ export function EmailVerificationPage() {
       return;
     }
 
-    const session = await resolveApiSession(auth.currentUser, true);
-    const accountKind = state.accountKind || 'CUSTOMER';
+    const accountKind =
+      state.accountKind || readPendingSignupRole(auth.currentUser.email) || 'CUSTOMER';
 
-    if (!session.user.role) {
-      await api('/users/role', {
-        method: 'PATCH',
-        token: session.token,
-        body: JSON.stringify({ role: accountKind }),
-      });
-    }
-
-    navigate('/loading', {
-      state: {
-        redirectTo: accountKind === 'ARTISAN' ? '/workspace/overview' : '/',
-      },
+    const { session, destination } = await finalizeAuthSession(auth.currentUser, {
+      mode: 'signup',
+      intendedRole: accountKind,
+      phone: state.phone,
     });
+
+    ctx.acknowledgeSession(session.token, session.user);
+    await ctx.loadPrivateData(session.token, session.user).catch(() => undefined);
+
+    navigate(destinationForRole(session.user.role) || destination, { replace: true });
   } catch (error) {
     setMessage(
       error instanceof ApiError

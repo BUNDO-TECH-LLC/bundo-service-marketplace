@@ -3,10 +3,8 @@ import { createPortal } from 'react-dom';
 import type { User } from 'firebase/auth';
 import {
   createUserWithEmailAndPassword,
-  GoogleAuthProvider,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
-  signInWithPopup,
   signOut,
   updateProfile,
 } from 'firebase/auth';
@@ -25,6 +23,7 @@ import type { SignupRole, View, WorkspaceSection } from '../appTypes';
 import bundoLogo from '../assets/bundo-logo.png';
 import { EmailInboxHint } from '../components/EmailInboxHint';
 import { sendBundoEmailVerification } from '../lib/authEmailVerification';
+import { signInWithGooglePopup } from '../lib/authSessionFlow';
 import { LegalLinks } from '../components/LegalLinks';
 import { PasswordInput } from '../components/PasswordInput';
 import {
@@ -365,9 +364,7 @@ export function AuthBox({
     setSubmitting(true);
     onNotice('');
     try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
-      const credential = await signInWithPopup(auth, provider);
+      const credential = await signInWithGooglePopup();
       await finishAuth(credential.user);
     } catch (error) {
       onNotice(error instanceof Error ? error.message : 'Could not continue with Google');

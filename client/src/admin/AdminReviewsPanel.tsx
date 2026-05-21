@@ -53,13 +53,7 @@ export function AdminReviewsPanel({
 
   return (
     <section className="admin-panel">
-      <header className="admin-panel-head">
-        <div>
-          <p className="eyebrow">Trust & safety</p>
-          <h2>Review moderation</h2>
-          <p>Remove reviews that violate policy or contain abusive content.</p>
-        </div>
-      </header>
+      <p className="admin-panel-lead muted">Remove reviews that violate policy or contain abusive content.</p>
 
       {loading && <p className="muted">Loading reviews…</p>}
       {!loading && reviews.length === 0 && (

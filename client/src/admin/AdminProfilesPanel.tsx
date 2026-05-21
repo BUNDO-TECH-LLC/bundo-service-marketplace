@@ -1,4 +1,5 @@
 import { api } from '../lib/api';
+import { EmptyState } from '../components/EmptyState';
 import type { ActionRunner, AdminArtisanRecord, AdminUserRecord } from '../appTypes';
 import { AdminPortfolioGallery } from '../components/AdminPortfolioGallery';
 import type { Artisan, Role } from '../types';
@@ -47,14 +48,6 @@ export function AdminProfilesPanel({
 
   return (
     <section className="admin-panel">
-      <header className="admin-panel-head">
-        <div>
-          <p className="eyebrow">Profiles</p>
-          <h2>Users and service providers</h2>
-          <p>Adjust account access, roles, and artisan verification without leaving the admin surface.</p>
-        </div>
-      </header>
-
       <div className="admin-stack">
         <article className="admin-surface">
           <div className="admin-surface-head">
@@ -64,6 +57,9 @@ export function AdminProfilesPanel({
             </div>
           </div>
           <div className="admin-inline-table" role="list">
+            {users.length === 0 && (
+              <EmptyState title="No users loaded" body="Refresh admin data or widen the user list limit." />
+            )}
             {users.map((user) => (
               <article className="admin-row admin-row--profile" key={user.firebaseUid} role="listitem">
                 <div className="admin-row-grid admin-row-grid--profile">
@@ -125,6 +121,9 @@ export function AdminProfilesPanel({
             </div>
           </div>
           <div className="admin-inline-table" role="list">
+            {artisans.length === 0 && (
+              <EmptyState title="No artisan profiles" body="Artisans will appear here once they register." />
+            )}
             {artisans.map((artisan) => (
               <article className="admin-row admin-row--profile" key={artisan.id} role="listitem">
                 <div className="admin-row-grid admin-row-grid--profile">

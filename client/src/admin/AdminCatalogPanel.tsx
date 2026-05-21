@@ -40,12 +40,8 @@ export function AdminCatalogPanel({
 
   return (
     <section className="admin-panel">
-      <header className="admin-panel-head">
-        <div>
-          <p className="eyebrow">Catalog</p>
-          <h2>Manage the public service menu</h2>
-          <p>Keep categories clean so search, onboarding, and discovery stay sharp.</p>
-        </div>
+      <div className="admin-panel-toolbar">
+        <p className="admin-panel-lead muted">Service categories shown in marketplace search and onboarding.</p>
         <button
           className="primary-button"
           disabled={busy}
@@ -56,7 +52,7 @@ export function AdminCatalogPanel({
         >
           New category
         </button>
-      </header>
+      </div>
 
       <CategoryFormDialog
         open={dialogOpen}
