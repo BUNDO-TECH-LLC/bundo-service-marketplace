@@ -22,12 +22,10 @@ main.tsx
 | `/admin/:section` | `AdminPage` | `MainLayout` |
 | `/help`, `/help/:topicId` | `HelpPage` | `MainLayout` |
 | `/artisans/:id` | `ArtisanProfileRoute` | `MainLayout` |
-| `/login`, `/signup` | `AuthPage` | self-contained `AuthLayout` |
-| `/forgot-password` | `ForgotPassword` | `AuthLayout` |
 | `/verify-email` | `EmailVerificationPage` | `AuthLayout` |
 | `/loading` | `LoadingPage` | none |
 
-Legacy redirect: `/create-account` → `/signup`.
+Login, signup, and password reset use the header **auth drawer** on `MainLayout`. Signup is **auth first, role second**: account form (phone required) → email verify (if needed) → client/artisan choice. Marketing links (`?role=artisan`) pre-select artisan on the role step only. Legacy paths redirect to `/?auth=…` (see `authDrawerPrompt.ts`, `AuthDrawerRedirect.tsx`).
 
 ## Folder layout
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { BundoLoadingScreen } from '../components/BundoLoadingScreen';
 import { EmptyState } from '../components/EmptyState';
 import { AccountSettingsHub } from '../features/account/AccountSettingsHub';
+import { markArtisanApplicant } from '../lib/artisanApplication';
 import { ArtisanOffersPanel, ArtisanProfileSettings, ArtisanReviewsPanel } from '../features/artisan';
 import { api } from '../lib/api';
 import type { ApiUser } from '../types';
@@ -245,6 +246,11 @@ export default function WorkspacePage() {
               reloadPrivate={() => ctx.loadPrivateData()}
               onBookingSuccess={ctx.setBookingSuccess}
               openBookings={() => ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'bookings' }))}
+              onBecomeArtisan={() => {
+                markArtisanApplicant();
+                ctx.setNotice('Complete your artisan profile and verification to get approved.');
+                ctx.navigate('/');
+              }}
             />
           )}
         </>

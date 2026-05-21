@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { signOut } from 'firebase/auth';
 import { Outlet } from 'react-router-dom';
+import type { AuthDrawerPrompt } from '../lib/authDrawerPrompt';
+import { parseAuthDrawerPrompt, stripAuthDrawerParams } from '../lib/authDrawerPrompt';
 import { AuthBox } from '../auth/AuthBox';
 import { BundoLoadingScreen } from '../components/BundoLoadingScreen';
 import { buildAppPath } from '../lib/appPaths';
@@ -18,12 +20,35 @@ import { useAppRoot } from './appRootContext';
 export function MainLayout() {
   const ctx = useAppRoot();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [authDrawerPrompt, setAuthDrawerPrompt] = useState<AuthDrawerPrompt | null>(null);
+  const consumedAuthPromptRef = useRef('');
 
   const closeMobileNav = () => setMobileNavOpen(false);
 
   useEffect(() => {
     closeMobileNav();
   }, [ctx.location.pathname, ctx.location.search]);
+
+  useEffect(() => {
+    const parsed = parseAuthDrawerPrompt(ctx.location.search);
+    if (!parsed) {
+      consumedAuthPromptRef.current = '';
+      return;
+    }
+
+    const promptKey = JSON.stringify(parsed);
+    if (consumedAuthPromptRef.current === promptKey) {
+      return;
+    }
+
+    consumedAuthPromptRef.current = promptKey;
+    setAuthDrawerPrompt(parsed);
+
+    const cleanedSearch = stripAuthDrawerParams(ctx.location.search);
+    if (cleanedSearch !== ctx.location.search) {
+      ctx.navigate({ pathname: ctx.location.pathname, search: cleanedSearch }, { replace: true });
+    }
+  }, [ctx.location.pathname, ctx.location.search, ctx.navigate]);
 
   useEffect(() => {
     if (!mobileNavOpen) return;
@@ -141,6 +166,8 @@ export function MainLayout() {
             <AuthBox
               firebaseUser={ctx.firebaseUser}
               me={ctx.me}
+              authDrawerPrompt={authDrawerPrompt}
+              onAuthDrawerPromptHandled={() => setAuthDrawerPrompt(null)}
               unreadCount={ctx.notifications.filter((notification) => !notification.readAt).length}
               onOpenAuth={closeMobileNav}
               onReady={(nextToken, nextUser) => {

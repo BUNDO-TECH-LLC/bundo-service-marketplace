@@ -5,7 +5,9 @@ import { AuthLayout } from '../../layouts/AuthLayout';
 import { ApiError } from '../../lib/api';
 import { EmailInboxHint } from '../../components/EmailInboxHint';
 import { sendBundoEmailVerification } from '../../lib/authEmailVerification';
-import { readPendingSignupRole } from '../../lib/authSignupStorage';
+import { markArtisanApplicant } from '../../lib/artisanApplication';
+import { buildAuthDrawerSearch } from '../../lib/authDrawerPrompt';
+import { readPendingSignupPhone, resolveSignupIntent } from '../../lib/authSignupStorage';
 import { finalizeAuthSession } from '../../lib/authSessionFlow';
 import {
   completeFirebaseEmailAction,
@@ -111,7 +113,7 @@ export function EmailVerificationPage() {
 
   async function continueAfterVerification() {
   if (!auth?.currentUser) {
-    navigate('/login');
+    navigate({ pathname: '/', search: buildAuthDrawerSearch({ mode: 'login' }) });
     return;
   }
 
@@ -128,19 +130,27 @@ export function EmailVerificationPage() {
       return;
     }
 
-    const accountKind =
-      state.accountKind || readPendingSignupRole(auth.currentUser.email) || 'CUSTOMER';
+    const pendingPhone =
+      state.phone || readPendingSignupPhone(auth.currentUser.email) || undefined;
+    const signupIntent =
+      state.accountKind || resolveSignupIntent(auth.currentUser.email) || undefined;
 
-    const { session, destination } = await finalizeAuthSession(auth.currentUser, {
+    const { session } = await finalizeAuthSession(auth.currentUser, {
       mode: 'signup',
-      intendedRole: accountKind,
-      phone: state.phone,
+      phone: pendingPhone,
+      forceTokenRefresh: true,
     });
 
     ctx.acknowledgeSession(session.token, session.user);
     await ctx.loadPrivateData(session.token, session.user).catch(() => undefined);
 
-    navigate(destinationForRole(session.user.role) || destination, { replace: true });
+    if (signupIntent === 'ARTISAN') {
+      markArtisanApplicant();
+      navigate('/', { replace: true });
+      return;
+    }
+
+    navigate(destinationForRole(session.user.role) || '/workspace/overview', { replace: true });
   } catch (error) {
     setMessage(
       error instanceof ApiError

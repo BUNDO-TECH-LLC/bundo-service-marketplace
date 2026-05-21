@@ -285,6 +285,13 @@ export const reviewKycSubmission = async (input: {
       },
     });
 
+    if (input.status === KycStatus.APPROVED) {
+      await tx.user.update({
+        where: { firebaseUid: artisan.userId },
+        data: { role: Role.ARTISAN },
+      });
+    }
+
     return { ...reviewedSubmission, artisan };
   });
 

@@ -1,9 +1,8 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { BundoLoadingScreen } from '../components/BundoLoadingScreen';
-import { AuthPage } from '../pages/auth/AuthPage';
+import { AuthDrawerRedirect } from '../pages/auth/AuthDrawerRedirect';
 import { EmailVerificationPage } from '../pages/auth/EmailVerificationPage';
-import ForgotPasswordPage from '../pages/auth/ForgotPassword';
 import { PrivacyPage, TermsPage } from '../pages/LegalPage';
 import { MainLayout } from './MainLayout';
 
@@ -23,10 +22,10 @@ export function AppRoutes() {
   return (
     <Suspense fallback={<PageFallback />}>
       <Routes>
-        <Route path="/login" element={<AuthPage mode="login" />} />
-        <Route path="/signup" element={<AuthPage mode="signup" />} />
-        <Route path="/create-account" element={<Navigate to="/signup" replace />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/login" element={<AuthDrawerRedirect preset="login" />} />
+        <Route path="/signup" element={<AuthDrawerRedirect preset="signup" />} />
+        <Route path="/create-account" element={<AuthDrawerRedirect preset="signup" />} />
+        <Route path="/forgot-password" element={<AuthDrawerRedirect preset="reset" />} />
         <Route path="/verify-email" element={<EmailVerificationPage />} />
         <Route path="/loading" element={<LoadingPage />} />
 

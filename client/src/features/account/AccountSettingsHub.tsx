@@ -14,6 +14,7 @@ import {
 import { userDisplayName } from '../../lib/userDisplayName';
 import { ArtisanKycSection } from '../artisan/ArtisanKycSection';
 import { ArtisanPayoutSection } from '../artisan/ArtisanPayoutSection';
+import { BecomeArtisanButton } from './BecomeArtisanButton';
 import type { AccountSettingsSection, ActionRunner, PushStatus } from '../../appTypes';
 import type { ApiUser, Artisan, NotificationPreferences } from '../../types';
 
@@ -334,6 +335,25 @@ export function AccountSettingsHub({
           {me.role === 'ARTISAN' && (
             <article id="account-settings-payouts" className={`panel-card form-card ${panelClass('payouts')}`}>
               <ArtisanPayoutSection token={token} busy={busy} runAction={runAction} />
+            </article>
+          )}
+
+          {me.role === 'CUSTOMER' && (
+            <article id="account-settings-artisan" className={`panel-card form-card ${panelClass('personal')}`}>
+              <p className="eyebrow">Offer services</p>
+              <h2>Become an artisan</h2>
+              <p className="muted">
+                Start onboarding to list services on Bundo. You stay a client until identity verification and admin
+                approval are complete.
+              </p>
+              <BecomeArtisanButton
+                me={me}
+                busy={busy}
+                onStart={() => {
+                  onNavigate('/');
+                  onNotice('Complete your artisan profile and verification to get approved.');
+                }}
+              />
             </article>
           )}
 

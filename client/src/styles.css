@@ -993,6 +993,12 @@ canvas {
   line-height: 1.5;
 }
 
+.role-choice-card--selected {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  box-shadow: 0 0 0 2px var(--color-accent-soft);
+}
+
 .role-choice-card.artisan {
   border-color: #ead5c8;
   background: #fffaf7;
@@ -1126,6 +1132,28 @@ canvas {
   height: 1px;
   content: "";
   background: var(--line);
+}
+
+.auth-name-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.auth-field-error {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-danger-dark);
+}
+
+.logged-hero-actions {
+  margin-top: 16px;
+}
+
+.become-artisan-button {
+  width: fit-content;
 }
 
 .auth-form {

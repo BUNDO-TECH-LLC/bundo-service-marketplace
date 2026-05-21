@@ -3,7 +3,11 @@ import type { NavigateFunction } from 'react-router-dom';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { ApiError } from '../lib/api';
 import { buildAppPath, legacyQueryToAppPath, parseAppPath } from '../lib/appPaths';
-import { needsEmailVerification } from '../lib/authSignupStorage';
+import {
+  needsEmailVerification,
+  readPendingSignupPhone,
+  resolveSignupIntent,
+} from '../lib/authSignupStorage';
 import { auth } from '../lib/firebase';
 import { hasPushConfig } from '../lib/messaging';
 import { resolveApiSession } from '../lib/resolveApiSession';
@@ -149,7 +153,11 @@ export function useAppAuth({
               },
               {
                 replace: true,
-                state: { email: user.email ?? '' },
+                state: {
+                  email: user.email ?? '',
+                  accountKind: resolveSignupIntent(user.email) || undefined,
+                  phone: readPendingSignupPhone(user.email) || undefined,
+                },
               }
             );
           }

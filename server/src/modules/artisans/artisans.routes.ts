@@ -3,6 +3,7 @@ import { asyncHandler } from '../../middlewares/errorHandler';
 import { httpError } from '../../utils/errors';
 import { Prisma, Role } from '@prisma/client';
 import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
+import { requireArtisanOrApplicant } from '../../middlewares/requireArtisanOrApplicant';
 import { requireRole } from '../../middlewares/requireRole';
 import { getReviewsForArtisan } from '../reviews/reviews.service';
 import {
@@ -42,7 +43,7 @@ const router = Router();
 router.post(
   '/kyc',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   async (req, res) => {
     const {
       legalName,
@@ -101,7 +102,7 @@ router.post(
 router.get(
   '/kyc',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   async (req, res) => {
     const submission = await getKycSubmissionForArtisanUser(
       (req as any).user.firebaseUid
@@ -117,7 +118,7 @@ router.get(
 router.post(
   '/kyc/sign-upload',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   asyncHandler(async (_req, res) => {
     const upload = await createCloudinarySignedUpload('bundo/artisan-kyc');
 
@@ -131,7 +132,7 @@ router.post(
 router.post(
   '/portfolio-images/sign-upload',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   asyncHandler(async (_req, res) => {
     const upload = await createCloudinarySignedUpload('bundo/artisan-portfolio');
 
@@ -145,7 +146,7 @@ router.post(
 router.post(
   '/profile',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   async (req, res) => {
     const { displayName, bio, city, area, lat, lng } = req.body;
 
@@ -192,7 +193,7 @@ router.post(
 router.patch(
   '/profile',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   async (req, res) => {
     const { displayName, bio, city, area, lat, lng } = req.body;
     const data: {
@@ -276,7 +277,7 @@ router.patch(
 router.post(
   '/portfolio-images',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   asyncHandler(async (req, res) => {
     const { cloudinaryId, url, displayOrder } = req.body;
 
@@ -320,7 +321,7 @@ router.post(
 router.post(
   '/availability-slots',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   async (req, res) => {
     const { dayOfWeek, startTime, endTime } = req.body;
 
@@ -353,7 +354,7 @@ router.post(
 router.get(
   '/offerings',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   async (req, res) => {
     res.setHeader('Deprecation', 'true');
     res.setHeader('Link', '</offerings/me>; rel="successor-version"');
@@ -372,7 +373,7 @@ router.get(
   }
 );
 
-router.get('/me', verifyFirebaseToken, requireRole(Role.ARTISAN), asyncHandler(async (req, res) => {
+router.get('/me', verifyFirebaseToken, requireArtisanOrApplicant, asyncHandler(async (req, res) => {
   const profile = await getArtisanProfileDetailsByUserId(
     (req as any).user.firebaseUid
   );
@@ -437,7 +438,7 @@ router.post('/payout-account', verifyFirebaseToken, requireRole(Role.ARTISAN), a
 router.get(
   '/portfolio-images/me',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   asyncHandler(async (req, res) => {
     const images = await getPortfolioImagesForArtisanUser(
       (req as any).user.firebaseUid
@@ -453,7 +454,7 @@ router.get(
 router.patch(
   '/portfolio-images/:id',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   async (req, res) => {
     const { cloudinaryId, url, displayOrder } = req.body;
     const data: {
@@ -515,7 +516,7 @@ router.patch(
 router.delete(
   '/portfolio-images/:id',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   async (req, res) => {
     const result = await deletePortfolioImageForArtisan({
       imageId: String(req.params.id),
@@ -541,7 +542,7 @@ router.delete(
 router.get(
   '/availability-slots/me',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   async (req, res) => {
     const slots = await getAvailabilitySlotsForArtisanUser(
       (req as any).user.firebaseUid
@@ -561,7 +562,7 @@ router.get(
 router.patch(
   '/availability-slots/:id',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   async (req, res) => {
     const { dayOfWeek, startTime, endTime, isActive } = req.body;
     const data: {
@@ -631,7 +632,7 @@ router.patch(
 router.delete(
   '/availability-slots/:id',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   async (req, res) => {
     const result = await deleteAvailabilitySlotForArtisan({
       slotId: String(req.params.id),

@@ -1,13 +1,6 @@
 import { routeStorageKey } from './workspaceRoute';
 
-const AUTH_PATHS = new Set([
-  '/login',
-  '/signup',
-  '/forgot-password',
-  '/verify-email',
-  '/loading',
-  '/create-account',
-]);
+const AUTH_PATHS = new Set(['/verify-email', '/loading']);
 
 /** Dedicated auth screens (not wrapped in MainLayout). */
 export function isAuthPathname(pathname: string): boolean {

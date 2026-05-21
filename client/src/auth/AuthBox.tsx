@@ -3,19 +3,27 @@ import { createPortal } from 'react-dom';
 import type { User } from 'firebase/auth';
 import {
   createUserWithEmailAndPassword,
-  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
 } from 'firebase/auth';
 import { api, ApiError } from '../lib/api';
 import { auth, firebaseReady } from '../lib/firebase';
+import { markArtisanApplicant } from '../lib/artisanApplication';
+import type { AuthDrawerPrompt } from '../lib/authDrawerPrompt';
+import { validateEmailAddress } from '../lib/emailValidation';
 import {
-  clearPendingSignupRole,
+  clearSessionSignupIntent,
   needsEmailVerification,
-  readPendingSignupRole,
-  savePendingSignupRole,
+  readPendingSignupIntent,
+  readPendingSignupPhone,
+  resolveSignupIntent,
+  savePendingSignupIntent,
+  savePendingSignupPhone,
+  saveSessionSignupIntent,
 } from '../lib/authSignupStorage';
+import { finalizeAuthSession } from '../lib/authSessionFlow';
+import { sendBundoPasswordResetEmail } from '../lib/authEmailVerification';
 import { resolveApiSession } from '../lib/resolveApiSession';
 import { userDisplayName } from '../lib/userDisplayName';
 import type { ApiUser, Role } from '../types';
@@ -94,7 +102,8 @@ function AuthDrawer({
 export function AuthBox({
   firebaseUser,
   me,
-  authPromptSignal = 0,
+  authDrawerPrompt = null,
+  onAuthDrawerPromptHandled,
   unreadCount,
   onReady,
   onNavigate,
@@ -104,7 +113,8 @@ export function AuthBox({
 }: {
   firebaseUser: User | null;
   me: ApiUser | null;
-  authPromptSignal?: number;
+  authDrawerPrompt?: AuthDrawerPrompt | null;
+  onAuthDrawerPromptHandled?: () => void;
   unreadCount: number;
   onReady: (token: string, user: ApiUser) => void;
   onNavigate: (view: View) => void;
@@ -113,15 +123,18 @@ export function AuthBox({
   onOpenAuth?: () => void;
 }) {
   const [email, setEmail] = useState('');
-  const [fullName, setFullName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
-  const [authStep, setAuthStep] = useState<'role' | 'account' | 'verify'>('account');
+  const [authStep, setAuthStep] = useState<'account' | 'verify'>('account');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [preferredRole, setPreferredRole] = useState<SignupRole | null>(null);
+  const [signupIntent, setSignupIntent] = useState<SignupRole | null>(null);
   const [pendingAuthUser, setPendingAuthUser] = useState<User | null>(null);
   const [pendingEmailVerificationUser, setPendingEmailVerificationUser] = useState<User | null>(null);
 
@@ -130,71 +143,54 @@ export function AuthBox({
     firebaseUser && me?.role && narrowViewport ? 'topbar-mobile-panel' : null
   );
 
-  useEffect(() => {
-    if (!authPromptSignal) return;
+  function combinedDisplayName() {
+    return `${firstName.trim()} ${lastName.trim()}`.trim();
+  }
 
-    if (firebaseUser && me && !me.role) {
-      setMode('signup');
-      setAuthStep('role');
-      setDrawerOpen(true);
-      return;
+  function validateEmailField(value = email) {
+    const result = validateEmailAddress(value);
+    if (!result.ok) {
+      setEmailError(result.message);
+      return false;
     }
 
-    setPreferredRole('ARTISAN');
-    setMode('signup');
-    setAuthStep('account');
-    setDrawerOpen(true);
-  }, [authPromptSignal, firebaseUser, me]);
+    setEmail(result.normalized);
+    setEmailError('');
+    return true;
+  }
 
   async function finishAuth(
     firebaseAuthUser: User,
     authMode = mode,
-    roleOverride = preferredRole,
     forceTokenRefresh = false
   ) {
-    const rememberedRole = readPendingSignupRole(firebaseAuthUser.email);
-    const intendedRole = roleOverride || rememberedRole;
-    let session = await resolveApiSession(firebaseAuthUser, forceTokenRefresh);
+    const rememberedPhone = readPendingSignupPhone(firebaseAuthUser.email);
+    const phoneToApply =
+      authMode === 'signup' ? phone.trim() || rememberedPhone || undefined : undefined;
+    const artisanIntent =
+      resolveSignupIntent(firebaseAuthUser.email, signupIntent) === 'ARTISAN';
 
-    if (
-      intendedRole &&
-      session.user.role !== intendedRole &&
-      session.user.role !== 'ADMIN' &&
-      !(session.user.role === 'ARTISAN' && intendedRole === 'CUSTOMER')
-    ) {
-      await api('/users/role', {
-        method: 'PATCH',
-        token: session.token,
-        body: JSON.stringify({ role: intendedRole }),
-      });
-      const refreshed = await api<{ user: ApiUser }>('/me', { token: session.token });
-      session = {
-        token: session.token,
-        user: refreshed.user,
-      };
-    }
+    const bootstrapSession = await resolveApiSession(firebaseAuthUser, forceTokenRefresh);
+    const rolePatch = !bootstrapSession.user.role ? ('CUSTOMER' as const) : undefined;
 
-    if (!session.user.role) {
-      setPendingAuthUser(firebaseAuthUser);
-      setPreferredRole(rememberedRole);
-      setMode('signup');
-      setAuthStep(rememberedRole ? 'account' : 'role');
-      setDrawerOpen(true);
-      onNotice('Choose client or artisan to finish setting up your Bundo account.');
-      return;
-    }
+    const { session } = await finalizeAuthSession(firebaseAuthUser, {
+      mode: authMode === 'login' ? 'login' : 'signup',
+      intendedRole: rolePatch,
+      phone: phoneToApply,
+      forceTokenRefresh,
+    });
 
-    clearPendingSignupRole(firebaseAuthUser.email);
     onReady(session.token, session.user);
+
     if (session.user.role === 'ARTISAN') {
-      if (authMode === 'signup' || intendedRole === 'ARTISAN') {
-        onNavigate('home');
-      } else {
-        onWorkspaceSection('overview');
-      }
+      onNavigate('home');
       onNotice(
-        'Your artisan onboarding is ready. Complete your profile, KYC, and offerings for admin review.'
+        'Your artisan account is active. Manage jobs, messages, and offerings from your workspace.'
       );
+    } else if (artisanIntent && session.user.role === 'CUSTOMER') {
+      markArtisanApplicant();
+      onNavigate('home');
+      onNotice('Complete your artisan profile and verification. You will become an artisan after admin approval.');
     } else if (authMode === 'signup') {
       onNotice('Account created. Welcome to Bundo.');
     } else {
@@ -204,15 +200,22 @@ export function AuthBox({
     setDrawerOpen(false);
     setPassword('');
     setConfirmPassword('');
-    setFullName('');
-    setPreferredRole(null);
+    setFirstName('');
+    setLastName('');
+    setPhone('');
+    setSignupIntent(null);
     setPendingAuthUser(null);
     setPendingEmailVerificationUser(null);
     setAuthStep('account');
+    clearSessionSignupIntent();
   }
 
   async function sendVerification(user: User) {
-    savePendingSignupRole(user.email, preferredRole);
+    if (signupIntent === 'ARTISAN') {
+      saveSessionSignupIntent('ARTISAN');
+      savePendingSignupIntent(user.email, 'ARTISAN');
+    }
+    savePendingSignupPhone(user.email, phone.trim() || null);
     await sendBundoEmailVerification(user);
     setPendingEmailVerificationUser(user);
     setAuthStep('verify');
@@ -239,12 +242,7 @@ export function AuthBox({
         return;
       }
 
-      await finishAuth(
-        refreshedUser,
-        'signup',
-        readPendingSignupRole(refreshedUser.email) || preferredRole,
-        true
-      );
+      await finishAuth(refreshedUser, 'signup', true);
     } catch (error) {
       const message =
         error instanceof ApiError
@@ -287,7 +285,7 @@ export function AuthBox({
 
     setSubmitting(true);
     try {
-      await sendPasswordResetEmail(auth, email.trim());
+      await sendBundoPasswordResetEmail(email.trim());
       onNotice('Password reset email sent. Check your inbox and spam folder.');
       setMode('login');
       setAuthStep('account');
@@ -306,9 +304,23 @@ export function AuthBox({
       return;
     }
 
-    if (mode === 'signup' && !preferredRole) {
-      setAuthStep('role');
-      onNotice('Choose how you want to use Bundo first.');
+    if (!validateEmailField()) {
+      onNotice(emailError || 'Enter a valid email address.');
+      return;
+    }
+
+    if (mode === 'signup' && (!firstName.trim() || !lastName.trim())) {
+      onNotice('Enter your first and last name.');
+      return;
+    }
+
+    if (mode === 'signup' && !phone.trim()) {
+      onNotice('Enter your phone number (include country code, e.g. +234…).');
+      return;
+    }
+
+    if (mode === 'signup' && password.length < 8) {
+      onNotice('Password must be at least 8 characters.');
       return;
     }
 
@@ -325,8 +337,14 @@ export function AuthBox({
           ? await signInWithEmailAndPassword(auth, email, password)
           : await createUserWithEmailAndPassword(auth, email, password);
 
-      if (mode === 'signup' && fullName.trim()) {
-        await updateProfile(credential.user, { displayName: fullName.trim() });
+      if (mode === 'signup') {
+        const displayName = combinedDisplayName();
+        if (displayName) {
+          await updateProfile(credential.user, { displayName });
+        }
+        if (signupIntent === 'ARTISAN') {
+          saveSessionSignupIntent('ARTISAN');
+        }
       }
 
       if (mode === 'signup' && !credential.user.emailVerified) {
@@ -355,9 +373,18 @@ export function AuthBox({
       return;
     }
 
-    if (mode === 'signup' && !preferredRole) {
-      setAuthStep('role');
-      onNotice('Choose how you want to use Bundo first.');
+    if (mode === 'signup' && (!firstName.trim() || !lastName.trim())) {
+      onNotice('Enter your first and last name before continuing with Google.');
+      return;
+    }
+
+    if (mode === 'signup' && !phone.trim()) {
+      onNotice('Enter your phone number before continuing with Google.');
+      return;
+    }
+
+    if (!validateEmailField() && mode === 'signup') {
+      onNotice(emailError || 'Enter a valid email address.');
       return;
     }
 
@@ -365,7 +392,19 @@ export function AuthBox({
     onNotice('');
     try {
       const credential = await signInWithGooglePopup();
-      await finishAuth(credential.user);
+
+      if (mode === 'signup') {
+        const displayName = combinedDisplayName();
+        if (displayName) {
+          await updateProfile(credential.user, { displayName });
+        }
+        if (signupIntent === 'ARTISAN') {
+          saveSessionSignupIntent('ARTISAN');
+        }
+        savePendingSignupPhone(credential.user.email, phone.trim());
+      }
+
+      await finishAuth(credential.user, mode);
     } catch (error) {
       onNotice(error instanceof Error ? error.message : 'Could not continue with Google');
     } finally {
@@ -373,49 +412,46 @@ export function AuthBox({
     }
   }
 
-  function chooseRole(role: SignupRole) {
-    setPreferredRole(role);
-
-    if (pendingAuthUser) {
-      void finishAuth(pendingAuthUser, 'signup', role);
-      return;
-    }
-
-    setAuthStep('account');
-    onNotice('');
-  }
-
-  function openLogin() {
+  function openLogin(prefillEmail?: string) {
     onOpenAuth?.();
-    setPreferredRole(null);
+    setSignupIntent(null);
     setConfirmPassword('');
+    setPhone('');
     setPendingAuthUser(null);
     setPendingEmailVerificationUser(null);
     setMode('login');
     setAuthStep('account');
+    if (prefillEmail) {
+      setEmail(prefillEmail);
+    }
     setDrawerOpen(true);
     onNotice('');
   }
 
-  function openSignup(role: SignupRole | null = null) {
+  function openSignup(intent: SignupRole | null = null) {
     onOpenAuth?.();
-    setPreferredRole(role);
+    setSignupIntent(intent);
+    saveSessionSignupIntent(intent);
     setConfirmPassword('');
     setPendingAuthUser(null);
     setPendingEmailVerificationUser(null);
     setMode('signup');
-    setAuthStep(role ? 'account' : 'role');
+    setAuthStep('account');
     setDrawerOpen(true);
     onNotice('');
   }
 
-  function openResetPassword() {
+  function openResetPassword(prefillEmail?: string) {
     setPassword('');
     setConfirmPassword('');
+    setPhone('');
     setPendingAuthUser(null);
     setPendingEmailVerificationUser(null);
     setMode('reset');
     setAuthStep('account');
+    if (prefillEmail) {
+      setEmail(prefillEmail);
+    }
     setDrawerOpen(true);
   }
 
@@ -428,55 +464,39 @@ export function AuthBox({
     openLogin();
   }
 
-  if (firebaseUser && me && !me.role) {
-    return (
-      <div className="auth-entry role-completion-entry">
-        <button
-          type="button"
-          onClick={() => {
-            setMode('signup');
-            setAuthStep('role');
-            setDrawerOpen(true);
-            onNotice('Choose client or artisan to finish setting up your Bundo account.');
-          }}
-        >
-          Complete setup
-        </button>
+  useEffect(() => {
+    if (!authDrawerPrompt) return;
 
-        <AuthDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} ariaLabel="Complete account setup">
-              <div className="drawer-head">
-                <img className="drawer-logo" src={bundoLogo} alt="Bundo logo" />
-                <button type="button" onClick={() => setDrawerOpen(false)}>Close</button>
-              </div>
-              <p className="eyebrow">Finish setup</p>
-              <h2>How will you use Bundo?</h2>
-              <p className="drawer-copy">Choose your account type so we can unlock the right marketplace actions.</p>
-              <div className="role-choice-grid" aria-label="Choose account type">
-                <button type="button" className="role-choice-card" onClick={() => void finishAuth(firebaseUser, 'signup', 'CUSTOMER', true)}>
-                  <span>Client</span>
-                  <strong>Find and book trusted services</strong>
-                  <small>Browse professionals, message artisans, request bookings, and track jobs.</small>
-                </button>
-                <button type="button" className="role-choice-card artisan" onClick={() => void finishAuth(firebaseUser, 'signup', 'ARTISAN', true)}>
-                  <span>Artisan</span>
-                  <strong>Offer services on Bundo</strong>
-                  <small>Create a profile, add offerings, complete verification, and receive bookings.</small>
-                </button>
-              </div>
-              <button
-                type="button"
-                className="mode-switch"
-                onClick={() => {
-                  onNotice('Signed out');
-                  auth && signOut(auth);
-                }}
-              >
-                Use another account
-              </button>
-        </AuthDrawer>
-      </div>
-    );
-  }
+    onOpenAuth?.();
+
+    const prefillEmail = authDrawerPrompt.email;
+
+    if (authDrawerPrompt.mode === 'login') {
+      openLogin(prefillEmail);
+    } else if (authDrawerPrompt.mode === 'reset') {
+      openResetPassword(prefillEmail);
+    } else if (authDrawerPrompt.mode === 'choose-role') {
+      markArtisanApplicant();
+      onNavigate('home');
+      onNotice('Complete your artisan profile and verification to get approved.');
+    } else {
+      openSignup(authDrawerPrompt.role ?? null);
+      if (prefillEmail) {
+        setEmail(prefillEmail);
+      }
+    }
+
+    onAuthDrawerPromptHandled?.();
+  }, [authDrawerPrompt, onAuthDrawerPromptHandled, onOpenAuth, onNavigate, onNotice]);
+
+  useEffect(() => {
+    if (!firebaseUser || !me || me.role) {
+      return;
+    }
+
+    void finishAuth(firebaseUser, 'login', true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time legacy role backfill
+  }, [firebaseUser, me?.role, me?.firebaseUid]);
 
   if (firebaseUser && me) {
     const displayName = userDisplayName(firebaseUser, me);
@@ -646,7 +666,7 @@ export function AuthBox({
 
   return (
     <div className="auth-entry">
-      <button type="button" onClick={openLogin}>
+      <button type="button" onClick={() => openLogin()}>
         Login
       </button>
       <button type="button" className="signup-link" onClick={() => openSignup()}>
@@ -694,72 +714,30 @@ export function AuthBox({
                   >
                     Resend verification email
                   </button>
-                  <button type="button" className="mode-switch" onClick={openLogin}>
+                  <button type="button" className="mode-switch" onClick={() => openLogin()}>
                     Back to login
                   </button>
                 </div>
               </>
-            ) : mode === 'signup' && authStep === 'role' ? (
-              <>
-                <p className="eyebrow">Create your account</p>
-                <h2>How will you use Bundo?</h2>
-                <p className="drawer-copy">
-                  Choose the account type that matches your first workflow. You can manage your setup from the dashboard after login.
-                </p>
-
-                <div className="role-choice-grid" aria-label="Choose account type">
-                  <button type="button" className="role-choice-card" onClick={() => chooseRole('CUSTOMER')}>
-                    <span>Client</span>
-                    <strong>Find and book trusted services</strong>
-                    <small>Browse professionals, message artisans, request bookings, and track jobs.</small>
-                  </button>
-                  <button type="button" className="role-choice-card artisan" onClick={() => chooseRole('ARTISAN')}>
-                    <span>Artisan</span>
-                    <strong>Offer services on Bundo</strong>
-                    <small>Create a profile, add offerings, complete verification, and receive bookings.</small>
-                  </button>
-                </div>
-
-                <button type="button" className="mode-switch" onClick={switchMode}>
-                  Already have an account? Login
-                </button>
-              </>
             ) : (
               <>
                 <p className="eyebrow">
-                  {mode === 'reset'
-                    ? 'Reset access'
-                    : mode === 'login'
-                    ? 'Welcome back'
-                    : preferredRole === 'ARTISAN'
-                      ? 'Join as an artisan'
-                      : 'Join as a client'}
+                  {mode === 'reset' ? 'Reset access' : mode === 'login' ? 'Welcome back' : 'Create your account'}
                 </p>
             <h2>
                   {mode === 'reset'
                     ? 'Reset your password'
                     : mode === 'login'
                     ? 'Login to your account'
-                    : preferredRole === 'ARTISAN'
-                      ? 'Create your artisan account'
-                      : 'Create your client account'}
+                    : 'Sign up for Bundo'}
             </h2>
             <p className="drawer-copy">
                   {mode === 'reset'
                     ? 'Enter your account email and Firebase will send a secure password reset link.'
                     : mode === 'login'
                     ? 'Continue with Google or your email to pick up your marketplace workflow.'
-                    : preferredRole === 'ARTISAN'
-                      ? 'Start with your login, then complete profile setup, verification, offerings, and admin review from your workspace.'
-                      : 'Start with your login, then browse, message, book, and manage service requests from your dashboard.'}
+                    : 'Every account starts as a client. You can apply to become an artisan later from your dashboard after verification.'}
             </p>
-
-                {mode === 'signup' && (
-                  <div className="selected-role-banner">
-                    <span>{preferredRole === 'ARTISAN' ? 'Artisan account' : 'Client account'}</span>
-                    <button type="button" onClick={() => setAuthStep('role')}>Change</button>
-                  </div>
-                )}
 
                 {mode !== 'reset' && (
                   <>
@@ -779,29 +757,67 @@ export function AuthBox({
 
             <form className="auth-form" onSubmit={mode === 'reset' ? resetPassword : submit}>
                   {mode === 'signup' && (
-                    <label>
-                      Full name
-                      <input
-                        value={fullName}
-                        onChange={(event) => setFullName(event.target.value)}
-                        placeholder="Your full name"
-                        type="text"
-                        autoComplete="name"
-                        required
-                      />
-                    </label>
+                    <div className="auth-name-grid">
+                      <label>
+                        First name
+                        <input
+                          value={firstName}
+                          onChange={(event) => setFirstName(event.target.value)}
+                          placeholder="First name"
+                          type="text"
+                          autoComplete="given-name"
+                          required
+                        />
+                      </label>
+                      <label>
+                        Last name
+                        <input
+                          value={lastName}
+                          onChange={(event) => setLastName(event.target.value)}
+                          placeholder="Last name"
+                          type="text"
+                          autoComplete="family-name"
+                          required
+                        />
+                      </label>
+                    </div>
                   )}
               <label>
                 Email
                     <input
                       value={email}
-                      onChange={(event) => setEmail(event.target.value)}
+                      onChange={(event) => {
+                        setEmail(event.target.value);
+                        if (emailError) {
+                          validateEmailField(event.target.value);
+                        }
+                      }}
+                      onBlur={() => {
+                        if (email.trim()) {
+                          validateEmailField();
+                        }
+                      }}
                       placeholder="you@example.com"
                       type="email"
                       autoComplete="email"
+                      aria-invalid={emailError ? 'true' : undefined}
                       required
                     />
+                    {emailError && <span className="auth-field-error">{emailError}</span>}
               </label>
+                  {mode === 'signup' && (
+                    <label>
+                      Phone number
+                      <input
+                        value={phone}
+                        onChange={(event) => setPhone(event.target.value)}
+                        placeholder="+2348012345678"
+                        type="tel"
+                        autoComplete="tel"
+                        required
+                      />
+                    </label>
+                  )}
                   {mode !== 'reset' && (
                     <label>
                       Password
@@ -810,7 +826,7 @@ export function AuthBox({
                         onChange={setPassword}
                         placeholder="Your password"
                         autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                        minLength={6}
+                        minLength={mode === 'signup' ? 8 : 6}
                         required
                       />
                     </label>
@@ -823,7 +839,7 @@ export function AuthBox({
                         onChange={setConfirmPassword}
                         placeholder="Retype your password"
                         autoComplete="new-password"
-                        minLength={6}
+                        minLength={8}
                         required
                       />
                     </label>
@@ -835,9 +851,7 @@ export function AuthBox({
                         ? 'Send reset link'
                       : mode === 'login'
                         ? 'Login'
-                        : preferredRole === 'ARTISAN'
-                          ? 'Create artisan account'
-                          : 'Create client account'}
+                        : 'Create account'}
               </button>
                   {mode === 'signup' && (
                     <p className="auth-legal-note">
@@ -847,7 +861,7 @@ export function AuthBox({
             </form>
 
                 {mode === 'login' && (
-                  <button type="button" className="forgot-password-link" onClick={openResetPassword}>
+                  <button type="button" className="forgot-password-link" onClick={() => openResetPassword()}>
                     Forgot password?
                   </button>
                 )}

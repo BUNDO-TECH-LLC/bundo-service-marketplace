@@ -101,6 +101,7 @@ export const findOrCreateUser = async (firebaseUser: {
         firebaseUid: uid,
         email: normalizedEmail,
         phone: normalizedPhone,
+        role: Role.CUSTOMER,
       },
     });
   } catch (error) {
@@ -149,6 +150,10 @@ export const updateUserRole = async (firebaseUid: string, role: Role) => {
   }
 
   if (user.role === Role.ADMIN) {
+    return { status: 'locked_role' as const };
+  }
+
+  if (role === Role.ARTISAN && user.role === Role.CUSTOMER) {
     return { status: 'locked_role' as const };
   }
 

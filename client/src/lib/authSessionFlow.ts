@@ -1,6 +1,12 @@
 import { GoogleAuthProvider, signInWithPopup, type User } from 'firebase/auth';
 import { api } from './api';
-import { clearPendingSignupRole, readPendingSignupRole } from './authSignupStorage';
+import {
+  clearPendingSignupIntent,
+  clearPendingSignupPhone,
+  clearPendingSignupRole,
+  clearSessionSignupIntent,
+  readPendingSignupRole,
+} from './authSignupStorage';
 import { auth } from './firebase';
 import { resolveApiSession } from './resolveApiSession';
 import type { ApiUser, Role } from '../types';
@@ -51,11 +57,15 @@ export async function finalizeAuthSession(
     mode: 'login' | 'signup';
     intendedRole?: AccountKind;
     phone?: string;
+    forceTokenRefresh?: boolean;
   }
 ) {
-  let session = await resolveApiSession(firebaseUser);
+  let session = await resolveApiSession(firebaseUser, options.forceTokenRefresh ?? false);
   const rememberedRole = readPendingSignupRole(firebaseUser.email);
-  const intendedRole = options.intendedRole || rememberedRole;
+  const intendedRole =
+    options.mode === 'signup'
+      ? 'CUSTOMER'
+      : options.intendedRole || rememberedRole;
 
   if (options.phone?.trim()) {
     await api('/users/phone', {
@@ -83,6 +93,9 @@ export async function finalizeAuthSession(
   }
 
   clearPendingSignupRole(firebaseUser.email);
+  clearPendingSignupPhone(firebaseUser.email);
+  clearPendingSignupIntent(firebaseUser.email);
+  clearSessionSignupIntent();
 
   const destination =
     session.user.role === 'ARTISAN' || session.user.role === 'ADMIN'

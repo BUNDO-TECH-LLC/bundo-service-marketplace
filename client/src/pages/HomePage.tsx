@@ -2,6 +2,7 @@ import { AppPromo, Footer, Hero, ServicesSection, WhySection } from '../features
 import { MarketplacePreview } from '../features/marketplace';
 import { ArtisanLanding } from '../features/artisan/ArtisanLanding';
 import { buildAppPath } from '../lib/appPaths';
+import { clearArtisanApplicant, isArtisanApplicantSession, markArtisanApplicant } from '../lib/artisanApplication';
 import { nigeriaStates } from '../lib/geo';
 import { LoggedInHome } from '../views/LoggedInHome';
 import { useAppRoot } from '../app/appRootContext';
@@ -9,8 +10,16 @@ import { useAppRoot } from '../app/appRootContext';
 export default function HomePage() {
   const ctx = useAppRoot();
 
+  const showArtisanOnboarding =
+    ctx.me?.role === 'ARTISAN' ||
+    (ctx.me?.role === 'CUSTOMER' && isArtisanApplicantSession());
+
   if (ctx.isAuthed && ctx.me) {
     if (ctx.me.role === 'ARTISAN') {
+      clearArtisanApplicant();
+    }
+
+    if (showArtisanOnboarding) {
       return (
         <ArtisanLanding
           token={ctx.token}
@@ -72,6 +81,11 @@ export default function HomePage() {
         onBookingSuccess={ctx.setBookingSuccess}
         openBookings={() => {
           ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'bookings' }));
+        }}
+        onBecomeArtisan={() => {
+          markArtisanApplicant();
+          ctx.setNotice('Complete your artisan profile and verification to get approved.');
+          ctx.navigate('/');
         }}
       />
     );

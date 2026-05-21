@@ -74,7 +74,7 @@ export function passwordResetActionCodeSettings(): ActionCodeSettings | undefine
     return undefined;
   }
 
-  return { url: `${window.location.origin}/login`, handleCodeInApp: false };
+  return { url: `${window.location.origin}/?auth=login`, handleCodeInApp: false };
 }
 
 export async function sendBundoPasswordResetEmail(email: string) {
