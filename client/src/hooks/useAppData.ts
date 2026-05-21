@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { api, ApiError } from '../lib/api';
+import { isArtisanApplicantSession } from '../lib/artisanApplication';
 import { paymentSuccessFromVerify, type VerifyPaymentResponse } from '../lib/paymentReturn';
 import type {
   AdminArtisanRecord,
@@ -128,7 +129,15 @@ export function useAppData(filters: MarketplaceFilterState, options?: UseAppData
       setBookings(bookingRes.bookings);
       setConversations(conversationRes.conversations);
       setNotifications(notificationRes.notifications);
-      setMyOfferings([]);
+
+      if (isArtisanApplicantSession(user.firebaseUid)) {
+        const offeringRes = await api<{ offerings: Offering[] }>('/offerings/me', { token: authToken }).catch(
+          () => ({ offerings: [] })
+        );
+        setMyOfferings(offeringRes.offerings);
+      } else {
+        setMyOfferings([]);
+      }
     }
 
     if (user.role === 'ARTISAN') {

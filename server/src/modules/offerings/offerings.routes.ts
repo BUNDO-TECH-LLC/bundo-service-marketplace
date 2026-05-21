@@ -1,7 +1,6 @@
 import { Router } from 'express';
-import { Role } from '@prisma/client';
 import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
-import { requireRole } from '../../middlewares/requireRole';
+import { requireArtisanOrApplicant } from '../../middlewares/requireArtisanOrApplicant';
 import { asyncHandler } from '../../middlewares/errorHandler';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../utils/errors';
 import { throwOnServiceStatus } from '../../utils/resultErrors';
@@ -79,7 +78,7 @@ const validateOfferingBody = (body: any, partial = false) => {
 router.post(
   '/',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   asyncHandler(async (req, res) => {
     const validation = validateOfferingBody(req.body);
 
@@ -113,7 +112,7 @@ router.post(
 router.get(
   '/me',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   asyncHandler(async (req, res) => {
     const offerings = await getOfferingsForArtisanUser((req as any).user.firebaseUid);
 
@@ -198,7 +197,7 @@ router.get(
 router.patch(
   '/:id',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   asyncHandler(async (req, res) => {
     const validation = validateOfferingBody(req.body, true);
 
@@ -229,7 +228,7 @@ router.patch(
 router.delete(
   '/:id',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   asyncHandler(async (req, res) => {
     const result = await deleteOfferingForArtisan({
       offeringId: String(req.params.id),
