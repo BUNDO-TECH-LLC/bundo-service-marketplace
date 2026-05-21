@@ -34,8 +34,16 @@ export async function validateSignupEmail(raw: string) {
   }
 
   try {
-    await Promise.any([dns.resolve4(domain), dns.resolve6(domain)]);
-    return { email, domainReachable: true as const };
+    let lastError: unknown;
+    for (const lookup of [dns.resolve4(domain), dns.resolve6(domain)]) {
+      try {
+        await lookup;
+        return { email, domainReachable: true as const };
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError;
   } catch {
     throw new ValidationError(
       'This email domain does not look reachable. Check the address or try another email provider.'
