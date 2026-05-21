@@ -11,8 +11,28 @@ import {
   updateUserPhone,
   updateUserRole,
 } from './users.service';
+import { validateSignupEmail } from './emailValidation.service';
 
 const router = Router();
+
+router.post(
+  '/validate-email',
+  asyncHandler(async (req, res) => {
+    const { email } = req.body;
+
+    if (typeof email !== 'string') {
+      throw new ValidationError('email is required');
+    }
+
+    const result = await validateSignupEmail(email);
+
+    res.json({
+      message: 'Email looks valid',
+      email: result.email,
+      domainReachable: result.domainReachable,
+    });
+  })
+);
 
 router.patch(
   '/role',

@@ -7,11 +7,11 @@ import {
   signOut,
   updateProfile,
 } from 'firebase/auth';
-import { api, ApiError } from '../lib/api';
+import { api } from '../lib/api';
 import { auth, firebaseReady } from '../lib/firebase';
 import { markArtisanApplicant } from '../lib/artisanApplication';
 import type { AuthDrawerPrompt } from '../lib/authDrawerPrompt';
-import { validateEmailAddress } from '../lib/emailValidation';
+import { checkEmailDeliverability, validateEmailAddress } from '../lib/emailValidation';
 import {
   clearSessionSignupIntent,
   needsEmailVerification,
@@ -29,7 +29,6 @@ import { userDisplayName } from '../lib/userDisplayName';
 import type { ApiUser, Role } from '../types';
 import type { SignupRole, View, WorkspaceSection } from '../appTypes';
 import bundoLogo from '../assets/bundo-logo.png';
-import { EmailInboxHint } from '../components/EmailInboxHint';
 import { sendBundoEmailVerification } from '../lib/authEmailVerification';
 import { signInWithGooglePopup } from '../lib/authSessionFlow';
 import { LegalLinks } from '../components/LegalLinks';
@@ -130,13 +129,11 @@ export function AuthBox({
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
-  const [authStep, setAuthStep] = useState<'account' | 'verify'>('account');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [signupIntent, setSignupIntent] = useState<SignupRole | null>(null);
   const [pendingAuthUser, setPendingAuthUser] = useState<User | null>(null);
-  const [pendingEmailVerificationUser, setPendingEmailVerificationUser] = useState<User | null>(null);
 
   const narrowViewport = useMediaQuery('(max-width: 768px)');
   const topbarPanelEl = useElementById(
@@ -191,9 +188,7 @@ export function AuthBox({
       markArtisanApplicant();
       onNavigate('home');
       onNotice('Complete your artisan profile and verification. You will become an artisan after admin approval.');
-    } else if (authMode === 'signup') {
-      onNotice('Account created. Welcome to Bundo.');
-    } else {
+    } else if (authMode !== 'signup') {
       onNotice('Signed in');
     }
 
@@ -205,73 +200,39 @@ export function AuthBox({
     setPhone('');
     setSignupIntent(null);
     setPendingAuthUser(null);
-    setPendingEmailVerificationUser(null);
-    setAuthStep('account');
     clearSessionSignupIntent();
   }
 
-  async function sendVerification(user: User) {
+  async function queueVerificationEmail(user: User) {
     if (signupIntent === 'ARTISAN') {
       saveSessionSignupIntent('ARTISAN');
       savePendingSignupIntent(user.email, 'ARTISAN');
     }
     savePendingSignupPhone(user.email, phone.trim() || null);
-    await sendBundoEmailVerification(user);
-    setPendingEmailVerificationUser(user);
-    setAuthStep('verify');
-    onNotice('Verification email sent. Check your inbox and spam folder, then come back to continue.');
-  }
 
-  async function confirmEmailVerification() {
-    const user = pendingEmailVerificationUser || auth?.currentUser;
-
-    if (!user) {
-      onNotice('Sign in again so we can check your verification status.');
-      return;
-    }
-
-    setSubmitting(true);
     try {
-      await user.reload();
-      const refreshedUser = auth?.currentUser || user;
-
-      if (!refreshedUser.emailVerified) {
-        onNotice(
-          'Email is not verified yet. Open the link in your inbox (or spam folder), then try again.'
-        );
-        return;
-      }
-
-      await finishAuth(refreshedUser, 'signup', true);
-    } catch (error) {
-      const message =
-        error instanceof ApiError
-          ? error.message
-          : error instanceof Error
-            ? error.message
-            : 'Could not check verification status';
-      onNotice(message);
-    } finally {
-      setSubmitting(false);
+      await sendBundoEmailVerification(user);
+      return true;
+    } catch {
+      return false;
     }
   }
 
-  async function resendVerification() {
-    const user = pendingEmailVerificationUser || auth?.currentUser;
-
-    if (!user) {
-      onNotice('Sign in again so we can send a verification email.');
-      return;
+  async function validateSignupEmailField() {
+    if (!validateEmailField()) {
+      return false;
     }
 
-    setSubmitting(true);
-    try {
-      await sendVerification(user);
-    } catch (error) {
-      onNotice(error instanceof Error ? error.message : 'Could not send verification email');
-    } finally {
-      setSubmitting(false);
+    const deliverability = await checkEmailDeliverability(email);
+    if (!deliverability.ok) {
+      setEmailError(deliverability.message);
+      onNotice(deliverability.message);
+      return false;
     }
+
+    setEmail(deliverability.normalized);
+    setEmailError('');
+    return true;
   }
 
   async function resetPassword(event: FormEvent) {
@@ -288,7 +249,6 @@ export function AuthBox({
       await sendBundoPasswordResetEmail(email.trim());
       onNotice('Password reset email sent. Check your inbox and spam folder.');
       setMode('login');
-      setAuthStep('account');
       setPassword('');
     } catch (error) {
       onNotice(error instanceof Error ? error.message : 'Could not send password reset email');
@@ -304,7 +264,11 @@ export function AuthBox({
       return;
     }
 
-    if (!validateEmailField()) {
+    if (mode === 'signup') {
+      if (!(await validateSignupEmailField())) {
+        return;
+      }
+    } else if (!validateEmailField()) {
       onNotice(emailError || 'Enter a valid email address.');
       return;
     }
@@ -347,19 +311,31 @@ export function AuthBox({
         }
       }
 
-      if (mode === 'signup' && !credential.user.emailVerified) {
-        await sendVerification(credential.user);
-        return;
+      const isPasswordAccount = credential.user.providerData.some(
+        (provider) => provider.providerId === 'password'
+      );
+      const needsVerify = isPasswordAccount && needsEmailVerification(credential.user);
+
+      let verificationSent = false;
+      if (needsVerify) {
+        verificationSent = await queueVerificationEmail(credential.user);
       }
 
-      if (mode === 'login' && credential.user.providerData.some((provider) => provider.providerId === 'password') && !credential.user.emailVerified) {
-        setPendingEmailVerificationUser(credential.user);
-        setAuthStep('verify');
-        onNotice('Please verify your email before continuing.');
-        return;
-      }
+      await finishAuth(credential.user, mode);
 
-      await finishAuth(credential.user);
+      if (mode === 'signup' && verificationSent) {
+        onNotice(
+          'Account created. We sent a verification link—confirm when you can. You can resend it anytime from Settings.'
+        );
+      } else if (mode === 'signup') {
+        onNotice(
+          'Account created. We could not send a verification email yet—you can resend it from Settings when you are ready.'
+        );
+      } else if (mode === 'login' && needsVerify && verificationSent) {
+        onNotice('Signed in. We sent a verification link—you can confirm or resend from Settings.');
+      } else if (mode === 'login' && needsVerify) {
+        onNotice('Signed in. Resend your verification email anytime from Settings.');
+      }
     } catch (error) {
       onNotice(error instanceof Error ? error.message : 'Could not sign in');
     } finally {
@@ -418,9 +394,7 @@ export function AuthBox({
     setConfirmPassword('');
     setPhone('');
     setPendingAuthUser(null);
-    setPendingEmailVerificationUser(null);
     setMode('login');
-    setAuthStep('account');
     if (prefillEmail) {
       setEmail(prefillEmail);
     }
@@ -434,9 +408,7 @@ export function AuthBox({
     saveSessionSignupIntent(intent);
     setConfirmPassword('');
     setPendingAuthUser(null);
-    setPendingEmailVerificationUser(null);
     setMode('signup');
-    setAuthStep('account');
     setDrawerOpen(true);
     onNotice('');
   }
@@ -446,9 +418,7 @@ export function AuthBox({
     setConfirmPassword('');
     setPhone('');
     setPendingAuthUser(null);
-    setPendingEmailVerificationUser(null);
     setMode('reset');
-    setAuthStep('account');
     if (prefillEmail) {
       setEmail(prefillEmail);
     }
@@ -687,40 +657,7 @@ export function AuthBox({
               </p>
             )}
 
-            {authStep === 'verify' ? (
-              <>
-                <p className="eyebrow">Verify your email</p>
-                <h2>Check your inbox</h2>
-                <p className="drawer-copy">
-                  We sent a verification link to {pendingEmailVerificationUser?.email || email || 'your email address'}.
-                  Open that link, then return here to continue into your Bundo account.
-                </p>
-                <EmailInboxHint email={pendingEmailVerificationUser?.email || email || undefined} />
-                <div className="auth-status-card">
-                  <strong>Email verification required</strong>
-                  <span>
-                    This helps protect bookings, messages, payments, and artisan verification from fake or mistyped accounts.
-                  </span>
-                </div>
-                <div className="auth-action-stack">
-                  <button type="button" onClick={() => void confirmEmailVerification()} disabled={submitting}>
-                    {submitting ? 'Checking...' : "I've verified my email"}
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() => void resendVerification()}
-                    disabled={submitting}
-                  >
-                    Resend verification email
-                  </button>
-                  <button type="button" className="mode-switch" onClick={() => openLogin()}>
-                    Back to login
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
+            <>
                 <p className="eyebrow">
                   {mode === 'reset' ? 'Reset access' : mode === 'login' ? 'Welcome back' : 'Create your account'}
                 </p>
@@ -869,8 +806,7 @@ export function AuthBox({
                 <button type="button" className="mode-switch" onClick={switchMode}>
               {mode === 'login' || mode === 'reset' ? 'New here? Sign up' : 'Already have an account? Login'}
             </button>
-              </>
-            )}
+            </>
       </AuthDrawer>
     </div>
   );

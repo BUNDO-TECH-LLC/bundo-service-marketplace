@@ -3,11 +3,6 @@ import type { NavigateFunction } from 'react-router-dom';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { ApiError } from '../lib/api';
 import { buildAppPath, legacyQueryToAppPath, parseAppPath } from '../lib/appPaths';
-import {
-  needsEmailVerification,
-  readPendingSignupPhone,
-  resolveSignupIntent,
-} from '../lib/authSignupStorage';
 import { auth } from '../lib/firebase';
 import { hasPushConfig } from '../lib/messaging';
 import { resolveApiSession } from '../lib/resolveApiSession';
@@ -135,38 +130,6 @@ export function useAppAuth({
           return;
         }
 
-        if (needsEmailVerification(user)) {
-          setToken('');
-          setMe(null);
-          clearPrivateDataRef.current();
-          setPushToken('');
-          setPushStatus(hasPushConfig() ? 'idle' : 'missing-config');
-          setRouteHydrated(true);
-          clearStoredRoute();
-          authBootstrapCompletedRef.current = false;
-          window.clearTimeout(authInitTimer);
-          if (!isAuthPathname(window.location.pathname)) {
-            navigateRef.current(
-              {
-                pathname: '/verify-email',
-                search: window.location.search,
-              },
-              {
-                replace: true,
-                state: {
-                  email: user.email ?? '',
-                  accountKind: resolveSignupIntent(user.email) || undefined,
-                  phone: readPendingSignupPhone(user.email) || undefined,
-                },
-              }
-            );
-          }
-          if (!isStale()) {
-            setAuthChecked(true);
-          }
-          return;
-        }
-
         if (authBootstrapCompletedRef.current) {
           try {
             const session = await resolveApiSession(user);
@@ -195,9 +158,7 @@ export function useAppAuth({
 
           if (!session.user.role) {
             finishAuthBootstrap();
-            setNoticeRef.current(
-              'Choose client or artisan to finish setting up your Bundo account before booking.'
-            );
+            setNoticeRef.current('Finishing your account setup…');
             if (!onAuthScreen) {
               navigateRef.current({ pathname: '/', search: '' }, { replace: true });
             }

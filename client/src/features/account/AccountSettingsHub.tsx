@@ -15,6 +15,7 @@ import { userDisplayName } from '../../lib/userDisplayName';
 import { ArtisanKycSection } from '../artisan/ArtisanKycSection';
 import { ArtisanPayoutSection } from '../artisan/ArtisanPayoutSection';
 import { BecomeArtisanButton } from './BecomeArtisanButton';
+import { EmailVerificationReminder } from './EmailVerificationReminder';
 import type { AccountSettingsSection, ActionRunner, PushStatus } from '../../appTypes';
 import type { ApiUser, Artisan, NotificationPreferences } from '../../types';
 
@@ -320,6 +321,13 @@ export function AccountSettingsHub({
         </p>
 
         <div className="account-settings-panels">
+          <EmailVerificationReminder
+            firebaseUser={firebaseUser}
+            busy={busy}
+            runAction={runAction}
+            onNotice={onNotice}
+          />
+
           {me.role === 'ARTISAN' && (
             <article id="account-settings-verification" className={`panel-card form-card ${panelClass('verification')}`}>
               <ArtisanKycSection

@@ -1156,6 +1156,35 @@ canvas {
   width: fit-content;
 }
 
+.settings-email-reminder {
+  grid-column: 1 / -1;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 35%, var(--line));
+  background: color-mix(in srgb, var(--color-accent-soft) 55%, var(--surface));
+}
+
+.settings-email-reminder-title {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.settings-email-reminder-copy {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.settings-email-reminder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
 .auth-form {
   display: grid;
   gap: 16px;

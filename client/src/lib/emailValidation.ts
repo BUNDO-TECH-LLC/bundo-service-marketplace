@@ -15,6 +15,8 @@ const COMMON_TYPOS: Record<string, string> = {
   'outlok.com': 'outlook.com',
 };
 
+import { api } from './api';
+
 export function validateEmailAddress(raw: string): EmailValidationResult {
   const normalized = raw.trim().toLowerCase();
 
@@ -48,4 +50,30 @@ export function validateEmailAddress(raw: string): EmailValidationResult {
   }
 
   return { ok: true, normalized };
+}
+
+export type EmailDeliverabilityResult =
+  | { ok: true; normalized: string }
+  | { ok: false; message: string };
+
+/** Format + typo check, then server MX/domain reachability for signup. */
+export async function checkEmailDeliverability(raw: string): Promise<EmailDeliverabilityResult> {
+  const format = validateEmailAddress(raw);
+  if (!format.ok) {
+    return format;
+  }
+
+  try {
+    await api<{ email: string }>('/users/validate-email', {
+      method: 'POST',
+      body: JSON.stringify({ email: format.normalized }),
+    });
+    return { ok: true, normalized: format.normalized };
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'Could not confirm this email domain. Try another address.';
+    return { ok: false, message };
+  }
 }
