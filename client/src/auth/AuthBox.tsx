@@ -9,7 +9,7 @@ import {
 } from 'firebase/auth';
 import { api } from '../lib/api';
 import { auth, firebaseReady } from '../lib/firebase';
-import { markArtisanApplicant } from '../lib/artisanApplication';
+import { artisanOnboardingEntryPath, markArtisanApplicant } from '../lib/artisanApplication';
 import type { AuthDrawerPrompt } from '../lib/authDrawerPrompt';
 import { checkEmailDeliverability, validateEmailAddress } from '../lib/emailValidation';
 import {
@@ -110,6 +110,7 @@ export function AuthBox({
   onWorkspaceSection,
   onNotice,
   onOpenAuth,
+  onNavigatePath,
 }: {
   firebaseUser: User | null;
   me: ApiUser | null;
@@ -121,6 +122,7 @@ export function AuthBox({
   onWorkspaceSection: (section: WorkspaceSection) => void;
   onNotice: (message: string) => void;
   onOpenAuth?: () => void;
+  onNavigatePath?: (path: string) => void;
 }) {
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
@@ -133,7 +135,7 @@ export function AuthBox({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [authStep, setAuthStep] = useState<'role' | 'account'>('account');
+  const [authStep, setAuthStep] = useState<'role' | 'artisan-confirm' | 'account'>('account');
   const [preferredRole, setPreferredRole] = useState<SignupRole | null>(null);
   const [pendingAuthUser, setPendingAuthUser] = useState<User | null>(null);
 
@@ -178,21 +180,20 @@ export function AuthBox({
       forceTokenRefresh,
     });
 
+    if (artisanIntent && session.user.role === 'CUSTOMER') {
+      markArtisanApplicant(session.user.firebaseUid);
+    }
+
     onReady(session.token, session.user);
 
     if (session.user.role === 'ARTISAN') {
-      onNavigate('home');
       onNotice(
         artisanIntent || authMode === 'signup'
           ? 'Your artisan onboarding is ready. Complete your profile, verification, and offerings for admin review.'
           : 'Your artisan account is active. Manage jobs, messages, and offerings from your workspace.'
       );
     } else if (artisanIntent && session.user.role === 'CUSTOMER') {
-      markArtisanApplicant();
-      onNavigate('home');
-      onNotice(
-        'Welcome to Bundo. Complete your artisan profile and verification—you will become an artisan after admin approval.'
-      );
+      onNotice('Account created. Continue with artisan onboarding on the next screen.');
     } else if (authMode === 'signup') {
       onNotice('Account created. Welcome to Bundo.');
     } else {
@@ -425,6 +426,11 @@ export function AuthBox({
       return;
     }
 
+    setAuthStep(role === 'ARTISAN' ? 'artisan-confirm' : 'account');
+    onNotice('');
+  }
+
+  function confirmArtisanRole() {
     setAuthStep('account');
     onNotice('');
   }
@@ -451,7 +457,7 @@ export function AuthBox({
     setConfirmPassword('');
     setPendingAuthUser(null);
     setMode('signup');
-    setAuthStep(role ? 'account' : 'role');
+    setAuthStep(role === 'ARTISAN' ? 'artisan-confirm' : role ? 'account' : 'role');
     setDrawerOpen(true);
     onNotice('');
   }
@@ -491,9 +497,13 @@ export function AuthBox({
       openResetPassword(prefillEmail);
     } else if (authDrawerPrompt.mode === 'choose-role') {
       if (firebaseUser && me) {
-        markArtisanApplicant();
-        onNavigate('home');
-        onNotice('Complete your artisan profile and verification to get approved.');
+        markArtisanApplicant(me.firebaseUid);
+        if (onNavigatePath) {
+          onNavigatePath(artisanOnboardingEntryPath(me.firebaseUid));
+        } else {
+          onNavigate('home');
+        }
+        onNotice('Continue with artisan onboarding.');
       } else {
         openSignup('ARTISAN');
       }
@@ -763,7 +773,32 @@ export function AuthBox({
               </p>
             )}
 
-            {mode === 'signup' && authStep === 'role' ? (
+            {mode === 'signup' && authStep === 'artisan-confirm' ? (
+              <>
+                <p className="eyebrow">Artisan account</p>
+                <h2>Confirm you want to offer services</h2>
+                <p className="drawer-copy">
+                  You are signing up as a <strong>service provider</strong>, not as a client. After you create your
+                  login, we will take you straight into artisan onboarding—profile, offerings, verification, and admin
+                  review—before you can receive bookings.
+                </p>
+                <div className="auth-status-card">
+                  <strong>What happens next</strong>
+                  <span>
+                    Create your account, see a short confirmation screen, then complete setup. Full artisan workspace
+                    access unlocks after verification is approved.
+                  </span>
+                </div>
+                <div className="auth-action-stack">
+                  <button type="button" onClick={confirmArtisanRole}>
+                    Continue — create artisan account
+                  </button>
+                  <button type="button" className="mode-switch" onClick={() => setAuthStep('role')}>
+                    Choose a different account type
+                  </button>
+                </div>
+              </>
+            ) : mode === 'signup' && authStep === 'role' ? (
               <>
                 <p className="eyebrow">Create your account</p>
                 <h2>How will you use Bundo?</h2>
@@ -833,7 +868,10 @@ export function AuthBox({
                 {mode === 'signup' && preferredRole && (
                   <div className="selected-role-banner">
                     <span>{preferredRole === 'ARTISAN' ? 'Artisan account' : 'Client account'}</span>
-                    <button type="button" onClick={() => setAuthStep('role')}>
+                    <button
+                      type="button"
+                      onClick={() => setAuthStep(preferredRole === 'ARTISAN' ? 'artisan-confirm' : 'role')}
+                    >
                       Change
                     </button>
                   </div>

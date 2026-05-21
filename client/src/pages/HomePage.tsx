@@ -1,8 +1,14 @@
+import { useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
 import { AppPromo, Footer, Hero, ServicesSection, WhySection } from '../features/marketing';
 import { MarketplacePreview } from '../features/marketplace';
-import { ArtisanLanding } from '../features/artisan/ArtisanLanding';
 import { buildAppPath } from '../lib/appPaths';
-import { clearArtisanApplicant, isArtisanApplicantSession, markArtisanApplicant } from '../lib/artisanApplication';
+import {
+  artisanOnboardingEntryPath,
+  clearArtisanApplicant,
+  isArtisanApplicantSession,
+  markArtisanApplicant,
+} from '../lib/artisanApplication';
 import { nigeriaStates } from '../lib/geo';
 import { LoggedInHome } from '../views/LoggedInHome';
 import { useAppRoot } from '../app/appRootContext';
@@ -10,43 +16,24 @@ import { useAppRoot } from '../app/appRootContext';
 export default function HomePage() {
   const ctx = useAppRoot();
 
-  const showArtisanOnboarding =
-    ctx.me?.role === 'ARTISAN' ||
-    (ctx.me?.role === 'CUSTOMER' && isArtisanApplicantSession());
+  useEffect(() => {
+    if (!ctx.me) {
+      return;
+    }
+
+    if (ctx.me.role === 'CUSTOMER' && isArtisanApplicantSession(ctx.me.firebaseUid)) {
+      ctx.navigate(artisanOnboardingEntryPath(ctx.me.firebaseUid), { replace: true });
+    }
+  }, [ctx.me, ctx.navigate]);
 
   if (ctx.isAuthed && ctx.me) {
     if (ctx.me.role === 'ARTISAN') {
-      clearArtisanApplicant();
+      clearArtisanApplicant(ctx.me.firebaseUid);
+      return <Navigate to="/artisan/onboarding" replace />;
     }
 
-    if (showArtisanOnboarding) {
-      return (
-        <ArtisanLanding
-          token={ctx.token}
-          categories={ctx.categories}
-          offerings={ctx.myOfferings}
-          bookings={ctx.bookings}
-          firebaseUser={ctx.firebaseUser}
-          busy={ctx.busy}
-          runAction={ctx.withNotice}
-          refresh={async () => {
-            await ctx.loadPublicData();
-            await ctx.loadPrivateData();
-          }}
-          openBookings={() => {
-            ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'bookings' }));
-          }}
-          openMessages={() => {
-            ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'messages' }));
-          }}
-          openReviews={() => {
-            ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'reviews' }));
-          }}
-          openProfile={() => {
-            ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'profile' }));
-          }}
-        />
-      );
+    if (ctx.me.role === 'CUSTOMER' && isArtisanApplicantSession(ctx.me.firebaseUid)) {
+      return null;
     }
 
     return (
@@ -83,9 +70,12 @@ export default function HomePage() {
           ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'bookings' }));
         }}
         onBecomeArtisan={() => {
-          markArtisanApplicant();
-          ctx.setNotice('Complete your artisan profile and verification to get approved.');
-          ctx.navigate('/');
+          if (!ctx.me) {
+            return;
+          }
+          markArtisanApplicant(ctx.me.firebaseUid);
+          ctx.setNotice('Continue with artisan onboarding.');
+          ctx.navigate(artisanOnboardingEntryPath(ctx.me.firebaseUid));
         }}
       />
     );

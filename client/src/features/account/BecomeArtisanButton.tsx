@@ -20,7 +20,7 @@ export function BecomeArtisanButton({
       className="secondary-button become-artisan-button"
       disabled={busy}
       onClick={() => {
-        markArtisanApplicant();
+        markArtisanApplicant(me.firebaseUid);
         onStart();
       }}
     >

@@ -5,7 +5,7 @@ import { AuthLayout } from '../../layouts/AuthLayout';
 import { ApiError } from '../../lib/api';
 import { EmailInboxHint } from '../../components/EmailInboxHint';
 import { sendBundoEmailVerification } from '../../lib/authEmailVerification';
-import { markArtisanApplicant } from '../../lib/artisanApplication';
+import { artisanOnboardingEntryPath, markArtisanApplicant } from '../../lib/artisanApplication';
 import { buildAuthDrawerSearch } from '../../lib/authDrawerPrompt';
 import { readPendingSignupPhone, resolveSignupIntent } from '../../lib/authSignupStorage';
 import { finalizeAuthSession } from '../../lib/authSessionFlow';
@@ -145,8 +145,8 @@ export function EmailVerificationPage() {
     await ctx.loadPrivateData(session.token, session.user).catch(() => undefined);
 
     if (signupIntent === 'ARTISAN') {
-      markArtisanApplicant();
-      navigate('/', { replace: true });
+      markArtisanApplicant(session.user.firebaseUid);
+      navigate(artisanOnboardingEntryPath(session.user.firebaseUid), { replace: true });
       return;
     }
 

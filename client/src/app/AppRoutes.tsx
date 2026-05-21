@@ -12,6 +12,8 @@ const WorkspacePage = lazy(() => import('../pages/WorkspacePage'));
 const AdminPage = lazy(() => import('../pages/AdminPage'));
 const HelpPage = lazy(() => import('../pages/HelpPage'));
 const ArtisanProfileRoute = lazy(() => import('../pages/ArtisanProfileRoute'));
+const ArtisanOnboardingPage = lazy(() => import('../pages/ArtisanOnboardingPage'));
+const ArtisanOnboardingWelcomePage = lazy(() => import('../pages/ArtisanOnboardingWelcomePage'));
 const LoadingPage = lazy(() => import('../pages/LoadingPage'));
 
 function PageFallback() {
@@ -47,6 +49,8 @@ export function AppRoutes() {
           <Route path="terms" element={<TermsPage />} />
           <Route path="privacy" element={<PrivacyPage />} />
           <Route path="artisans/:artisanId" element={<ArtisanProfileRoute />} />
+          <Route path="artisan/onboarding/welcome" element={<ArtisanOnboardingWelcomePage />} />
+          <Route path="artisan/onboarding" element={<ArtisanOnboardingPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

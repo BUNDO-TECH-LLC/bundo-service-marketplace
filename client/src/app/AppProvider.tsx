@@ -8,6 +8,7 @@ import { useAppAuth } from '../hooks/useAppAuth';
 import { useAppData } from '../hooks/useAppData';
 import { useAppPush } from '../hooks/useAppPush';
 import { useAppRouteSync } from '../hooks/useAppRouteSync';
+import { isArtisanApplicantSession } from '../lib/artisanApplication';
 import { useMarketplaceFilters } from '../hooks/useMarketplaceFilters';
 import type { ApiUser } from '../types';
 import { AppRootContext, type AppRootValue } from './appRootContext';
@@ -78,7 +79,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     isAuthed && Boolean(auth.me?.role) && !auth.routeHydrated && !onAuthScreen;
   // Only block the shell while restoring a signed-in session — not on the initial Firebase check.
   const isAppBootstrapping = isRestoringAuthedRoute;
-  const usesArtisanSetupHeader = isAuthed && auth.me?.role === 'ARTISAN' && routeSync.view === 'home';
+  const onArtisanOnboardingRoute = location.pathname.startsWith('/artisan/onboarding');
+  const usesArtisanSetupHeader =
+    isAuthed &&
+    onArtisanOnboardingRoute &&
+    (auth.me?.role === 'ARTISAN' ||
+      (auth.me?.role === 'CUSTOMER' && isArtisanApplicantSession(auth.me.firebaseUid)));
   const usesArtisanWorkspaceHeader = isAuthed && auth.me?.role === 'ARTISAN' && routeSync.view === 'workspace';
   const hideGlobalHeader =
     isAuthed && (auth.me?.role === 'ADMIN' || usesArtisanSetupHeader || usesArtisanWorkspaceHeader);

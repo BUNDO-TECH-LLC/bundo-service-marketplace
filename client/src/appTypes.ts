@@ -1,6 +1,13 @@
 import type { ApiUser, Artisan, ArtisanKycSubmission, Category, Offering, PortfolioImage, Review, Role } from './types';
 
-export type View = 'home' | 'marketplace' | 'workspace' | 'admin' | 'help' | 'artisan-profile';
+export type View =
+  | 'home'
+  | 'marketplace'
+  | 'workspace'
+  | 'admin'
+  | 'help'
+  | 'artisan-profile'
+  | 'artisan-onboarding';
 export type WorkspaceSection =
   | 'overview'
   | 'bookings'

@@ -14,6 +14,7 @@ import {
 import { userDisplayName } from '../../lib/userDisplayName';
 import { ArtisanKycSection } from '../artisan/ArtisanKycSection';
 import { ArtisanPayoutSection } from '../artisan/ArtisanPayoutSection';
+import { artisanOnboardingEntryPath, markArtisanApplicant } from '../../lib/artisanApplication';
 import { BecomeArtisanButton } from './BecomeArtisanButton';
 import { EmailVerificationReminder } from './EmailVerificationReminder';
 import type { AccountSettingsSection, ActionRunner, PushStatus } from '../../appTypes';
@@ -358,8 +359,9 @@ export function AccountSettingsHub({
                 me={me}
                 busy={busy}
                 onStart={() => {
-                  onNavigate('/');
-                  onNotice('Complete your artisan profile and verification to get approved.');
+                  markArtisanApplicant(me.firebaseUid);
+                  onNavigate(artisanOnboardingEntryPath(me.firebaseUid));
+                  onNotice('Continue with artisan onboarding.');
                 }}
               />
             </article>

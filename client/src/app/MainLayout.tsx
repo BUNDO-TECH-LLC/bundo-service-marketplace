@@ -15,6 +15,7 @@ import { PaymentSuccessDialog } from '../components/PaymentSuccessDialog';
 import { ArtisanAppHeader } from '../features/artisan/ArtisanAppHeader';
 import { BookingSuccessDialog } from '../features/booking/BookingSuccessDialog';
 import { SignedInTopbarNav } from './SignedInTopbarNav';
+import { artisanOnboardingEntryPath, isArtisanApplicantSession } from '../lib/artisanApplication';
 import { useAppRoot } from './appRootContext';
 
 export function MainLayout() {
@@ -178,6 +179,13 @@ export function MainLayout() {
                   if (!onAdminRoute) {
                     ctx.navigate('/admin/overview');
                   }
+                } else if (nextUser.role === 'ARTISAN') {
+                  ctx.navigate('/artisan/onboarding');
+                } else if (
+                  nextUser.role === 'CUSTOMER' &&
+                  isArtisanApplicantSession(nextUser.firebaseUid)
+                ) {
+                  ctx.navigate(artisanOnboardingEntryPath(nextUser.firebaseUid));
                 } else if (nextUser.role === 'CUSTOMER') {
                   ctx.navigate('/');
                 }
@@ -190,6 +198,10 @@ export function MainLayout() {
                   return;
                 }
                 ctx.navigate(buildAppPath({ view: nextView }));
+              }}
+              onNavigatePath={(path) => {
+                closeMobileNav();
+                ctx.navigate(path);
               }}
               onWorkspaceSection={(section) => {
                 closeMobileNav();
