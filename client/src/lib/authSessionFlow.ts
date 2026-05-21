@@ -64,7 +64,7 @@ export async function finalizeAuthSession(
   const rememberedRole = readPendingSignupRole(firebaseUser.email);
   const intendedRole =
     options.mode === 'signup'
-      ? 'CUSTOMER'
+      ? options.intendedRole ?? rememberedRole
       : options.intendedRole || rememberedRole;
 
   if (options.phone?.trim()) {

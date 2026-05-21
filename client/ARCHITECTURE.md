@@ -25,7 +25,7 @@ main.tsx
 | `/verify-email` | `EmailVerificationPage` | `AuthLayout` |
 | `/loading` | `LoadingPage` | none |
 
-Login, signup, and password reset use the header **auth drawer** on `MainLayout`. Signup is **auth first, role second**: account form (phone required) → email verify (if needed) → client/artisan choice. Marketing links (`?role=artisan`) pre-select artisan on the role step only. Legacy paths redirect to `/?auth=…` (see `authDrawerPrompt.ts`, `AuthDrawerRedirect.tsx`).
+Login, signup, and password reset use the header **auth drawer** on `MainLayout`. Signup is **role first** (Upwork-style): choose client or artisan → account form (phone required) → sign in without blocking on email verify (reminder in Settings). Artisan signups stay `CUSTOMER` until admin KYC approval, with artisan onboarding shown via session intent. Marketing links (`?auth=signup&role=artisan`) skip to the account step with artisan pre-selected. Legacy paths redirect to `/?auth=…` (see `authDrawerPrompt.ts`, `AuthDrawerRedirect.tsx`).
 
 ## Folder layout
 
