@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 import type { ActionRunner } from '../../appTypes';
 import type { PayoutBank, ProviderPayoutAccount } from '../../types';
 
@@ -14,6 +14,7 @@ export function ArtisanPayoutSection({
 }) {
   const [payoutAccount, setPayoutAccount] = useState<ProviderPayoutAccount | null>(null);
   const [banks, setBanks] = useState<PayoutBank[]>([]);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     let mounted = true;
@@ -67,8 +68,10 @@ export function ArtisanPayoutSection({
     >
       <h2>Payout bank account</h2>
       <p className="muted">
-        Add the Nigerian bank account where approved completed-service payouts should be sent.
+        Add the Nigerian bank account where approved completed-service payouts should be sent. Use a
+        10-digit account number with no spaces.
       </p>
+      {loadError && <p className="auth-field-error">{loadError}</p>}
       {payoutAccount && (
         <div className="payment-note success">
           <strong>{payoutAccount.accountName || 'Saved payout account'}</strong>

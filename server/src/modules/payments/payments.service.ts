@@ -372,6 +372,12 @@ function normalizeNigerianAccountNumber(raw: string) {
   return raw.replace(/\s+/g, '').replace(/-/g, '');
 }
 
+function isUniqueConstraintError(error: unknown) {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
+  );
+}
+
 export const createOrUpdatePayoutAccount = async (input: {
   artisanUserId: string;
   bankCode: string;
@@ -391,6 +397,8 @@ export const createOrUpdatePayoutAccount = async (input: {
 
   const bankCode = input.bankCode.trim();
   const accountNumber = normalizeNigerianAccountNumber(input.accountNumber);
+  const accountNameInput = input.accountName?.trim() || undefined;
+  const bankNameInput = input.bankName?.trim() || undefined;
 
   if (!/^\d{10}$/.test(accountNumber)) {
     return {
@@ -399,11 +407,32 @@ export const createOrUpdatePayoutAccount = async (input: {
     };
   }
 
+  const existing = await db.providerPayoutAccount.findUnique({
+    where: { artisanId: artisan.id },
+  });
+
+  if (
+    existing &&
+    existing.bankCode === bankCode &&
+    existing.accountNumber === accountNumber
+  ) {
+    const account = await db.providerPayoutAccount.update({
+      where: { artisanId: artisan.id },
+      data: {
+        isVerified: true,
+        ...(bankNameInput !== undefined ? { bankName: bankNameInput } : {}),
+        ...(accountNameInput !== undefined ? { accountName: accountNameInput } : {}),
+      },
+    });
+
+    return { status: 'saved' as const, account };
+  }
+
   let recipient;
 
   try {
     recipient = await createPaystackTransferRecipient({
-      name: (input.accountName || artisan.displayName).trim(),
+      name: accountNameInput || artisan.displayName.trim(),
       accountNumber,
       bankCode,
     });
@@ -413,27 +442,80 @@ export const createOrUpdatePayoutAccount = async (input: {
     return { status: 'paystack_error' as const, message };
   }
 
-  const bankName = input.bankName?.trim() || recipient.data.details?.bank_name;
-  const accountName = input.accountName?.trim() || recipient.data.details?.account_name;
+  const recipientCode = recipient.data?.recipient_code?.trim();
+
+  if (!recipientCode) {
+    return {
+      status: 'paystack_error' as const,
+      message: 'Paystack did not return a payout recipient code. Try again in a moment.',
+    };
+  }
+
+  const bankName = bankNameInput || recipient.data.details?.bank_name;
+  const accountName = accountNameInput || recipient.data.details?.account_name;
   const payoutAccountData = {
     bankCode,
     accountNumber,
-    paystackRecipientCode: recipient.data.recipient_code,
+    paystackRecipientCode: recipientCode,
     isVerified: true,
     ...(bankName !== undefined ? { bankName } : {}),
     ...(accountName !== undefined ? { accountName } : {}),
   };
 
-  const account = await db.providerPayoutAccount.upsert({
-    where: { artisanId: artisan.id },
-    update: payoutAccountData,
-    create: {
-      artisanId: artisan.id,
-      ...payoutAccountData,
-    },
+  const recipientOwner = await db.providerPayoutAccount.findUnique({
+    where: { paystackRecipientCode: recipientCode },
   });
 
-  return { status: 'saved' as const, account };
+  if (recipientOwner && recipientOwner.artisanId !== artisan.id) {
+    return {
+      status: 'paystack_error' as const,
+      message:
+        'This bank account is already linked to another Bundo profile. Use a different account or contact support.',
+    };
+  }
+
+  try {
+    if (existing) {
+      const account = await db.providerPayoutAccount.update({
+        where: { artisanId: artisan.id },
+        data: payoutAccountData,
+      });
+
+      return { status: 'saved' as const, account };
+    }
+
+    const account = await db.providerPayoutAccount.create({
+      data: {
+        artisanId: artisan.id,
+        ...payoutAccountData,
+      },
+    });
+
+    return { status: 'saved' as const, account };
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) {
+      throw error;
+    }
+
+    const linked = await db.providerPayoutAccount.findUnique({
+      where: { artisanId: artisan.id },
+    });
+
+    if (linked) {
+      const account = await db.providerPayoutAccount.update({
+        where: { artisanId: artisan.id },
+        data: payoutAccountData,
+      });
+
+      return { status: 'saved' as const, account };
+    }
+
+    return {
+      status: 'paystack_error' as const,
+      message:
+        'Could not save this payout account because it conflicts with an existing record. Try again or contact support.',
+    };
+  }
 };
 
 export const getPayoutAccountForArtisanUser = async (artisanUserId: string) => {

@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const findUniqueArtisan = vi.fn();
-const upsertPayoutAccount = vi.fn();
+const findPayoutAccount = vi.fn();
+const updatePayoutAccount = vi.fn();
+const createPayoutAccount = vi.fn();
 const createPaystackTransferRecipient = vi.fn();
 
 vi.mock('../artisans/artisans.service', () => ({
@@ -16,7 +18,9 @@ vi.mock('./paystack.service', () => ({
 vi.mock('../../db/client', () => ({
   default: {
     providerPayoutAccount: {
-      upsert: (...args: unknown[]) => upsertPayoutAccount(...args),
+      findUnique: (...args: unknown[]) => findPayoutAccount(...args),
+      update: (...args: unknown[]) => updatePayoutAccount(...args),
+      create: (...args: unknown[]) => createPayoutAccount(...args),
     },
   },
 }));
@@ -24,7 +28,9 @@ vi.mock('../../db/client', () => ({
 describe('createOrUpdatePayoutAccount', () => {
   beforeEach(() => {
     findUniqueArtisan.mockReset();
-    upsertPayoutAccount.mockReset();
+    findPayoutAccount.mockReset();
+    updatePayoutAccount.mockReset();
+    createPayoutAccount.mockReset();
     createPaystackTransferRecipient.mockReset();
 
     findUniqueArtisan.mockResolvedValue({
@@ -32,6 +38,7 @@ describe('createOrUpdatePayoutAccount', () => {
       userId: 'uid-1',
       displayName: 'Test Artisan',
     });
+    findPayoutAccount.mockResolvedValue(null);
   });
 
   it('rejects non-10-digit account numbers before calling Paystack', async () => {
@@ -74,7 +81,7 @@ describe('createOrUpdatePayoutAccount', () => {
         },
       },
     });
-    upsertPayoutAccount.mockResolvedValue({
+    createPayoutAccount.mockResolvedValue({
       id: 'payout-1',
       artisanId: 'artisan-1',
       bankCode: '058',
@@ -97,6 +104,47 @@ describe('createOrUpdatePayoutAccount', () => {
       accountNumber: '0123456789',
       bankCode: '058',
     });
-    expect(upsertPayoutAccount).toHaveBeenCalled();
+    expect(createPayoutAccount).toHaveBeenCalled();
+  });
+
+  it('updates existing payout row without creating a duplicate recipient code', async () => {
+    findPayoutAccount
+      .mockResolvedValueOnce({
+        id: 'payout-1',
+        artisanId: 'artisan-1',
+        bankCode: '058',
+        accountNumber: '0123456789',
+        paystackRecipientCode: 'RCP_old',
+        isVerified: true,
+      })
+      .mockResolvedValueOnce(null);
+
+    createPaystackTransferRecipient.mockResolvedValue({
+      data: {
+        recipient_code: 'RCP_new',
+        details: { account_name: 'Test Artisan', bank_name: 'GTBank' },
+      },
+    });
+
+    updatePayoutAccount.mockResolvedValue({
+      id: 'payout-1',
+      artisanId: 'artisan-1',
+      bankCode: '044',
+      accountNumber: '9876543210',
+      paystackRecipientCode: 'RCP_new',
+      isVerified: true,
+    });
+
+    const { createOrUpdatePayoutAccount } = await import('./payments.service');
+
+    const result = await createOrUpdatePayoutAccount({
+      artisanUserId: 'uid-1',
+      bankCode: '044',
+      accountNumber: '9876543210',
+    });
+
+    expect(result.status).toBe('saved');
+    expect(updatePayoutAccount).toHaveBeenCalled();
+    expect(createPayoutAccount).not.toHaveBeenCalled();
   });
 });
