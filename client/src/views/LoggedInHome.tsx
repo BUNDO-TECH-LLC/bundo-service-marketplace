@@ -9,7 +9,6 @@ import { userDisplayName } from '../lib/userDisplayName';
 import type { ActionRunner, BookingSuccessState } from '../appTypes';
 import type { ApiUser, Artisan, Booking, Category, Offering } from '../types';
 import { EmptyState } from '../components/EmptyState';
-import { BecomeArtisanButton } from '../features/account/BecomeArtisanButton';
 
 export function LoggedInHome({
   me,
@@ -30,7 +29,6 @@ export function LoggedInHome({
   reloadPrivate,
   onBookingSuccess,
   openBookings,
-  onBecomeArtisan,
 }: {
   me: ApiUser;
   firebaseUser: User | null;
@@ -50,7 +48,6 @@ export function LoggedInHome({
   reloadPrivate: () => Promise<void>;
   onBookingSuccess: (booking: BookingSuccessState) => void;
   openBookings: () => void;
-  onBecomeArtisan?: () => void;
 }) {
   const displayName = userDisplayName(firebaseUser, me);
   const recommendedOfferings = offerings.slice(0, 3);
@@ -96,11 +93,6 @@ export function LoggedInHome({
           <h1>
             Connect with artisans who <span>deliver.</span>
           </h1>
-          {me.role === 'CUSTOMER' && onBecomeArtisan && (
-            <div className="logged-hero-actions">
-              <BecomeArtisanButton me={me} busy={busy} onStart={() => onBecomeArtisan?.()} />
-            </div>
-          )}
           <form className="logged-hero-search" onSubmit={submitSearch}>
             <label>
               Search

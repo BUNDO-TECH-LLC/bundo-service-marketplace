@@ -19,7 +19,7 @@ export const helpTopics: HelpTopic[] = [
         heading: 'Account setup',
         questions: [
           ['How do I create an account?', 'Use Login or Sign up in the top navigation, then choose client or artisan during signup.'],
-          ['Can one account become an artisan?', 'Yes. Apply from profile settings, create a public artisan profile, submit KYC, and wait for admin approval before listing services.'],
+          ['Can one account become an artisan?', 'Yes. Go to Settings → Become an artisan, confirm you want to offer services, then complete onboarding, KYC, and admin approval before listing services publicly.'],
         ],
       },
     ],
@@ -53,7 +53,7 @@ export const helpTopics: HelpTopic[] = [
       {
         heading: 'Profile setup',
         questions: [
-          ['How do I become an artisan?', 'Choose artisan during signup or apply from profile settings, then create your profile and submit KYC.'],
+          ['How do I become an artisan?', 'Choose artisan during signup, or as a client open Settings → Become an artisan, confirm, then complete profile setup and KYC.'],
           ['When will customers see my profile?', 'Your profile becomes publicly discoverable after KYC and admin approval. This helps keep the marketplace trustworthy.'],
         ],
       },

@@ -118,9 +118,7 @@ export function AccountSettingsPanel({
               Every account starts as a client. To offer services on Bundo, complete artisan onboarding and identity
               verification. Your account switches to artisan only after admin approval.
             </p>
-            <div className="actions">
-              <BecomeArtisanButton me={me} busy={busy} onStart={onBecomeArtisan} />
-            </div>
+            <BecomeArtisanButton me={me} busy={busy} onStart={onBecomeArtisan} />
           </>
         )}
       </article>

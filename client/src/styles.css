@@ -1152,6 +1152,24 @@ canvas {
   margin-top: 16px;
 }
 
+.become-artisan-confirm {
+  display: grid;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.become-artisan-confirm-list {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.become-artisan-confirm-list li + li {
+  margin-top: 6px;
+}
+
 .become-artisan-button {
   width: fit-content;
 }

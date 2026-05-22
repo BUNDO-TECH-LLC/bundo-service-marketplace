@@ -14,7 +14,7 @@ import {
 import { userDisplayName } from '../../lib/userDisplayName';
 import { ArtisanKycSection } from '../artisan/ArtisanKycSection';
 import { ArtisanPayoutSection } from '../artisan/ArtisanPayoutSection';
-import { ARTISAN_ONBOARDING_PATH, markArtisanApplicant } from '../../lib/artisanApplication';
+import { ARTISAN_ONBOARDING_PATH } from '../../lib/artisanApplication';
 import { BecomeArtisanButton } from './BecomeArtisanButton';
 import { EmailVerificationReminder } from './EmailVerificationReminder';
 import type { AccountSettingsSection, ActionRunner, PushStatus } from '../../appTypes';
@@ -359,7 +359,6 @@ export function AccountSettingsHub({
                 me={me}
                 busy={busy}
                 onStart={() => {
-                  markArtisanApplicant(me.firebaseUid);
                   onNavigate(ARTISAN_ONBOARDING_PATH);
                   onNotice('Continue with artisan onboarding.');
                 }}

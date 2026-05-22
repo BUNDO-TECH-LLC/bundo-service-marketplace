@@ -7,7 +7,6 @@ import {
   ARTISAN_ONBOARDING_PATH,
   clearArtisanApplicant,
   isArtisanApplicantSession,
-  markArtisanApplicant,
 } from '../lib/artisanApplication';
 import { nigeriaStates } from '../lib/geo';
 import { LoggedInHome } from '../views/LoggedInHome';
@@ -68,14 +67,6 @@ export default function HomePage() {
         onBookingSuccess={ctx.setBookingSuccess}
         openBookings={() => {
           ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'bookings' }));
-        }}
-        onBecomeArtisan={() => {
-          if (!ctx.me) {
-            return;
-          }
-          markArtisanApplicant(ctx.me.firebaseUid);
-          ctx.setNotice('Continue with artisan onboarding.');
-          ctx.navigate(ARTISAN_ONBOARDING_PATH);
         }}
       />
     );
