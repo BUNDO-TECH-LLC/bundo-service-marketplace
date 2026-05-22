@@ -40,14 +40,17 @@ export function ArtisanPayoutSection({
   async function savePayoutAccount(formElement: HTMLFormElement) {
     const form = new FormData(formElement);
     const selectedBank = banks.find((bank) => bank.code === String(form.get('bankCode') || ''));
+    const accountNumber = String(form.get('accountNumber') || '')
+      .replace(/\s+/g, '')
+      .replace(/-/g, '');
     const response = await api<{ account: ProviderPayoutAccount }>('/artisans/payout-account', {
       method: 'POST',
       token,
       body: JSON.stringify({
-        bankCode: form.get('bankCode'),
+        bankCode: String(form.get('bankCode') || '').trim(),
         bankName: selectedBank?.name,
-        accountNumber: form.get('accountNumber'),
-        accountName: form.get('accountName'),
+        accountNumber,
+        accountName: String(form.get('accountName') || '').trim() || undefined,
       }),
     });
     setPayoutAccount(response.account);

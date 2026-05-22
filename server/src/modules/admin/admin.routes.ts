@@ -535,11 +535,22 @@ router.post('/bookings/:id/release-payment', asyncHandler(async (req, res) => {
   }
 
   if (result.status === 'missing_payout_account') {
-    throw httpError(409, 'Artisan payout account is missing or unverified');
+    throw httpError(
+      409,
+      'Artisan payout account is missing or unverified. Ask the artisan to add a bank account under Settings → Payout bank account.'
+    );
+  }
+
+  if (result.status === 'paystack_error') {
+    throw httpError(502, result.message, 'PAYSTACK_ERROR');
   }
 
   if (result.status === 'already_released') {
     throw httpError(409, 'Payment has already been released');
+  }
+
+  if (result.status !== 'released') {
+    throw httpError(500, 'Could not release payout');
   }
 
   res.json({
@@ -601,7 +612,14 @@ router.post('/disputes/:id/resolve', asyncHandler(async (req, res) => {
   }
 
   if (result.status === 'missing_payout_account') {
-    throw httpError(409, 'Artisan payout account is missing or unverified');
+    throw httpError(
+      409,
+      'Artisan payout account is missing or unverified. Ask the artisan to add a bank account under Settings → Payout bank account.'
+    );
+  }
+
+  if (result.status === 'paystack_error') {
+    throw httpError(502, result.message, 'PAYSTACK_ERROR');
   }
 
   if (result.status === 'blocked_by_dispute') {

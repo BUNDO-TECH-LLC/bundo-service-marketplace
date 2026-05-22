@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { asyncHandler } from '../../middlewares/errorHandler';
-import { httpError } from '../../utils/errors';
+import { BadGatewayError, httpError } from '../../utils/errors';
 import { Prisma, Role } from '@prisma/client';
 import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
 import { requireArtisanOrApplicant } from '../../middlewares/requireArtisanOrApplicant';
@@ -95,7 +95,10 @@ router.post(
       throw httpError(404, 'Create an artisan profile before submitting KYC');
     }
 
-    throw httpError(201, 'KYC submitted');
+    res.status(201).json({
+      message: 'KYC submitted',
+      submission,
+    });
   }
 );
 
@@ -432,7 +435,22 @@ router.post('/payout-account', verifyFirebaseToken, requireRole(Role.ARTISAN), a
     throw httpError(404, 'Create an artisan profile before adding payout details');
   }
 
-  throw httpError(201, 'Payout account saved');
+  if (result.status === 'invalid_account_number') {
+    throw httpError(400, result.message);
+  }
+
+  if (result.status === 'paystack_error') {
+    throw new BadGatewayError(result.message, 'PAYSTACK_ERROR');
+  }
+
+  if (result.status !== 'saved') {
+    throw httpError(500, 'Could not save payout account');
+  }
+
+  res.status(201).json({
+    message: 'Payout account saved',
+    account: result.account,
+  });
 }));
 
 router.get(

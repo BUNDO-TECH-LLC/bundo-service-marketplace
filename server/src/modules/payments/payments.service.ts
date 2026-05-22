@@ -368,6 +368,10 @@ export const markPaymentReferencePaid = async (reference: string) => {
   return { status: 'processed' as const, payment: updated };
 };
 
+function normalizeNigerianAccountNumber(raw: string) {
+  return raw.replace(/\s+/g, '').replace(/-/g, '');
+}
+
 export const createOrUpdatePayoutAccount = async (input: {
   artisanUserId: string;
   bankCode: string;
@@ -385,16 +389,35 @@ export const createOrUpdatePayoutAccount = async (input: {
     return { status: 'missing_artisan' as const };
   }
 
-  const recipient = await createPaystackTransferRecipient({
-    name: input.accountName || artisan.displayName,
-    accountNumber: input.accountNumber,
-    bankCode: input.bankCode,
-  });
-  const bankName = input.bankName || recipient.data.details?.bank_name;
-  const accountName = input.accountName || recipient.data.details?.account_name;
+  const bankCode = input.bankCode.trim();
+  const accountNumber = normalizeNigerianAccountNumber(input.accountNumber);
+
+  if (!/^\d{10}$/.test(accountNumber)) {
+    return {
+      status: 'invalid_account_number' as const,
+      message: 'Account number must be exactly 10 digits.',
+    };
+  }
+
+  let recipient;
+
+  try {
+    recipient = await createPaystackTransferRecipient({
+      name: (input.accountName || artisan.displayName).trim(),
+      accountNumber,
+      bankCode,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Could not verify bank account with Paystack';
+    return { status: 'paystack_error' as const, message };
+  }
+
+  const bankName = input.bankName?.trim() || recipient.data.details?.bank_name;
+  const accountName = input.accountName?.trim() || recipient.data.details?.account_name;
   const payoutAccountData = {
-    bankCode: input.bankCode,
-    accountNumber: input.accountNumber,
+    bankCode,
+    accountNumber,
     paystackRecipientCode: recipient.data.recipient_code,
     isVerified: true,
     ...(bankName !== undefined ? { bankName } : {}),
@@ -486,12 +509,21 @@ export const releaseBookingPayment = async (bookingId: string) => {
   }
 
   const reference = payoutReference(booking.id);
-  const transfer = await initiatePaystackTransfer({
-    amountKobo: toKobo(booking.payment.providerEarning),
-    recipientCode: booking.artisan.payoutAccount.paystackRecipientCode,
-    reason: `Bundo service payout for booking ${booking.id}`,
-    reference,
-  });
+
+  let transfer;
+
+  try {
+    transfer = await initiatePaystackTransfer({
+      amountKobo: toKobo(booking.payment.providerEarning),
+      recipientCode: booking.artisan.payoutAccount.paystackRecipientCode,
+      reason: `Bundo service payout for booking ${booking.id}`,
+      reference,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Paystack could not send this payout';
+    return { status: 'paystack_error' as const, message };
+  }
 
   const result = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const payout = await tx.payout.create({
