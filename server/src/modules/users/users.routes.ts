@@ -1,173 +1,109 @@
 import { Router } from 'express';
 import { Role } from '@prisma/client';
 import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
-import { asyncHandler } from '../../middlewares/errorHandler';
-import { ConflictError, NotFoundError, ValidationError } from '../../utils/errors';
-import { throwOnServiceStatus } from '../../utils/resultErrors';
-import {
-  deleteUserAccount,
-  updateUserFcmToken,
-  updateUserNotificationPreferences,
-  updateUserPhone,
-  updateUserRole,
-} from './users.service';
-import { validateSignupEmail } from './emailValidation.service';
+import { updateUserFcmToken, updateUserProfile, updateUserRole } from './users.service';
 
 const router = Router();
 
-router.post(
-  '/validate-email',
-  asyncHandler(async (req, res) => {
-    const { email } = req.body;
+router.patch('/role', verifyFirebaseToken, async (req, res) => {
+  const { role } = req.body;
 
-    if (typeof email !== 'string') {
-      throw new ValidationError('email is required');
-    }
-
-    const result = await validateSignupEmail(email);
-
-    res.json({
-      message: 'Email looks valid',
-      email: result.email,
-      domainReachable: result.domainReachable,
+  if (![Role.CUSTOMER, Role.ARTISAN].includes(role)) {
+    return res.status(400).json({
+      message: 'Role must be CUSTOMER or ARTISAN',
     });
-  })
-);
+  }
 
-router.patch(
-  '/role',
-  verifyFirebaseToken,
-  asyncHandler(async (req, res) => {
-    const { role } = req.body;
+  const result = await updateUserRole((req as any).user.firebaseUid, role);
 
-    if (![Role.CUSTOMER, Role.ARTISAN].includes(role)) {
-      throw new ValidationError('Role must be CUSTOMER or ARTISAN');
-    }
+  if (result.status === 'missing_user') {
+    return res.status(404).json({
+      message: 'User not found',
+    });
+  }
 
-    const result = await updateUserRole((req as any).user.firebaseUid, role);
-
-    throwOnServiceStatus(result.status, {
-      missing_user: new NotFoundError('User'),
-      locked_role: new ConflictError(
+  if (result.status === 'locked_role') {
+    return res.status(409).json({
+      message:
         'This role change requires admin support. Artisan accounts remain under verification control.',
-        'LOCKED_ROLE'
-      ),
     });
+  }
 
-    res.json({
-      message: 'Role updated',
+  return res.json({
+    message: 'Role updated',
+    user: result.user,
+  });
+});
+
+router.patch('/profile', verifyFirebaseToken, async (req, res) => {
+  const { phone } = req.body;
+  const data: { phone?: string | null } = {};
+
+  if (phone !== undefined) {
+    if (phone !== null && typeof phone !== 'string') {
+      return res.status(400).json({ message: 'phone must be a string' });
+    }
+
+    const trimmed = typeof phone === 'string' ? phone.trim() : '';
+    data.phone = trimmed || null;
+  }
+
+  if (!Object.keys(data).length) {
+    return res.status(400).json({ message: 'No profile fields provided' });
+  }
+
+  try {
+    const result = await updateUserProfile((req as any).user.firebaseUid, data);
+
+    if (result.status === 'no_fields') {
+      return res.status(400).json({ message: 'No profile fields provided' });
+    }
+
+    return res.json({
+      message: 'Profile updated',
       user: result.user,
     });
-  })
-);
-
-router.patch(
-  '/fcm-token',
-  verifyFirebaseToken,
-  asyncHandler(async (req, res) => {
-    const { fcmToken } = req.body;
-
-    if (typeof fcmToken !== 'string' || !fcmToken.trim()) {
-      throw new ValidationError('fcmToken is required');
+  } catch (error: unknown) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'P2002'
+    ) {
+      return res.status(409).json({ message: 'Phone number is already in use' });
     }
 
-    const user = await updateUserFcmToken((req as any).user.firebaseUid, fcmToken.trim());
+    throw error;
+  }
+});
 
-    res.json({
-      message: 'FCM token updated',
-      user,
+router.patch('/fcm-token', verifyFirebaseToken, async (req, res) => {
+  const { fcmToken } = req.body;
+
+  if (typeof fcmToken !== 'string' || !fcmToken.trim()) {
+    return res.status(400).json({
+      message: 'fcmToken is required',
     });
-  })
-);
+  }
 
-router.delete(
-  '/fcm-token',
-  verifyFirebaseToken,
-  asyncHandler(async (req, res) => {
-    const user = await updateUserFcmToken((req as any).user.firebaseUid, null);
+  const user = await updateUserFcmToken(
+    (req as any).user.firebaseUid,
+    fcmToken.trim()
+  );
 
-    res.json({
-      message: 'FCM token removed',
-      user,
-    });
-  })
-);
+  return res.json({
+    message: 'FCM token updated',
+    user,
+  });
+});
 
-router.patch(
-  '/phone',
-  verifyFirebaseToken,
-  asyncHandler(async (req, res) => {
-    const { phone } = req.body;
+router.delete('/fcm-token', verifyFirebaseToken, async (req, res) => {
+  const user = await updateUserFcmToken((req as any).user.firebaseUid, null);
 
-    if (typeof phone !== 'string') {
-      throw new ValidationError('phone is required');
-    }
-
-    const user = await updateUserPhone((req as any).user.firebaseUid, phone);
-
-    res.json({
-      message: 'Phone updated',
-      user,
-    });
-  })
-);
-
-router.patch(
-  '/notification-preferences',
-  verifyFirebaseToken,
-  asyncHandler(async (req, res) => {
-    const { bookings, messages, marketing } = req.body;
-    const patch: Record<string, boolean> = {};
-
-    if (bookings !== undefined) {
-      if (typeof bookings !== 'boolean') throw new ValidationError('bookings must be a boolean');
-      patch.bookings = bookings;
-    }
-    if (messages !== undefined) {
-      if (typeof messages !== 'boolean') throw new ValidationError('messages must be a boolean');
-      patch.messages = messages;
-    }
-    if (marketing !== undefined) {
-      if (typeof marketing !== 'boolean') throw new ValidationError('marketing must be a boolean');
-      patch.marketing = marketing;
-    }
-
-    if (!Object.keys(patch).length) {
-      throw new ValidationError('Provide at least one preference to update');
-    }
-
-    const result = await updateUserNotificationPreferences((req as any).user.firebaseUid, patch);
-
-    throwOnServiceStatus(result.status, {
-      missing_user: new NotFoundError('User'),
-    });
-
-    res.json({
-      message: 'Notification preferences updated',
-      preferences: result.preferences,
-    });
-  })
-);
-
-router.delete(
-  '/account',
-  verifyFirebaseToken,
-  asyncHandler(async (req, res) => {
-    const { confirm } = req.body;
-
-    if (confirm !== 'DELETE') {
-      throw new ValidationError('Send { "confirm": "DELETE" } to permanently delete your account.');
-    }
-
-    const result = await deleteUserAccount((req as any).user.firebaseUid);
-
-    throwOnServiceStatus(result.status, {
-      missing_user: new NotFoundError('User'),
-      locked_role: new ConflictError('Admin accounts cannot be deleted from the app.', 'LOCKED_ROLE'),
-    });
-
-    res.json({ message: 'Account deleted' });
-  })
-);
+  return res.json({
+    message: 'FCM token removed',
+    user,
+  });
+});
 
 export default router;

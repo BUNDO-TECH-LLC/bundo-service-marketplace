@@ -44,6 +44,9 @@ describe('findOrCreateUser', () => {
   });
 
   it('re-links an existing email row when firebase uid is new', async () => {
+    findUnique.mockReset();
+    update.mockReset();
+
     findUnique.mockResolvedValueOnce(null);
     findUnique.mockResolvedValueOnce({
       firebaseUid: 'old-uid',

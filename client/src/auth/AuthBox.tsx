@@ -1,199 +1,124 @@
-import { FormEvent, useEffect, useState, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { User } from 'firebase/auth';
 import {
   createUserWithEmailAndPassword,
+  GoogleAuthProvider,
+  sendEmailVerification,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signOut,
   updateProfile,
 } from 'firebase/auth';
-import { api } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 import { auth, firebaseReady } from '../lib/firebase';
-import { ARTISAN_ONBOARDING_PATH, markArtisanApplicant } from '../lib/artisanApplication';
-import type { AuthDrawerPrompt } from '../lib/authDrawerPrompt';
-import { checkEmailDeliverability, validateEmailAddress } from '../lib/emailValidation';
 import {
-  clearSessionSignupIntent,
+  clearPendingSignupRole,
   needsEmailVerification,
-  readPendingSignupIntent,
-  readPendingSignupPhone,
-  resolveSignupIntent,
-  savePendingSignupIntent,
-  savePendingSignupPhone,
+  readPendingSignupRole,
   savePendingSignupRole,
-  saveSessionSignupIntent,
 } from '../lib/authSignupStorage';
-import { finalizeAuthSession } from '../lib/authSessionFlow';
-import { sendBundoPasswordResetEmail } from '../lib/authEmailVerification';
 import { resolveApiSession } from '../lib/resolveApiSession';
 import { userDisplayName } from '../lib/userDisplayName';
 import type { ApiUser, Role } from '../types';
 import type { SignupRole, View, WorkspaceSection } from '../appTypes';
+import { AppIcon } from '../components/ui/AppIcon';
 import bundoLogo from '../assets/bundo-logo.png';
-import { sendBundoEmailVerification } from '../lib/authEmailVerification';
-import { signInWithGooglePopup } from '../lib/authSessionFlow';
-import { LegalLinks } from '../components/LegalLinks';
-import { PasswordInput } from '../components/PasswordInput';
-import {
-  IconAdmin,
-  IconBookings,
-  IconDashboard,
-  IconHelp,
-  IconMessages,
-  IconNotifications,
-  IconProfile,
-  IconReviews,
-  IconSettings,
-} from '../components/TopbarNavIcons';
-import { ProfileAccountMenu } from '../components/ProfileAccountMenu';
-import { useElementById } from '../hooks/useElementById';
-import { useMediaQuery } from '../hooks/useMediaQuery';
-
-function AuthDrawer({
-  open,
-  onClose,
-  ariaLabel,
-  children,
-}: {
-  open: boolean;
-  onClose: () => void;
-  ariaLabel: string;
-  children: ReactNode;
-}) {
-  useEffect(() => {
-    if (!open) return;
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    document.addEventListener('keydown', onKeyDown);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [open, onClose]);
-
-  if (!open) {
-    return null;
-  }
-
-  return createPortal(
-    <div className="auth-overlay" role="presentation" onClick={onClose}>
-      <aside
-        className="auth-drawer"
-        aria-label={ariaLabel}
-        aria-modal="true"
-        role="dialog"
-        onClick={(event) => event.stopPropagation()}
-      >
-        {children}
-      </aside>
-    </div>,
-    document.body
-  );
-}
 
 export function AuthBox({
   firebaseUser,
   me,
-  authDrawerPrompt = null,
-  onAuthDrawerPromptHandled,
+  authPromptSignal = 0,
   unreadCount,
   onReady,
   onNavigate,
   onWorkspaceSection,
   onNotice,
-  onOpenAuth,
-  onNavigatePath,
 }: {
   firebaseUser: User | null;
   me: ApiUser | null;
-  authDrawerPrompt?: AuthDrawerPrompt | null;
-  onAuthDrawerPromptHandled?: () => void;
+  authPromptSignal?: number;
   unreadCount: number;
   onReady: (token: string, user: ApiUser) => void;
   onNavigate: (view: View) => void;
   onWorkspaceSection: (section: WorkspaceSection) => void;
   onNotice: (message: string) => void;
-  onOpenAuth?: () => void;
-  onNavigatePath?: (path: string) => void;
 }) {
   const [email, setEmail] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [emailError, setEmailError] = useState('');
-  const [phone, setPhone] = useState('');
+  const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
+  const [authStep, setAuthStep] = useState<'role' | 'account' | 'verify'>('account');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [authStep, setAuthStep] = useState<'role' | 'account'>('account');
   const [preferredRole, setPreferredRole] = useState<SignupRole | null>(null);
   const [pendingAuthUser, setPendingAuthUser] = useState<User | null>(null);
+  const [pendingEmailVerificationUser, setPendingEmailVerificationUser] = useState<User | null>(null);
 
-  const narrowViewport = useMediaQuery('(max-width: 768px)');
-  const topbarPanelEl = useElementById(
-    firebaseUser && me?.role && narrowViewport ? 'topbar-mobile-panel' : null
-  );
+  useEffect(() => {
+    if (!authPromptSignal) return;
 
-  function combinedDisplayName() {
-    return `${firstName.trim()} ${lastName.trim()}`.trim();
-  }
-
-  function validateEmailField(value = email) {
-    const result = validateEmailAddress(value);
-    if (!result.ok) {
-      setEmailError(result.message);
-      return false;
+    if (firebaseUser && me && !me.role) {
+      setMode('signup');
+      setAuthStep('role');
+      setDrawerOpen(true);
+      return;
     }
 
-    setEmail(result.normalized);
-    setEmailError('');
-    return true;
-  }
+    setPreferredRole('ARTISAN');
+    setMode('signup');
+    setAuthStep('account');
+    setDrawerOpen(true);
+  }, [authPromptSignal]);
 
   async function finishAuth(
     firebaseAuthUser: User,
     authMode = mode,
-    roleOverride: SignupRole | null = preferredRole,
+    roleOverride = preferredRole,
     forceTokenRefresh = false
   ) {
-    const rememberedPhone = readPendingSignupPhone(firebaseAuthUser.email);
-    const phoneToApply =
-      authMode === 'signup' ? phone.trim() || rememberedPhone || undefined : undefined;
-    const resolvedRole = roleOverride || resolveSignupIntent(firebaseAuthUser.email, preferredRole);
-    const artisanIntent = resolvedRole === 'ARTISAN';
-    const intendedRole = resolvedRole === 'CUSTOMER' ? ('CUSTOMER' as const) : undefined;
+    const rememberedRole = readPendingSignupRole(firebaseAuthUser.email);
+    const intendedRole = roleOverride || rememberedRole;
+    let session = await resolveApiSession(firebaseAuthUser, forceTokenRefresh);
 
-    const { session } = await finalizeAuthSession(firebaseAuthUser, {
-      mode: authMode === 'login' ? 'login' : 'signup',
-      intendedRole,
-      phone: phoneToApply,
-      forceTokenRefresh,
-    });
-
-    if (artisanIntent && session.user.role === 'CUSTOMER') {
-      markArtisanApplicant(session.user.firebaseUid);
+    if (
+      intendedRole &&
+      session.user.role !== intendedRole &&
+      session.user.role !== 'ADMIN' &&
+      !(session.user.role === 'ARTISAN' && intendedRole === 'CUSTOMER')
+    ) {
+      await api('/users/role', {
+        method: 'PATCH',
+        token: session.token,
+        body: JSON.stringify({ role: intendedRole }),
+      });
+      const refreshed = await api<{ user: ApiUser }>('/me', { token: session.token });
+      session = {
+        token: session.token,
+        user: refreshed.user,
+      };
     }
 
-    onReady(session.token, session.user);
+    if (!session.user.role && session.user.role !== 'ADMIN') {
+      setPendingAuthUser(firebaseAuthUser);
+      setPreferredRole(rememberedRole);
+      setMode('signup');
+      setAuthStep(rememberedRole ? 'account' : 'role');
+      setDrawerOpen(true);
+      onNotice('Choose client or artisan to finish setting up your Bundo account.');
+      return;
+    }
 
+    clearPendingSignupRole(firebaseAuthUser.email);
+    onReady(session.token, session.user);
     if (session.user.role === 'ARTISAN') {
+      onWorkspaceSection('overview');
+      onNavigate(authMode === 'signup' || intendedRole === 'ARTISAN' ? 'home' : 'workspace');
       onNotice(
-        artisanIntent || authMode === 'signup'
-          ? 'Your artisan onboarding is ready. Complete your profile, verification, and offerings for admin review.'
-          : 'Your artisan account is active. Manage jobs, messages, and offerings from your workspace.'
+        'Your artisan onboarding is ready. Complete your profile, KYC, and offerings for admin review.'
       );
-    } else if (artisanIntent && session.user.role === 'CUSTOMER') {
-      onNotice('Account created. Continue with artisan onboarding on the next screen.');
     } else if (authMode === 'signup') {
       onNotice('Account created. Welcome to Bundo.');
     } else {
@@ -203,48 +128,63 @@ export function AuthBox({
     setDrawerOpen(false);
     setPassword('');
     setConfirmPassword('');
-    setFirstName('');
-    setLastName('');
-    setPhone('');
+    setFullName('');
     setPreferredRole(null);
     setPendingAuthUser(null);
+    setPendingEmailVerificationUser(null);
     setAuthStep('account');
-    clearSessionSignupIntent();
   }
 
-  async function queueVerificationEmail(user: User) {
-    if (preferredRole === 'ARTISAN') {
-      saveSessionSignupIntent('ARTISAN');
-      savePendingSignupIntent(user.email, 'ARTISAN');
-      savePendingSignupRole(user.email, 'ARTISAN');
-    } else if (preferredRole === 'CUSTOMER') {
-      savePendingSignupRole(user.email, 'CUSTOMER');
-    }
-    savePendingSignupPhone(user.email, phone.trim() || null);
+  async function sendVerification(user: User) {
+    savePendingSignupRole(user.email, preferredRole);
+    await sendEmailVerification(user);
+    setPendingEmailVerificationUser(user);
+    setAuthStep('verify');
+    onNotice('Verification email sent. Check your inbox, then come back to continue.');
+  }
 
+  async function confirmEmailVerification() {
+    const user = pendingEmailVerificationUser || auth?.currentUser;
+
+    if (!user) {
+      onNotice('Sign in again so we can check your verification status.');
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      await sendBundoEmailVerification(user);
-      return true;
-    } catch {
-      return false;
+      await user.reload();
+      const refreshedUser = auth?.currentUser || user;
+
+      if (!refreshedUser.emailVerified) {
+        onNotice('Email is not verified yet. Open the verification link, then try again.');
+        return;
+      }
+
+      await finishAuth(refreshedUser, 'signup', readPendingSignupRole(refreshedUser.email) || preferredRole, true);
+    } catch (error) {
+      onNotice(error instanceof Error ? error.message : 'Could not check verification status');
+    } finally {
+      setSubmitting(false);
     }
   }
 
-  async function validateSignupEmailField() {
-    if (!validateEmailField()) {
-      return false;
+  async function resendVerification() {
+    const user = pendingEmailVerificationUser || auth?.currentUser;
+
+    if (!user) {
+      onNotice('Sign in again so we can send a verification email.');
+      return;
     }
 
-    const deliverability = await checkEmailDeliverability(email);
-    if (!deliverability.ok) {
-      setEmailError(deliverability.message);
-      onNotice(deliverability.message);
-      return false;
+    setSubmitting(true);
+    try {
+      await sendVerification(user);
+    } catch (error) {
+      onNotice(error instanceof Error ? error.message : 'Could not send verification email');
+    } finally {
+      setSubmitting(false);
     }
-
-    setEmail(deliverability.normalized);
-    setEmailError('');
-    return true;
   }
 
   async function resetPassword(event: FormEvent) {
@@ -258,9 +198,10 @@ export function AuthBox({
 
     setSubmitting(true);
     try {
-      await sendBundoPasswordResetEmail(email.trim());
-      onNotice('Password reset email sent. Check your inbox and spam folder.');
+      await sendPasswordResetEmail(auth, email.trim());
+      onNotice('Password reset email sent. Check your inbox.');
       setMode('login');
+      setAuthStep('account');
       setPassword('');
     } catch (error) {
       onNotice(error instanceof Error ? error.message : 'Could not send password reset email');
@@ -271,38 +212,11 @@ export function AuthBox({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!auth) {
-      onNotice('Sign-in is not configured. Add VITE_FIREBASE_* to your client environment and reload.');
-      return;
-    }
+    if (!auth) return;
 
     if (mode === 'signup' && !preferredRole) {
       setAuthStep('role');
       onNotice('Choose how you want to use Bundo first.');
-      return;
-    }
-
-    if (mode === 'signup') {
-      if (!(await validateSignupEmailField())) {
-        return;
-      }
-    } else if (!validateEmailField()) {
-      onNotice(emailError || 'Enter a valid email address.');
-      return;
-    }
-
-    if (mode === 'signup' && (!firstName.trim() || !lastName.trim())) {
-      onNotice('Enter your first and last name.');
-      return;
-    }
-
-    if (mode === 'signup' && !phone.trim()) {
-      onNotice('Enter your phone number (include country code, e.g. +234…).');
-      return;
-    }
-
-    if (mode === 'signup' && password.length < 8) {
-      onNotice('Password must be at least 8 characters.');
       return;
     }
 
@@ -319,42 +233,23 @@ export function AuthBox({
           ? await signInWithEmailAndPassword(auth, email, password)
           : await createUserWithEmailAndPassword(auth, email, password);
 
-      if (mode === 'signup') {
-        const displayName = combinedDisplayName();
-        if (displayName) {
-          await updateProfile(credential.user, { displayName });
-        }
-        if (preferredRole === 'ARTISAN') {
-          saveSessionSignupIntent('ARTISAN');
-          savePendingSignupIntent(credential.user.email, 'ARTISAN');
-        }
+      if (mode === 'signup' && fullName.trim()) {
+        await updateProfile(credential.user, { displayName: fullName.trim() });
       }
 
-      const isPasswordAccount = credential.user.providerData.some(
-        (provider) => provider.providerId === 'password'
-      );
-      const needsVerify = isPasswordAccount && needsEmailVerification(credential.user);
-
-      let verificationSent = false;
-      if (needsVerify) {
-        verificationSent = await queueVerificationEmail(credential.user);
+      if (mode === 'signup' && !credential.user.emailVerified) {
+        await sendVerification(credential.user);
+        return;
       }
 
-      await finishAuth(credential.user, mode);
-
-      if (mode === 'signup' && verificationSent) {
-        onNotice(
-          'Account created. We sent a verification link—confirm when you can. You can resend it anytime from Settings.'
-        );
-      } else if (mode === 'signup') {
-        onNotice(
-          'Account created. We could not send a verification email yet—you can resend it from Settings when you are ready.'
-        );
-      } else if (mode === 'login' && needsVerify && verificationSent) {
-        onNotice('Signed in. We sent a verification link—you can confirm or resend from Settings.');
-      } else if (mode === 'login' && needsVerify) {
-        onNotice('Signed in. Resend your verification email anytime from Settings.');
+      if (mode === 'login' && credential.user.providerData.some((provider) => provider.providerId === 'password') && !credential.user.emailVerified) {
+        setPendingEmailVerificationUser(credential.user);
+        setAuthStep('verify');
+        onNotice('Please verify your email before continuing.');
+        return;
       }
+
+      await finishAuth(credential.user);
     } catch (error) {
       onNotice(error instanceof Error ? error.message : 'Could not sign in');
     } finally {
@@ -363,10 +258,7 @@ export function AuthBox({
   }
 
   async function continueWithGoogle() {
-    if (!auth) {
-      onNotice('Sign-in is not configured. Add VITE_FIREBASE_* to your client environment and reload.');
-      return;
-    }
+    if (!auth) return;
 
     if (mode === 'signup' && !preferredRole) {
       setAuthStep('role');
@@ -374,39 +266,13 @@ export function AuthBox({
       return;
     }
 
-    if (mode === 'signup' && (!firstName.trim() || !lastName.trim())) {
-      onNotice('Enter your first and last name before continuing with Google.');
-      return;
-    }
-
-    if (mode === 'signup' && !phone.trim()) {
-      onNotice('Enter your phone number before continuing with Google.');
-      return;
-    }
-
-    if (!validateEmailField() && mode === 'signup') {
-      onNotice(emailError || 'Enter a valid email address.');
-      return;
-    }
-
     setSubmitting(true);
     onNotice('');
     try {
-      const credential = await signInWithGooglePopup();
-
-      if (mode === 'signup') {
-        const displayName = combinedDisplayName();
-        if (displayName) {
-          await updateProfile(credential.user, { displayName });
-        }
-        if (preferredRole === 'ARTISAN') {
-          saveSessionSignupIntent('ARTISAN');
-          savePendingSignupIntent(credential.user.email, 'ARTISAN');
-        }
-        savePendingSignupPhone(credential.user.email, phone.trim());
-      }
-
-      await finishAuth(credential.user, mode);
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const credential = await signInWithPopup(auth, provider);
+      await finishAuth(credential.user);
     } catch (error) {
       onNotice(error instanceof Error ? error.message : 'Could not continue with Google');
     } finally {
@@ -416,10 +282,6 @@ export function AuthBox({
 
   function chooseRole(role: SignupRole) {
     setPreferredRole(role);
-    saveSessionSignupIntent(role);
-    if (email.trim()) {
-      savePendingSignupRole(email.trim(), role);
-    }
 
     if (pendingAuthUser) {
       void finishAuth(pendingAuthUser, 'signup', role);
@@ -430,44 +292,33 @@ export function AuthBox({
     onNotice('');
   }
 
-  function openLogin(prefillEmail?: string) {
-    onOpenAuth?.();
+  function openLogin() {
     setPreferredRole(null);
     setConfirmPassword('');
-    setPhone('');
     setPendingAuthUser(null);
+    setPendingEmailVerificationUser(null);
     setMode('login');
     setAuthStep('account');
-    if (prefillEmail) {
-      setEmail(prefillEmail);
-    }
     setDrawerOpen(true);
-    onNotice('');
   }
 
   function openSignup(role: SignupRole | null = null) {
-    onOpenAuth?.();
     setPreferredRole(role);
-    saveSessionSignupIntent(role);
     setConfirmPassword('');
     setPendingAuthUser(null);
+    setPendingEmailVerificationUser(null);
     setMode('signup');
     setAuthStep(role ? 'account' : 'role');
     setDrawerOpen(true);
-    onNotice('');
   }
 
-  function openResetPassword(prefillEmail?: string) {
+  function openResetPassword() {
     setPassword('');
     setConfirmPassword('');
-    setPhone('');
     setPendingAuthUser(null);
+    setPendingEmailVerificationUser(null);
     setMode('reset');
     setAuthStep('account');
-    if (prefillEmail) {
-      setEmail(prefillEmail);
-    }
-    setDrawerOpen(true);
   }
 
   function switchMode() {
@@ -476,41 +327,13 @@ export function AuthBox({
       return;
     }
 
-    openLogin();
+    setMode('login');
+    setPreferredRole(null);
+    setConfirmPassword('');
+    setPendingAuthUser(null);
+    setPendingEmailVerificationUser(null);
+    setAuthStep('account');
   }
-
-  useEffect(() => {
-    if (!authDrawerPrompt) return;
-
-    onOpenAuth?.();
-
-    const prefillEmail = authDrawerPrompt.email;
-
-    if (authDrawerPrompt.mode === 'login') {
-      openLogin(prefillEmail);
-    } else if (authDrawerPrompt.mode === 'reset') {
-      openResetPassword(prefillEmail);
-    } else if (authDrawerPrompt.mode === 'choose-role') {
-      if (firebaseUser && me) {
-        markArtisanApplicant(me.firebaseUid);
-        if (onNavigatePath) {
-          onNavigatePath(ARTISAN_ONBOARDING_PATH);
-        } else {
-          onNavigate('home');
-        }
-        onNotice('Continue with artisan onboarding.');
-      } else {
-        openSignup('ARTISAN');
-      }
-    } else {
-      openSignup(authDrawerPrompt.role ?? null);
-      if (prefillEmail) {
-        setEmail(prefillEmail);
-      }
-    }
-
-    onAuthDrawerPromptHandled?.();
-  }, [authDrawerPrompt, firebaseUser, me, onAuthDrawerPromptHandled, onOpenAuth, onNavigate, onNotice]);
 
   if (firebaseUser && me && !me.role) {
     return (
@@ -527,60 +350,54 @@ export function AuthBox({
           Complete setup
         </button>
 
-        <AuthDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} ariaLabel="Complete account setup">
-          <div className="drawer-head">
-            <img className="drawer-logo" src={bundoLogo} alt="Bundo logo" />
-            <button type="button" onClick={() => setDrawerOpen(false)}>
-              Close
-            </button>
-          </div>
-          <p className="eyebrow">Finish setup</p>
-          <h2>How will you use Bundo?</h2>
-          <p className="drawer-copy">
-            Choose the account type that matches how you want to use the marketplace. This unlocks the right
-            dashboard, bookings flow, and verification steps.
-          </p>
-          <div className="role-choice-grid" aria-label="Choose account type">
-            <button
-              type="button"
-              className="role-choice-card"
-              onClick={() => void finishAuth(firebaseUser, 'signup', 'CUSTOMER', true)}
+        {drawerOpen && (
+          <div className="auth-overlay" role="presentation" onClick={() => setDrawerOpen(false)}>
+            <aside
+              className="auth-drawer"
+              aria-label="Complete account setup"
+              aria-modal="true"
+              role="dialog"
+              onClick={(event) => event.stopPropagation()}
             >
-              <span>Client</span>
-              <strong>Find and book trusted services</strong>
-              <small>Browse professionals, message artisans, request bookings, and track jobs from one place.</small>
-            </button>
-            <button
-              type="button"
-              className={`role-choice-card artisan${preferredRole === 'ARTISAN' ? ' role-choice-card--selected' : ''}`}
-              onClick={() => void finishAuth(firebaseUser, 'signup', 'ARTISAN', true)}
-            >
-              <span>Artisan</span>
-              <strong>Offer services on Bundo</strong>
-              <small>
-                Build your profile, add offerings, submit verification documents, and receive bookings after approval.
-              </small>
-            </button>
+              <div className="drawer-head">
+                <img className="drawer-logo" src={bundoLogo} alt="Bundo logo" />
+                <button type="button" onClick={() => setDrawerOpen(false)}>Close</button>
+              </div>
+              <p className="eyebrow">Finish setup</p>
+              <h2>How will you use Bundo?</h2>
+              <p className="drawer-copy">Choose your account type so we can unlock the right marketplace actions.</p>
+              <div className="role-choice-grid" aria-label="Choose account type">
+                <button type="button" className="role-choice-card" onClick={() => void finishAuth(firebaseUser, 'signup', 'CUSTOMER', true)}>
+                  <span>Client</span>
+                  <strong>Find and book trusted services</strong>
+                  <small>Browse professionals, message artisans, request bookings, and track jobs.</small>
+                </button>
+                <button type="button" className="role-choice-card artisan" onClick={() => void finishAuth(firebaseUser, 'signup', 'ARTISAN', true)}>
+                  <span>Artisan</span>
+                  <strong>Offer services on Bundo</strong>
+                  <small>Create a profile, add offerings, complete verification, and receive bookings.</small>
+                </button>
+              </div>
+              <button
+                type="button"
+                className="mode-switch"
+                onClick={() => {
+                  onNotice('Signed out');
+                  auth && signOut(auth);
+                }}
+              >
+                Use another account
+              </button>
+            </aside>
           </div>
-          <button
-            type="button"
-            className="mode-switch"
-            onClick={() => {
-              onNotice('Signed out');
-              if (auth) {
-                void signOut(auth);
-              }
-            }}
-          >
-            Use another account
-          </button>
-        </AuthDrawer>
+        )}
       </div>
     );
   }
 
   if (firebaseUser && me) {
     const displayName = userDisplayName(firebaseUser, me);
+    const initial = displayName.slice(0, 1).toUpperCase();
     const role = me?.role || null;
     const roleLabel = role ? role.toLowerCase() : 'setup account';
 
@@ -593,211 +410,146 @@ export function AuthBox({
     };
 
     const goToWorkspace = (section: WorkspaceSection, message?: string) => {
-      setMenuOpen(false);
       onWorkspaceSection(section);
-      if (message) {
-        onNotice(message);
-      }
+      goTo('workspace', message);
     };
-
-    const roleHint =
-      role === 'ARTISAN'
-        ? null
-        : role === 'CUSTOMER'
-          ? 'Client'
-          : role === 'ADMIN'
-            ? 'Admin'
-            : roleLabel;
-
-    const logoutAction = () => {
-      onNavigate('home');
-      onNotice('Signed out');
-      if (auth) {
-        void signOut(auth);
-      }
-    };
-
-    const customerGroups = [
-      {
-        title: 'Workspace',
-        items: [
-          {
-            id: 'dashboard',
-            label: 'Dashboard',
-            icon: <IconDashboard />,
-            onSelect: () => goTo('home'),
-          },
-          {
-            id: 'bookings',
-            label: 'My bookings',
-            icon: <IconBookings />,
-            onSelect: () => goToWorkspace('bookings'),
-          },
-          {
-            id: 'messages',
-            label: 'Messages',
-            icon: <IconMessages />,
-            onSelect: () => goToWorkspace('messages'),
-          },
-          {
-            id: 'notifications',
-            label: 'Notifications',
-            icon: <IconNotifications />,
-            onSelect: () => goToWorkspace('notifications'),
-          },
-        ],
-      },
-      {
-        title: 'Support',
-        items: [
-          { id: 'help', label: 'Help', icon: <IconHelp />, onSelect: () => goTo('help') },
-          { id: 'settings', label: 'Settings', icon: <IconSettings />, onSelect: () => goToWorkspace('settings') },
-        ],
-      },
-      {
-        items: [{ id: 'logout', label: 'Log out', danger: true, onSelect: logoutAction }],
-      },
-    ];
-
-    const artisanGroups = [
-      {
-        title: 'Your business',
-        items: [
-          { id: 'profile', label: 'Profile', icon: <IconProfile />, onSelect: () => goToWorkspace('profile') },
-          { id: 'reviews', label: 'Reviews', icon: <IconReviews />, onSelect: () => goToWorkspace('reviews') },
-          { id: 'settings', label: 'Settings', icon: <IconSettings />, onSelect: () => goToWorkspace('settings') },
-        ],
-      },
-      {
-        title: 'Support',
-        items: [{ id: 'help', label: 'Help', icon: <IconHelp />, onSelect: () => goTo('help') }],
-      },
-      {
-        items: [{ id: 'logout', label: 'Log out', danger: true, onSelect: logoutAction }],
-      },
-    ];
-
-    const adminGroups = [
-      {
-        title: 'Admin',
-        items: [
-          { id: 'admin', label: 'Admin center', icon: <IconAdmin />, onSelect: () => goTo('admin') },
-          { id: 'dashboard', label: 'Dashboard', icon: <IconDashboard />, onSelect: () => goToWorkspace('overview') },
-          {
-            id: 'support',
-            label: 'Support chats',
-            icon: <IconMessages />,
-            onSelect: () => goTo('admin', 'Support chats are in the admin conversation panel'),
-          },
-          {
-            id: 'notifications',
-            label: 'Notifications',
-            icon: <IconNotifications />,
-            onSelect: () => goToWorkspace('notifications'),
-          },
-        ],
-      },
-      {
-        title: 'Support',
-        items: [
-          { id: 'help', label: 'Help', icon: <IconHelp />, onSelect: () => goTo('help') },
-          { id: 'settings', label: 'Settings', icon: <IconSettings />, onSelect: () => goToWorkspace('settings') },
-        ],
-      },
-      {
-        items: [{ id: 'logout', label: 'Log out', danger: true, onSelect: logoutAction }],
-      },
-    ];
-
-    const menuGroups = role === 'ARTISAN' ? artisanGroups : role === 'ADMIN' ? adminGroups : customerGroups;
-
-    if (narrowViewport && me.role) {
-      if (!topbarPanelEl) {
-        // Avoid flashing the desktop avatar popover before #topbar-mobile-panel is resolved (layout).
-        return null;
-      }
-      return createPortal(
-        <div className="topbar-mobile-account-embed">
-          <ProfileAccountMenu
-            layout="inline"
-            displayName={displayName}
-            email={firebaseUser.email || me?.email}
-            roleHint={roleHint}
-            groups={menuGroups}
-            onItemActivated={onOpenAuth}
-          />
-        </div>,
-        topbarPanelEl
-      );
-    }
 
     return (
-      <ProfileAccountMenu
-        displayName={displayName}
-        email={firebaseUser.email || me?.email}
-        roleHint={roleHint}
-        unreadCount={unreadCount}
-        open={menuOpen}
-        onOpenChange={setMenuOpen}
-        groups={menuGroups}
-        onItemActivated={onOpenAuth}
-      />
+      <div className="auth-summary">
+        <button
+          className="account-chip"
+          type="button"
+          aria-label="Open account menu"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <span className="account-avatar">{initial}</span>
+          {unreadCount > 0 && <span className="account-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+        </button>
+
+        {menuOpen && (
+          <div className="account-menu">
+            <div className="account-menu-head">
+              <span className="account-avatar large">{initial}</span>
+              <div>
+                <strong>{displayName}</strong>
+                <small>{firebaseUser.email || me?.email || roleLabel}</small>
+                <em>{roleLabel}</em>
+              </div>
+            </div>
+
+            {role === 'ARTISAN' ? (
+              <>
+                <button onClick={() => goToWorkspace('overview')}>Dashboard</button>
+                <button onClick={() => goToWorkspace('profile')}>Your profile</button>
+                <button onClick={() => goToWorkspace('offers')}>Manage offers</button>
+                <button onClick={() => goToWorkspace('bookings')}>Booking requests</button>
+                <button onClick={() => goToWorkspace('messages')}>Messages</button>
+                <button onClick={() => goToWorkspace('reviews')}>Reviews</button>
+                <button onClick={() => goToWorkspace('notifications')}>Notifications</button>
+              </>
+            ) : role === 'ADMIN' ? (
+              <>
+                <button onClick={() => goTo('admin')}>Admin center</button>
+                <button onClick={() => goToWorkspace('overview')}>Dashboard</button>
+                <button onClick={() => goTo('admin', 'Support chats are in the admin conversation panel')}>Support chats</button>
+                <button onClick={() => goToWorkspace('notifications')}>Notifications</button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => goTo('home')}>Dashboard</button>
+                <button onClick={() => goToWorkspace('bookings')}>My bookings</button>
+                <button onClick={() => goToWorkspace('messages')}>Messages</button>
+                <button onClick={() => goToWorkspace('notifications')}>Notifications</button>
+              </>
+            )}
+
+            <button onClick={() => goTo('help')}>Help</button>
+            <button
+              className="danger-menu-item"
+              onClick={() => {
+                setMenuOpen(false);
+                onWorkspaceSection('overview');
+                onNavigate('home');
+                onNotice('Signed out');
+                auth && signOut(auth);
+              }}
+            >
+              Log out
+            </button>
+          </div>
+        )}
+      </div>
     );
   }
 
   return (
     <div className="auth-entry">
-      <button type="button" onClick={() => openLogin()}>
+      <button type="button" onClick={openLogin}>
         Login
       </button>
       <button type="button" className="signup-link" onClick={() => openSignup()}>
         Sign up
       </button>
 
-      <AuthDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} ariaLabel="Authentication panel">
+      {drawerOpen && (
+        <div className="auth-overlay" role="presentation" onClick={() => setDrawerOpen(false)}>
+          <aside
+            className="auth-drawer"
+            aria-label="Authentication panel"
+            aria-modal="true"
+            role="dialog"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="drawer-head">
               <img className="drawer-logo" src={bundoLogo} alt="Bundo logo" />
-              <button type="button" onClick={() => setDrawerOpen(false)}>
-                Close
-              </button>
+              <button type="button" onClick={() => setDrawerOpen(false)}>Close</button>
             </div>
 
-            {!firebaseReady && (
-              <p className="auth-form-error">
-                Sign-in is not configured. Add VITE_FIREBASE_* to your client environment and reload.
-              </p>
-            )}
-
-            {mode === 'signup' && authStep === 'role' ? (
+            {authStep === 'verify' ? (
+              <>
+                <p className="eyebrow">Verify your email</p>
+                <h2>Check your inbox</h2>
+                <p className="drawer-copy">
+                  We sent a verification link to {pendingEmailVerificationUser?.email || email || 'your email address'}.
+                  Open that link, then return here to continue into your Bundo account.
+                </p>
+                <div className="auth-status-card">
+                  <strong>Email verification required</strong>
+                  <span>
+                    This helps protect bookings, messages, payments, and artisan verification from fake or mistyped accounts.
+                  </span>
+                </div>
+                <div className="auth-action-stack">
+                  <button type="button" onClick={confirmEmailVerification} disabled={submitting}>
+                    {submitting ? 'Checking...' : "I've verified my email"}
+                  </button>
+                  <button type="button" className="secondary-button" onClick={resendVerification} disabled={submitting}>
+                    Resend verification email
+                  </button>
+                  <button type="button" className="mode-switch" onClick={openLogin}>
+                    Back to login
+                  </button>
+                </div>
+              </>
+            ) : mode === 'signup' && authStep === 'role' ? (
               <>
                 <p className="eyebrow">Create your account</p>
                 <h2>How will you use Bundo?</h2>
                 <p className="drawer-copy">
-                  Pick the path that fits you first—like Upwork, you choose client or artisan before creating login
-                  details. You can manage profile and verification from your dashboard after signup.
+                  Choose the account type that matches your first workflow. You can manage your setup from the dashboard after login.
                 </p>
 
                 <div className="role-choice-grid" aria-label="Choose account type">
-                  <button
-                    type="button"
-                    className={`role-choice-card${preferredRole === 'CUSTOMER' ? ' role-choice-card--selected' : ''}`}
-                    onClick={() => chooseRole('CUSTOMER')}
-                  >
+                  <button type="button" className="role-choice-card" onClick={() => chooseRole('CUSTOMER')}>
                     <span>Client</span>
                     <strong>Find and book trusted services</strong>
                     <small>Browse professionals, message artisans, request bookings, and track jobs.</small>
                   </button>
-                  <button
-                    type="button"
-                    className={`role-choice-card artisan${preferredRole === 'ARTISAN' ? ' role-choice-card--selected' : ''}`}
-                    onClick={() => chooseRole('ARTISAN')}
-                  >
+                  <button type="button" className="role-choice-card artisan" onClick={() => chooseRole('ARTISAN')}>
                     <span>Artisan</span>
                     <strong>Offer services on Bundo</strong>
-                    <small>
-                      Create a profile, add offerings, complete identity verification, and receive bookings after admin
-                      approval.
-                    </small>
+                    <small>Create a profile, add offerings, complete verification, and receive bookings.</small>
                   </button>
                 </div>
 
@@ -811,132 +563,83 @@ export function AuthBox({
                   {mode === 'reset'
                     ? 'Reset access'
                     : mode === 'login'
-                      ? 'Welcome back'
-                      : preferredRole === 'ARTISAN'
-                        ? 'Join as an artisan'
-                        : 'Join as a client'}
+                    ? 'Welcome back'
+                    : preferredRole === 'ARTISAN'
+                      ? 'Join as an artisan'
+                      : 'Join as a client'}
                 </p>
-                <h2>
+            <h2>
                   {mode === 'reset'
                     ? 'Reset your password'
                     : mode === 'login'
-                      ? 'Login to your account'
-                      : preferredRole === 'ARTISAN'
-                        ? 'Create your artisan account'
-                        : 'Create your client account'}
-                </h2>
-                <p className="drawer-copy">
+                    ? 'Login to your account'
+                    : preferredRole === 'ARTISAN'
+                      ? 'Create your artisan account'
+                      : 'Create your client account'}
+            </h2>
+            <p className="drawer-copy">
                   {mode === 'reset'
-                    ? 'Enter your account email and we will send a secure password reset link.'
+                    ? 'Enter your account email and Firebase will send a secure password reset link.'
                     : mode === 'login'
-                      ? 'Continue with Google or your email to pick up your marketplace workflow.'
-                      : preferredRole === 'ARTISAN'
-                        ? 'Add your login details. After signup you go straight to artisan onboarding to set up your profile, offerings, and verification.'
-                        : 'Add your login details, then browse, message, book, and manage service requests from your dashboard.'}
-                </p>
+                    ? 'Continue with Google or your email to pick up your marketplace workflow.'
+                    : preferredRole === 'ARTISAN'
+                      ? 'Start with your login, then complete profile setup, verification, offerings, and admin review from your workspace.'
+                      : 'Start with your login, then browse, message, book, and manage service requests from your dashboard.'}
+            </p>
 
-                {mode === 'signup' && preferredRole && (
+                {mode === 'signup' && (
                   <div className="selected-role-banner">
                     <span>{preferredRole === 'ARTISAN' ? 'Artisan account' : 'Client account'}</span>
-                    <button
-                      type="button"
-                      onClick={() => setAuthStep('role')}
-                    >
-                      Change
-                    </button>
+                    <button type="button" onClick={() => setAuthStep('role')}>Change</button>
                   </div>
                 )}
 
                 {mode !== 'reset' && (
                   <>
-                    <button
-                      type="button"
-                      className="google-auth-button"
-                      onClick={() => void continueWithGoogle()}
-                      disabled={!firebaseReady || submitting}
-                    >
-                      <span aria-hidden="true">G</span>
+                    <button type="button" className="google-auth-button" onClick={continueWithGoogle} disabled={!firebaseReady || submitting}>
+                      <span aria-hidden="true"><AppIcon icon="mdi:google" size={18} /></span>
                       Continue with Google
                     </button>
 
-                    <div className="auth-divider">
-                      <span>or</span>
-                    </div>
+                    <div className="auth-divider"><span>or</span></div>
                   </>
                 )}
 
-                <form className="auth-form" onSubmit={mode === 'reset' ? resetPassword : submit}>
+            <form className="auth-form" onSubmit={mode === 'reset' ? resetPassword : submit}>
                   {mode === 'signup' && (
-                    <div className="auth-name-grid">
-                      <label>
-                        First name
-                        <input
-                          value={firstName}
-                          onChange={(event) => setFirstName(event.target.value)}
-                          placeholder="First name"
-                          type="text"
-                          autoComplete="given-name"
-                          required
-                        />
-                      </label>
-                      <label>
-                        Last name
-                        <input
-                          value={lastName}
-                          onChange={(event) => setLastName(event.target.value)}
-                          placeholder="Last name"
-                          type="text"
-                          autoComplete="family-name"
-                          required
-                        />
-                      </label>
-                    </div>
+                    <label>
+                      Full name
+                      <input
+                        value={fullName}
+                        onChange={(event) => setFullName(event.target.value)}
+                        placeholder="Your full name"
+                        type="text"
+                        autoComplete="name"
+                        required
+                      />
+                    </label>
                   )}
               <label>
                 Email
                     <input
                       value={email}
-                      onChange={(event) => {
-                        setEmail(event.target.value);
-                        if (emailError) {
-                          validateEmailField(event.target.value);
-                        }
-                      }}
-                      onBlur={() => {
-                        if (email.trim()) {
-                          validateEmailField();
-                        }
-                      }}
+                      onChange={(event) => setEmail(event.target.value)}
                       placeholder="you@example.com"
                       type="email"
                       autoComplete="email"
-                      aria-invalid={emailError ? 'true' : undefined}
                       required
                     />
-                    {emailError && <span className="auth-field-error">{emailError}</span>}
               </label>
-                  {mode === 'signup' && (
-                    <label>
-                      Phone number
-                      <input
-                        value={phone}
-                        onChange={(event) => setPhone(event.target.value)}
-                        placeholder="+2348012345678"
-                        type="tel"
-                        autoComplete="tel"
-                        required
-                      />
-                    </label>
-                  )}
                   {mode !== 'reset' && (
                     <label>
                       Password
-                      <PasswordInput
+                      <input
                         value={password}
-                        onChange={setPassword}
+                        onChange={(event) => setPassword(event.target.value)}
                         placeholder="Your password"
+                        type="password"
                         autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                        minLength={mode === 'signup' ? 8 : 6}
+                        minLength={6}
                         required
                       />
                     </label>
@@ -944,46 +647,44 @@ export function AuthBox({
                   {mode === 'signup' && (
                     <label>
                       Verify password
-                      <PasswordInput
+                      <input
                         value={confirmPassword}
-                        onChange={setConfirmPassword}
+                        onChange={(event) => setConfirmPassword(event.target.value)}
                         placeholder="Retype your password"
+                        type="password"
                         autoComplete="new-password"
-                        minLength={8}
+                        minLength={6}
                         required
                       />
                     </label>
                   )}
-              <button type="submit" disabled={!firebaseReady || submitting}>
+              <button disabled={!firebaseReady || submitting}>
                     {submitting
                       ? 'Please wait'
                       : mode === 'reset'
                         ? 'Send reset link'
-                        : mode === 'login'
-                          ? 'Login'
-                          : preferredRole === 'ARTISAN'
-                            ? 'Create artisan account'
-                            : 'Create client account'}
+                      : mode === 'login'
+                        ? 'Login'
+                        : preferredRole === 'ARTISAN'
+                          ? 'Create artisan account'
+                          : 'Create client account'}
               </button>
-                  {mode === 'signup' && (
-                    <p className="auth-legal-note">
-                      By creating an account, you agree to our <LegalLinks />.
-                    </p>
-                  )}
             </form>
 
                 {mode === 'login' && (
-                  <button type="button" className="forgot-password-link" onClick={() => openResetPassword()}>
+                  <button type="button" className="forgot-password-link" onClick={openResetPassword}>
                     Forgot password?
                   </button>
                 )}
 
                 <button type="button" className="mode-switch" onClick={switchMode}>
-                  {mode === 'login' || mode === 'reset' ? 'New here? Sign up' : 'Already have an account? Login'}
-                </button>
+              {mode === 'login' || mode === 'reset' ? 'New here? Sign up' : 'Already have an account? Login'}
+            </button>
               </>
             )}
-      </AuthDrawer>
+          </aside>
+        </div>
+      )}
     </div>
   );
 }

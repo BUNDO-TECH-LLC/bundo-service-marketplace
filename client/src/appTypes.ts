@@ -56,9 +56,12 @@ export type NotificationPreferences = {
 };
 export type SignupRole = Extract<Role, 'CUSTOMER' | 'ARTISAN'>;
 export type BookingSuccessState = {
-  bookingId?: string;
+  bookingId: string;
+  artisanId: string;
   serviceTitle: string;
   artisanName: string;
+  scheduledAt: string;
+  location: string;
 };
 
 export type PaymentSuccessState = {

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ActionRunner, BookingSuccessState } from '../../appTypes';
 import { EmptyState } from '../../components/EmptyState';
 import { api } from '../../lib/api';
+import { defaultBookingLocation } from '../../lib/bookingRequest';
 import { money } from '../../lib/formatting';
 import type { Booking, Offering, Role } from '../../types';
 
@@ -83,20 +84,26 @@ export function OfferingGrid({
                   void runOfferingAction(
                     bookActionKey,
                     async () => {
+                      const scheduledAt = new Date(Date.now() + 86400000).toISOString();
+                      const artisan = offering.artisan;
+
                       const response = await api<{ booking: Booking }>('/bookings', {
                         method: 'POST',
                         token,
                         body: JSON.stringify({
                           offeringId: offering.id,
-                          scheduledAt: new Date(Date.now() + 86400000).toISOString(),
+                          scheduledAt,
                           note: 'Booked from web client',
                         }),
                       });
                       await reloadPrivate();
                       onBookingSuccess({
                         bookingId: response.booking.id,
+                        artisanId: artisan?.id || offering.artisanId,
                         serviceTitle: offering.title,
-                        artisanName: offering.artisan?.displayName || 'this artisan',
+                        artisanName: artisan?.displayName || 'this artisan',
+                        scheduledAt: response.booking.scheduledAt || scheduledAt,
+                        location: defaultBookingLocation(artisan?.area, artisan?.city),
                       });
                     },
                     'Booking requested'

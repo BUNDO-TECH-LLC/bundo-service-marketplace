@@ -1,11 +1,6 @@
-import { Prisma, Role, UserStatus } from '@prisma/client';
+import { Prisma, Role } from '@prisma/client';
 import db from '../../db/client';
-import {
-  defaultNotificationPreferences,
-  parseNotificationPreferences,
-  type NotificationPreferences,
-} from '../../lib/notificationPreferences';
-import { ConflictError, ValidationError } from '../../utils/errors';
+import { ConflictError } from '../../utils/errors';
 
 function normalizeEmail(email?: string | null) {
   const trimmed = email?.trim();
@@ -153,10 +148,6 @@ export const updateUserRole = async (firebaseUid: string, role: Role) => {
     return { status: 'locked_role' as const };
   }
 
-  if (role === Role.ARTISAN && user.role === Role.CUSTOMER) {
-    return { status: 'locked_role' as const };
-  }
-
   const updated = await db.user.update({
     where: { firebaseUid },
     data: { role },
@@ -175,114 +166,24 @@ export const updateUserFcmToken = async (
   });
 };
 
-function normalizePhoneInput(phone: string) {
-  const trimmed = phone.trim();
-  if (!trimmed) {
-    throw new ValidationError('Phone number is required');
-  }
-
-  const digits = trimmed.replace(/[^\d+]/g, '');
-  if (digits.length < 10 || digits.length > 15) {
-    throw new ValidationError('Enter a valid phone number (10–15 digits).');
-  }
-
-  return digits.startsWith('+') ? digits : `+${digits.replace(/^\+/, '')}`;
-}
-
-export const updateUserPhone = async (firebaseUid: string, phone: string) => {
-  const normalizedPhone = normalizePhoneInput(phone);
-
-  try {
-    return await db.user.update({
-      where: { firebaseUid },
-      data: { phone: normalizedPhone },
-    });
-  } catch (error) {
-    if (isUniqueConstraintError(error)) {
-      throw new ConflictError(
-        'This phone number is already linked to another Bundo account.',
-        'PHONE_IN_USE'
-      );
-    }
-
-    throw error;
-  }
-};
-
-export const getUserNotificationPreferences = (user: {
-  notificationPreferences?: unknown | null;
-}): NotificationPreferences =>
-  parseNotificationPreferences(user.notificationPreferences);
-
-export const updateUserNotificationPreferences = async (
+export const updateUserProfile = async (
   firebaseUid: string,
-  prefs: Partial<NotificationPreferences>
+  input: { phone?: string | null }
 ) => {
-  const user = await db.user.findUnique({ where: { firebaseUid } });
+  const data: { phone?: string | null } = {};
 
-  if (!user) {
-    return { status: 'missing_user' as const };
+  if (input.phone !== undefined) {
+    data.phone = input.phone;
   }
 
-  const current = getUserNotificationPreferences(user);
-  const next = {
-    ...current,
-    ...prefs,
-  };
+  if (!Object.keys(data).length) {
+    return { status: 'no_fields' as const };
+  }
 
-  const updated = await db.user.update({
+  const user = await db.user.update({
     where: { firebaseUid },
-    data: { notificationPreferences: next },
+    data,
   });
 
-  return {
-    status: 'updated' as const,
-    user: updated,
-    preferences: getUserNotificationPreferences(updated),
-  };
+  return { status: 'updated' as const, user };
 };
-
-export const deleteUserAccount = async (firebaseUid: string) => {
-  const user = await db.user.findUnique({ where: { firebaseUid } });
-
-  if (!user) {
-    return { status: 'missing_user' as const };
-  }
-
-  if (user.role === Role.ADMIN) {
-    return { status: 'locked_role' as const };
-  }
-
-  const anonymizedEmail = `deleted+${firebaseUid}@bundo.invalid`;
-
-  await db.user.update({
-    where: { firebaseUid },
-    data: {
-      status: UserStatus.BANNED,
-      email: anonymizedEmail,
-      phone: null,
-      fcmToken: null,
-      notificationPreferences: Prisma.JsonNull,
-    },
-  });
-
-  return { status: 'deleted' as const };
-};
-
-export function serializeUser(user: {
-  firebaseUid: string;
-  email: string | null;
-  phone: string | null;
-  role: Role | null;
-  status: string;
-  notificationPreferences?: unknown | null;
-}) {
-  return {
-    firebaseUid: user.firebaseUid,
-    email: user.email,
-    phone: user.phone,
-    role: user.role,
-    status: user.status,
-    notificationPreferences: getUserNotificationPreferences(user),
-  };
-}

@@ -1,83 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { sendEmailVerification } from 'firebase/auth';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useAppRoot } from '../../app/appRootContext';
 import { AuthLayout } from '../../layouts/AuthLayout';
-import { ApiError } from '../../lib/api';
-import { EmailInboxHint } from '../../components/EmailInboxHint';
-import { sendBundoEmailVerification } from '../../lib/authEmailVerification';
-import { ARTISAN_ONBOARDING_PATH, markArtisanApplicant } from '../../lib/artisanApplication';
-import { buildAuthDrawerSearch } from '../../lib/authDrawerPrompt';
-import { readPendingSignupPhone, resolveSignupIntent } from '../../lib/authSignupStorage';
-import { finalizeAuthSession } from '../../lib/authSessionFlow';
-import {
-  completeFirebaseEmailAction,
-  stripFirebaseEmailActionParams,
-} from '../../lib/firebaseEmailAction';
 import { auth } from '../../lib/firebase';
-import type { ApiUser } from '../../types';
+import { appRoutes } from '../../routes/paths';
 
 type VerificationState = {
   email?: string;
   accountKind?: 'CUSTOMER' | 'ARTISAN';
-  phone?: string;
 };
-
-function destinationForRole(role: ApiUser['role']) {
-  if (role === 'ARTISAN') return '/';
-  if (role === 'ADMIN') return '/admin/overview';
-  return '/workspace/overview';
-}
 
 export function EmailVerificationPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const ctx = useAppRoot();
   const state = (location.state || {}) as VerificationState;
 
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
-  const [linkApplied, setLinkApplied] = useState(false);
 
   const email = state.email || auth?.currentUser?.email || 'your email';
-
-  useEffect(() => {
-    if (!auth?.currentUser) {
-      return;
-    }
-
-    let cancelled = false;
-
-    void (async () => {
-      try {
-        const result = await completeFirebaseEmailAction(auth, location.search);
-        if (cancelled || !result.handled) {
-          return;
-        }
-
-        setLinkApplied(true);
-        if (result.verified) {
-          setMessage('Email verified from your link. Tap the button below to continue into Bundo.');
-        } else {
-          setMessage('We received your verification link. Tap the button below to finish signing in.');
-        }
-
-        const cleaned = stripFirebaseEmailActionParams(location.search);
-        navigate({ pathname: location.pathname, search: cleaned }, { replace: true });
-      } catch (error) {
-        if (!cancelled) {
-          setMessage(
-            error instanceof Error
-              ? error.message
-              : 'Could not complete verification from the email link.'
-          );
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [location.pathname, location.search, navigate]);
 
   function maskEmail(email: string) {
     if (!email.includes('@')) return email;
@@ -98,8 +39,8 @@ export function EmailVerificationPage() {
     setMessage('');
 
     try {
-      await sendBundoEmailVerification(auth.currentUser);
-      setMessage('Verification link sent again. Check your inbox and spam folder.');
+      await sendEmailVerification(auth.currentUser);
+      setMessage('Verification link sent again. Check your inbox.');
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -113,7 +54,7 @@ export function EmailVerificationPage() {
 
   async function continueAfterVerification() {
   if (!auth?.currentUser) {
-    navigate({ pathname: '/', search: buildAuthDrawerSearch({ mode: 'login' }) });
+    navigate('/login');
     return;
   }
 
@@ -125,40 +66,19 @@ export function EmailVerificationPage() {
 
     if (!auth.currentUser.emailVerified) {
       setMessage(
-        'Your email is not verified yet. Click the link in your inbox (or spam folder), then try again.'
+        'Your email is not verified yet. Click the link in your inbox, then try again.'
       );
       return;
     }
 
-    const pendingPhone =
-      state.phone || readPendingSignupPhone(auth.currentUser.email) || undefined;
-    const signupIntent =
-      state.accountKind || resolveSignupIntent(auth.currentUser.email) || undefined;
-
-    const { session } = await finalizeAuthSession(auth.currentUser, {
-      mode: 'signup',
-      phone: pendingPhone,
-      forceTokenRefresh: true,
+    navigate('/loading', {
+      state: {
+        redirectTo:
+          state.accountKind === 'ARTISAN'
+            ? appRoutes.artisanOnboardingBasicInfo
+            : appRoutes.customerDashboard,
+      },
     });
-
-    ctx.acknowledgeSession(session.token, session.user);
-    await ctx.loadPrivateData(session.token, session.user).catch(() => undefined);
-
-    if (signupIntent === 'ARTISAN') {
-      markArtisanApplicant(session.user.firebaseUid);
-      navigate(ARTISAN_ONBOARDING_PATH, { replace: true });
-      return;
-    }
-
-    navigate(destinationForRole(session.user.role) || '/workspace/overview', { replace: true });
-  } catch (error) {
-    setMessage(
-      error instanceof ApiError
-        ? error.message
-        : error instanceof Error
-          ? error.message
-          : 'Could not finish signing you in after verification.'
-    );
   } finally {
     setBusy(false);
   }
@@ -173,21 +93,7 @@ export function EmailVerificationPage() {
         {email}
       </>
     }
-  >
-      {message && (
-        <p
-          className={`m-0 rounded-md p-3 text-sm leading-[1.45] ${
-            linkApplied
-              ? 'bg-[var(--color-success-wash,#e8f5ee)] text-[var(--color-ink-muted)]'
-              : 'bg-[var(--color-danger-wash)] font-extrabold text-[var(--color-danger-dark)]'
-          }`}
-          role="status"
-        >
-          {message}
-        </p>
-      )}
-      <EmailInboxHint email={typeof email === 'string' ? email : undefined} />
-      <div className="grid gap-[18px]">
+  > <div className="grid gap-[18px]">
         <button
           type="button"
           onClick={continueAfterVerification}

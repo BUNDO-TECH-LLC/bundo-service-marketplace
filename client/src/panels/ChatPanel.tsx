@@ -8,6 +8,7 @@ import { useAppRoot } from '../app/appRootContext';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import type { ActionRunner } from '../appTypes';
 import type { Conversation, Message } from '../types';
+import { AppIcon } from '../components/ui/AppIcon';
 
 /** Matches `.messenger-shell` responsive breakpoint in `styles.css`. */
 const MESSENGER_MOBILE_BREAKPOINT = '(max-width: 900px)';
@@ -180,7 +181,9 @@ export function ChatPanel({
         <section className="chatbox">
           {!activeConversation && (
             <div className="chat-empty">
-              <span className="conversation-avatar large">B</span>
+              <span className="conversation-avatar large">
+                <AppIcon icon="mdi:chat-processing-outline" size={28} />
+              </span>
               <h3>Select a conversation</h3>
               <p>Choose a thread from the left to read messages and send replies.</p>
             </div>

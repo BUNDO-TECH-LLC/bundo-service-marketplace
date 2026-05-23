@@ -1,12 +1,10 @@
-import { AppProvider } from './app/AppProvider';
-import { AppRoutes } from './app/AppRoutes';
+import { BookingConfirmedProvider } from './contexts/BookingConfirmedContext';
+import AppRouter from './routes/AppRouter';
 
 export default function App() {
   return (
-    <AppProvider>
-      <div className="app-shell">
-        <AppRoutes />
-      </div>
-    </AppProvider>
+    <BookingConfirmedProvider>
+      <AppRouter />
+    </BookingConfirmedProvider>
   );
 }

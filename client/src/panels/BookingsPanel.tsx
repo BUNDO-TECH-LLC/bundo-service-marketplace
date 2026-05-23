@@ -1,26 +1,24 @@
-import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { LeaveReviewDialog } from '../components/LeaveReviewDialog';
-import { PromptDialog } from '../components/PromptDialog';
+import { useState } from 'react';
 import { api } from '../lib/api';
 import { formatMessageTime, money } from '../lib/formatting';
+import { artisanProfileImageUrl } from '../lib/profileImage';
+import { capitalizeLeadingCharacter } from '../lib/userDisplayName';
 import {
+  artisanExpertiseLabel,
+  bookingCardDate,
+  bookingCardLocation,
+  bookingCardNotes,
   bookingContactName,
   bookingDate,
-  bookingInputValue,
   bookingLocation,
-  parseBookingInput,
-  paymentLabel,
+  bookingTimeSlotLabel,
+  customerBookingStatusLabel,
   statusLabel,
 } from '../lib/bookingDisplay';
-import {
-  canLeaveReview,
-  canStartOrCompleteBooking,
-  isBookingPaymentSecured,
-} from '../lib/bookingPayment';
 import type { ActionRunner } from '../appTypes';
 import type { Booking } from '../types';
 import { EmptyState } from '../components/EmptyState';
+import { ProfileAvatar } from '../components/ui/ProfileAvatar';
 
 export function BookingsSummary({ bookings, title = 'My bookings' }: { bookings: Booking[]; title?: string }) {
   return (
@@ -62,6 +60,7 @@ function ArtisanJobsPage({
   updateBookingStatus: (bookingId: string, status: Booking['status']) => Promise<void>;
 }) {
   if (selectedBooking) {
+    const isAccepted = selectedBooking.status === 'ACCEPTED';
     const customerName = bookingContactName(selectedBooking);
     const serviceName = selectedBooking.offering?.title || 'Basic inspection';
 
@@ -69,9 +68,10 @@ function ArtisanJobsPage({
       <section className="artisan-job-detail-page">
         <div className="artisan-job-detail-head">
           <div>
-            <h2>Job details</h2>
+            <h2>Active bookings</h2>
             <p>
-              {statusLabel(selectedBooking.status)} · Booking #{selectedBooking.id.slice(0, 6).toUpperCase()}
+              {isAccepted ? 'Accepted' : statusLabel(selectedBooking.status)} · Booking #
+              {selectedBooking.id.slice(0, 6)}
             </p>
           </div>
           <span className={`booking-status ${selectedBooking.status.toLowerCase()}`}>
@@ -115,31 +115,13 @@ function ArtisanJobsPage({
         </article>
 
         <div className="artisan-job-actions">
-          {!canStartOrCompleteBooking(selectedBooking) &&
-            ['ACCEPTED', 'ONGOING'].includes(selectedBooking.status) && (
-              <p className="booking-payment-notice" role="status">
-                Waiting for customer payment via Paystack. The service cannot start or be completed until
-                payment is secured.
-              </p>
-            )}
           {selectedBooking.status === 'REQUESTED' && (
             <button disabled={busy} onClick={() => updateBookingStatus(selectedBooking.id, 'ACCEPTED')}>
               Accept request
             </button>
           )}
           {selectedBooking.status === 'ACCEPTED' && (
-            <button
-              disabled={busy || !canStartOrCompleteBooking(selectedBooking)}
-              onClick={() => updateBookingStatus(selectedBooking.id, 'ONGOING')}
-            >
-              Start service
-            </button>
-          )}
-          {(selectedBooking.status === 'ACCEPTED' || selectedBooking.status === 'ONGOING') && (
-            <button
-              disabled={busy || !canStartOrCompleteBooking(selectedBooking)}
-              onClick={() => updateBookingStatus(selectedBooking.id, 'COMPLETED')}
-            >
+            <button disabled={busy} onClick={() => updateBookingStatus(selectedBooking.id, 'COMPLETED')}>
               Mark as completed
             </button>
           )}
@@ -217,7 +199,6 @@ export function BookingsPage({
   refresh: () => Promise<void>;
   openMessages: () => void;
 }) {
-  const [searchParams, setSearchParams] = useSearchParams();
   const [filter, setFilter] = useState<'ALL' | Booking['status']>('ALL');
   const tabs: Array<{ label: string; value: 'ALL' | Booking['status'] }> = [
     { label: 'All', value: 'ALL' },
@@ -227,56 +208,8 @@ export function BookingsPage({
     { label: 'Declined', value: 'DECLINED' },
   ];
   const visibleBookings = filter === 'ALL' ? bookings : bookings.filter((booking) => booking.status === filter);
-  const jobIdFromUrl = searchParams.get('job');
-  const [selectedArtisanBookingId, setSelectedArtisanBookingId] = useState<string | null>(() => jobIdFromUrl);
+  const [selectedArtisanBookingId, setSelectedArtisanBookingId] = useState<string | null>(null);
   const selectedArtisanBooking = bookings.find((booking) => booking.id === selectedArtisanBookingId) || null;
-
-  useEffect(() => {
-    if (mode !== 'artisan') {
-      return;
-    }
-    if (!jobIdFromUrl) {
-      setSelectedArtisanBookingId(null);
-      return;
-    }
-    if (bookings.some((booking) => booking.id === jobIdFromUrl)) {
-      setSelectedArtisanBookingId(jobIdFromUrl);
-      return;
-    }
-    setSelectedArtisanBookingId(null);
-    setSearchParams({}, { replace: true });
-  }, [mode, jobIdFromUrl, bookings, setSearchParams]);
-
-  function selectArtisanBooking(bookingId: string | null) {
-    setSelectedArtisanBookingId(bookingId);
-    if (bookingId) {
-      setSearchParams({ job: bookingId }, { replace: true });
-      return;
-    }
-    setSearchParams({}, { replace: true });
-  }
-
-  const [reviewBooking, setReviewBooking] = useState<Booking | null>(null);
-  const [reschedulePrompt, setReschedulePrompt] = useState<null | {
-    booking: Booking;
-    step: 'datetime' | 'note';
-    scheduledAt?: string;
-  }>(null);
-
-  async function submitReview(input: { rating: number; comment: string }) {
-    if (!reviewBooking) return;
-    await api('/reviews', {
-      method: 'POST',
-      token,
-      body: JSON.stringify({
-        bookingId: reviewBooking.id,
-        rating: input.rating,
-        comment: input.comment || undefined,
-      }),
-    });
-    setReviewBooking(null);
-    await refresh();
-  }
 
   async function cancelBooking(bookingId: string) {
     await api(`/bookings/${bookingId}/cancel`, {
@@ -310,49 +243,6 @@ export function BookingsPage({
     await refresh();
   }
 
-  async function openDispute(bookingId: string) {
-    await api(`/bookings/${bookingId}/dispute`, {
-      method: 'POST',
-      token,
-      body: JSON.stringify({
-        reason: 'Customer requested admin review from the bookings page',
-      }),
-    });
-    await refresh();
-  }
-
-  function startReschedule(booking: Booking) {
-    setReschedulePrompt({ booking, step: 'datetime' });
-  }
-
-  async function submitReschedule(input: string) {
-    if (!reschedulePrompt) return;
-
-    if (reschedulePrompt.step === 'datetime') {
-      const parsed = parseBookingInput(input);
-      if (!parsed) {
-        throw new Error('Please enter a valid date and time like 2026-05-15 14:30');
-      }
-      setReschedulePrompt({
-        booking: reschedulePrompt.booking,
-        step: 'note',
-        scheduledAt: parsed.toISOString(),
-      });
-      return;
-    }
-
-    await api(`/bookings/${reschedulePrompt.booking.id}/reschedule`, {
-      method: 'PATCH',
-      token,
-      body: JSON.stringify({
-        scheduledAt: reschedulePrompt.scheduledAt,
-        note: input || reschedulePrompt.booking.note,
-      }),
-    });
-    setReschedulePrompt(null);
-    await refresh();
-  }
-
   if (mode === 'artisan') {
     return (
       <ArtisanJobsPage
@@ -363,7 +253,7 @@ export function BookingsPage({
         tabs={tabs}
         busy={busy}
         setFilter={setFilter}
-        selectBooking={selectArtisanBooking}
+        selectBooking={setSelectedArtisanBookingId}
         openMessages={openMessages}
         updateBookingStatus={(bookingId, status) =>
           runAction(() => updateBookingStatus(bookingId, status), `Booking ${status.toLowerCase()}`)
@@ -373,41 +263,8 @@ export function BookingsPage({
   }
 
   return (
-    <>
-    {reviewBooking && (
-      <LeaveReviewDialog
-        booking={reviewBooking}
-        busy={busy}
-        onClose={() => setReviewBooking(null)}
-        onSubmit={(input) => runAction(() => submitReview(input), 'Review submitted')}
-      />
-    )}
-    <PromptDialog
-      open={reschedulePrompt !== null}
-      title={reschedulePrompt?.step === 'note' ? 'Reschedule note' : 'Reschedule booking'}
-      message={
-        reschedulePrompt?.step === 'datetime'
-          ? 'Enter the new date and time (YYYY-MM-DD HH:MM).'
-          : 'Optional note for the artisan.'
-      }
-      label={reschedulePrompt?.step === 'datetime' ? 'Date and time' : 'Note'}
-      defaultValue={
-        reschedulePrompt?.step === 'datetime'
-          ? bookingInputValue(reschedulePrompt.booking.scheduledAt)
-          : reschedulePrompt?.booking.note || ''
-      }
-      busy={busy}
-      onCancel={() => setReschedulePrompt(null)}
-      onConfirm={(value) => runAction(() => submitReschedule(value), 'Booking rescheduled')}
-    />
     <section className="bookings-page">
-      <div className="bookings-toolbar">
-        <div>
-          <p className="eyebrow">Booking details</p>
-          <h2>My bookings</h2>
-        </div>
-        <span>{bookings.length} total</span>
-      </div>
+      <h1 className="bookings-page-title">Booking details</h1>
 
       <div className="booking-tabs" role="tablist" aria-label="Booking filters">
         {tabs.map((tab) => (
@@ -430,43 +287,36 @@ export function BookingsPage({
 
       <div className="booking-list">
         {visibleBookings.map((booking) => {
-          const contactName =
-            booking.artisan?.displayName || booking.offering?.artisan?.displayName || 'Bundo professional';
-          const contactInitials = contactName
-            .split(' ')
-            .map((part) => part[0])
-            .join('')
-            .slice(0, 2)
-            .toUpperCase();
+          const contactName = capitalizeLeadingCharacter(
+            booking.artisan?.displayName || booking.offering?.artisan?.displayName || 'Bundo professional'
+          );
+          const contactImageUrl = artisanProfileImageUrl(booking.artisan || booking.offering?.artisan);
           const serviceName = booking.offering?.title || 'Service booking';
           const price = booking.offering?.priceFrom ? money(booking.offering.priceFrom) : 'To be confirmed';
           const paymentStatus = booking.payment?.status;
-          const latestDispute = booking.disputes?.[0];
-          const paymentSecured = isBookingPaymentSecured(paymentStatus);
           const canPay =
-            mode === 'customer' &&
-            !['CANCELLED', 'DECLINED', 'COMPLETED'].includes(booking.status) &&
-            !paymentSecured;
-          const awaitingPaymentToStart =
-            mode === 'customer' &&
             booking.status === 'ACCEPTED' &&
-            !paymentSecured;
-          const canDispute =
-            mode === 'customer' &&
-            paymentStatus === 'PAID_HELD' &&
-            !booking.disputes?.some((dispute) => dispute.status === 'OPEN' || dispute.status === 'UNDER_REVIEW');
+            (!paymentStatus || ['UNPAID', 'PAYMENT_PENDING', 'FAILED'].includes(paymentStatus));
+          const canCancel = ['REQUESTED', 'ACCEPTED'].includes(booking.status);
 
           return (
             <article className="booking-detail-card" key={booking.id}>
               <header className="booking-detail-head">
                 <div className="booking-person">
-                  <span>{contactInitials}</span>
+                  <ProfileAvatar
+                    name={contactName}
+                    imageUrl={contactImageUrl}
+                    className="h-11 w-11"
+                    textClassName="text-sm"
+                  />
                   <div>
                     <h3>{contactName}</h3>
-                    <p>{booking.offering?.category?.name || serviceName}</p>
+                    <p>{artisanExpertiseLabel(booking)}</p>
                   </div>
                 </div>
-                <span className={`booking-status ${booking.status.toLowerCase()}`}>{statusLabel(booking.status)}</span>
+                <span className={`booking-status ${booking.status.toLowerCase()}`}>
+                  {customerBookingStatusLabel(booking.status)}
+                </span>
               </header>
 
               <dl className="booking-detail-list">
@@ -476,31 +326,19 @@ export function BookingsPage({
                 </div>
                 <div>
                   <dt>Date</dt>
-                  <dd>{bookingDate(booking.scheduledAt)}</dd>
+                  <dd>{bookingCardDate(booking.scheduledAt)}</dd>
                 </div>
                 <div>
                   <dt>Time</dt>
-                  <dd>{booking.scheduledAt ? formatMessageTime(booking.scheduledAt) : 'To be confirmed'}</dd>
+                  <dd>{bookingTimeSlotLabel(booking.scheduledAt)}</dd>
                 </div>
                 <div>
                   <dt>Location</dt>
-                  <dd>{booking.artisan?.area || booking.offering?.artisan?.area || 'To be confirmed'}</dd>
+                  <dd>{bookingCardLocation(booking)}</dd>
                 </div>
-                <div>
+                <div className="booking-detail-notes">
                   <dt>Notes</dt>
-                  <dd>{booking.note || 'No note added'}</dd>
-                </div>
-                <div>
-                  <dt>Payment</dt>
-                  <dd>
-                    <span className={`payment-chip ${(paymentStatus || 'UNPAID').toLowerCase()}`}>
-                      {paymentLabel(paymentStatus)}
-                    </span>
-                  </dd>
-                </div>
-                <div>
-                  <dt>Dispute</dt>
-                  <dd>{latestDispute ? latestDispute.status.toLowerCase().replace(/_/g, ' ') : 'None'}</dd>
+                  <dd>{bookingCardNotes(booking.note)}</dd>
                 </div>
               </dl>
 
@@ -509,79 +347,54 @@ export function BookingsPage({
                 <strong>{price}</strong>
               </div>
 
-              {awaitingPaymentToStart && (
-                <p className="booking-payment-notice" role="status">
-                  Your booking was accepted. Pay securely below so your artisan can start the service.
-                </p>
-              )}
-
-              <div className="booking-card-actions">
-                {canPay && (
-                  <button
-                    className="primary-action"
-                    disabled={busy}
-                    onClick={() => runAction(() => startPayment(booking.id), 'Payment checkout opened')}
-                  >
-                    Pay securely
+              {booking.status === 'ACCEPTED' ? (
+                <div className="booking-card-action-stack">
+                  {canPay ? (
+                    <button
+                      type="button"
+                      className="booking-card-primary-action"
+                      disabled={busy}
+                      onClick={() => runAction(() => startPayment(booking.id), 'Payment checkout opened')}
+                    >
+                      Pay securely
+                    </button>
+                  ) : null}
+                  {paymentStatus === 'PAID_HELD' ? (
+                    <button type="button" className="booking-card-primary-action" disabled>
+                      Payment secured
+                    </button>
+                  ) : null}
+                  <button type="button" className="booking-card-secondary-action" onClick={openMessages}>
+                    Open Chat
                   </button>
-                )}
-                {paymentStatus === 'PAID_HELD' && (
-                  <button className="secondary-button" disabled>
-                    Payment secured
-                  </button>
-                )}
-                {paymentStatus === 'RELEASED' && (
-                  <button className="secondary-button" disabled>
-                    Payment released
-                  </button>
-                )}
-                {['REQUESTED', 'ACCEPTED'].includes(booking.status) && (
-                  <button disabled={busy} onClick={() => runAction(() => cancelBooking(booking.id), 'Booking cancelled')}>
-                    Cancel request
-                  </button>
-                )}
-                {(['REQUESTED', 'ACCEPTED'] as Booking['status'][]).includes(booking.status) && (
-                  <button
-                    className="secondary-button"
-                    disabled={busy}
-                    onClick={() => startReschedule(booking)}
-                  >
-                    Reschedule
-                  </button>
-                )}
-                {booking.status === 'ACCEPTED' && (
-                  <button className="secondary-button" onClick={openMessages}>
-                    Open chat
-                  </button>
-                )}
-                {canDispute && (
-                  <button
-                    className="secondary-button"
-                    disabled={busy}
-                    onClick={() => runAction(() => openDispute(booking.id), 'Dispute opened')}
-                  >
-                    Raise dispute
-                  </button>
-                )}
-                {canLeaveReview(booking) && (
-                  <button type="button" disabled={busy} onClick={() => setReviewBooking(booking)}>
-                    Leave review
-                  </button>
-                )}
-                {booking.status === 'COMPLETED' && !booking.review && !paymentSecured && (
-                  <span className="review-submitted-label">Review opens after payment is secured</span>
-                )}
-                {booking.status === 'COMPLETED' && booking.review && (
-                  <span className="review-submitted-label">
-                    Review submitted · {booking.review.rating}/5
-                  </span>
-                )}
-              </div>
+                </div>
+              ) : null}
+              {booking.status === 'COMPLETED' ? (
+                <button
+                  type="button"
+                  className="booking-card-primary-action"
+                  disabled={busy}
+                  onClick={() =>
+                    runAction(async () => undefined, 'Reviews are created from completed booking flow')
+                  }
+                >
+                  Leave a review
+                </button>
+              ) : null}
+              {booking.status !== 'ACCEPTED' && booking.status !== 'COMPLETED' ? (
+                <button
+                  type="button"
+                  className="booking-card-primary-action"
+                  disabled={busy || !canCancel}
+                  onClick={() => runAction(() => cancelBooking(booking.id), 'Booking cancelled')}
+                >
+                  Cancel request
+                </button>
+              ) : null}
             </article>
           );
         })}
       </div>
     </section>
-    </>
   );
 }

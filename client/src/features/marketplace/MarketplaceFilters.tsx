@@ -22,7 +22,7 @@ export function MarketplaceFilters({
 }: {
   categories: Category[];
   selectedState: string;
-  states: string[];
+  states: readonly string[];
   searchTerm: string;
   selectedCategoryId: string;
   priceMin: string;

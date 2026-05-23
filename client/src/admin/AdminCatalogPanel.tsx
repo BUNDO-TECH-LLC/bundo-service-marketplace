@@ -1,7 +1,7 @@
-import { useState } from 'react';
 import { api } from '../lib/api';
-import { CategoryFormDialog, type CategoryFormValues } from '../components/CategoryFormDialog';
 import type { ActionRunner, AdminCategoryRecord } from '../appTypes';
+import { AppIcon } from '../components/ui/AppIcon';
+import { categoryIcon } from '../lib/categoryIcon';
 
 export function AdminCatalogPanel({
   token,
@@ -16,63 +16,59 @@ export function AdminCatalogPanel({
   runAction: ActionRunner;
   refresh: () => Promise<void>;
 }) {
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<AdminCategoryRecord | null>(null);
+  async function createNewCategory() {
+    const name = window.prompt('Category name', '');
+    if (!name) return;
+    const slug = window.prompt('Category slug', name.toLowerCase().trim().replace(/\s+/g, '-'));
+    if (!slug) return;
+    const iconKey = window.prompt('Iconify icon name', 'solar:widget-5-bold');
+    if (!iconKey) return;
 
-  async function saveCategory(values: CategoryFormValues) {
-    if (editingCategory) {
-      await api(`/admin/categories/${editingCategory.id}`, {
-        method: 'PATCH',
-        token,
-        body: JSON.stringify(values),
-      });
-    } else {
-      await api('/admin/categories', {
-        method: 'POST',
-        token,
-        body: JSON.stringify(values),
-      });
-    }
-    setDialogOpen(false);
-    setEditingCategory(null);
+    await api('/admin/categories', {
+      method: 'POST',
+      token,
+      body: JSON.stringify({ name, slug, iconKey }),
+    });
+    await refresh();
+  }
+
+  async function editCategory(category: AdminCategoryRecord) {
+    const name = window.prompt('Update category name', category.name);
+    if (!name) return;
+    const slug = window.prompt('Update category slug', category.slug);
+    if (!slug) return;
+    const iconKey = window.prompt('Update Iconify icon name', category.iconKey);
+    if (!iconKey) return;
+
+    await api(`/admin/categories/${category.id}`, {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify({ name, slug, iconKey }),
+    });
+    await refresh();
+  }
+
+  async function removeCategory(category: AdminCategoryRecord) {
+    if (!window.confirm(`Delete ${category.name}?`)) return;
+    await api(`/admin/categories/${category.id}`, {
+      method: 'DELETE',
+      token,
+    });
     await refresh();
   }
 
   return (
     <section className="admin-panel">
-      <div className="admin-panel-toolbar">
-        <p className="admin-panel-lead muted">Service categories shown in marketplace search and onboarding.</p>
-        <button
-          className="primary-button"
-          disabled={busy}
-          onClick={() => {
-            setEditingCategory(null);
-            setDialogOpen(true);
-          }}
-        >
+      <header className="admin-panel-head">
+        <div>
+          <p className="eyebrow">Catalog</p>
+          <h2>Manage the public service menu</h2>
+          <p>Keep categories clean so search, onboarding, and discovery stay sharp.</p>
+        </div>
+        <button className="primary-button" disabled={busy} onClick={() => runAction(createNewCategory, 'Category created')}>
           New category
         </button>
-      </div>
-
-      <CategoryFormDialog
-        open={dialogOpen}
-        title={editingCategory ? 'Edit category' : 'New category'}
-        initial={
-          editingCategory
-            ? {
-                name: editingCategory.name,
-                slug: editingCategory.slug,
-                iconKey: editingCategory.iconKey,
-              }
-            : undefined
-        }
-        busy={busy}
-        onCancel={() => {
-          setDialogOpen(false);
-          setEditingCategory(null);
-        }}
-        onConfirm={(values) => runAction(() => saveCategory(values), editingCategory ? 'Category updated' : 'Category created')}
-      />
+      </header>
 
       <div className="admin-record-list">
         {categories.map((category) => (
@@ -82,11 +78,14 @@ export function AdminCatalogPanel({
                 <h4>{category.name}</h4>
                 <p>{category.slug}</p>
               </div>
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[var(--color-accent-wash)] text-[var(--color-accent-bright)]">
+                <AppIcon icon={categoryIcon(category.iconKey)} size={20} />
+              </span>
               <span className="booking-status">{category._count?.offerings || 0} offerings</span>
             </div>
             <dl className="admin-inline-list">
               <div>
-                <dt>Icon key</dt>
+                <dt>Iconify icon</dt>
                 <dd>{category.iconKey}</dd>
               </div>
               <div>
@@ -98,26 +97,14 @@ export function AdminCatalogPanel({
               <button
                 className="secondary-button"
                 disabled={busy}
-                onClick={() => {
-                  setEditingCategory(category);
-                  setDialogOpen(true);
-                }}
+                onClick={() => runAction(() => editCategory(category), 'Category updated')}
               >
                 Edit
               </button>
               <button
                 className="secondary-button"
                 disabled={busy}
-                onClick={() =>
-                  runAction(async () => {
-                    if (!window.confirm(`Delete ${category.name}?`)) return;
-                    await api(`/admin/categories/${category.id}`, {
-                      method: 'DELETE',
-                      token,
-                    });
-                    await refresh();
-                  }, 'Category deleted')
-                }
+                onClick={() => runAction(() => removeCategory(category), 'Category deleted')}
               >
                 Delete
               </button>

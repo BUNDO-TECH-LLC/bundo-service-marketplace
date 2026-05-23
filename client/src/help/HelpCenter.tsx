@@ -1,4 +1,5 @@
 import { helpTopics } from './helpTopics';
+import { AppIcon } from '../components/ui/AppIcon';
 
 export function HelpCenter({
   activeTopicId,
@@ -29,9 +30,9 @@ export function HelpCenter({
             <div className="help-topic-list">
               {helpTopics.map((topic) => (
                 <button key={topic.id} className="help-topic-row" onClick={() => onOpenTopic(topic.id)}>
-                  <span>{topic.icon}</span>
+                  <span><AppIcon icon={topic.icon} size={18} /></span>
                   <strong>{topic.title}</strong>
-                  <em>&gt;</em>
+                  <em><AppIcon icon="mdi:chevron-right" size={20} /></em>
                 </button>
               ))}
             </div>

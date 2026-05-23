@@ -4,3 +4,8 @@ dist/
 *.json.key
 .DS_Store
 .vercel/
+./server/.env
+.cursor/
+./client/.env
+./client/node_modules/
+./server/node_modules/

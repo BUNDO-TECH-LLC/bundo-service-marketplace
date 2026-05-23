@@ -26,6 +26,17 @@ ALTER TABLE "admin_notes" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "_prisma_migrations" ENABLE ROW LEVEL SECURITY;
 
 -- Defense in depth: strip default PostgREST grants from browser-facing roles.
-REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated;
-REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
-REVOKE ALL ON ALL ROUTINES IN SCHEMA public FROM anon, authenticated;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;
+    REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon;
+    REVOKE ALL ON ALL ROUTINES IN SCHEMA public FROM anon;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    REVOKE ALL ON ALL TABLES IN SCHEMA public FROM authenticated;
+    REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM authenticated;
+    REVOKE ALL ON ALL ROUTINES IN SCHEMA public FROM authenticated;
+  END IF;
+END $$;

@@ -1,0 +1,17 @@
+.primary-button {
+  border: 1px solid var(--ink);
+  border-radius: 8px;
+  padding: 13px 18px;
+  color: var(--color-white);
+  background: var(--ink);
+}
+
+.primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.secondary-button {
+  color: var(--ink) !important;
+  background: var(--color-input-soft) !important;
+}

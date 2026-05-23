@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { signOut } from 'firebase/auth';
 import { Outlet } from 'react-router-dom';
-import type { AuthDrawerPrompt } from '../lib/authDrawerPrompt';
 import { parseAuthDrawerPrompt, stripAuthDrawerParams } from '../lib/authDrawerPrompt';
 import { AuthBox } from '../auth/AuthBox';
 import { BundoLoadingScreen } from '../components/BundoLoadingScreen';
@@ -16,12 +15,13 @@ import { ArtisanAppHeader } from '../features/artisan/ArtisanAppHeader';
 import { BookingSuccessDialog } from '../features/booking/BookingSuccessDialog';
 import { SignedInTopbarNav } from './SignedInTopbarNav';
 import { ARTISAN_ONBOARDING_PATH, isArtisanApplicantSession } from '../lib/artisanApplication';
+import type { View, WorkspaceSection } from '../appTypes';
 import { useAppRoot } from './appRootContext';
 
 export function MainLayout() {
   const ctx = useAppRoot();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [authDrawerPrompt, setAuthDrawerPrompt] = useState<AuthDrawerPrompt | null>(null);
+  const [authPromptSignal, setAuthPromptSignal] = useState(0);
   const consumedAuthPromptRef = useRef('');
 
   const closeMobileNav = () => setMobileNavOpen(false);
@@ -43,7 +43,7 @@ export function MainLayout() {
     }
 
     consumedAuthPromptRef.current = promptKey;
-    setAuthDrawerPrompt(parsed);
+    setAuthPromptSignal((value) => value + 1);
 
     const cleanedSearch = stripAuthDrawerParams(ctx.location.search);
     if (cleanedSearch !== ctx.location.search) {
@@ -95,7 +95,7 @@ export function MainLayout() {
                 view={ctx.view}
                 workspaceSection={ctx.workspaceSection}
                 notifications={ctx.notifications}
-                onNavigate={(path) => goTo(() => ctx.navigate(path))}
+                onNavigate={(path: string) => goTo(() => ctx.navigate(path))}
               />
             ) : (
               <nav aria-label="Main navigation">
@@ -167,10 +167,8 @@ export function MainLayout() {
             <AuthBox
               firebaseUser={ctx.firebaseUser}
               me={ctx.me}
-              authDrawerPrompt={authDrawerPrompt}
-              onAuthDrawerPromptHandled={() => setAuthDrawerPrompt(null)}
+              authPromptSignal={authPromptSignal}
               unreadCount={ctx.notifications.filter((notification) => !notification.readAt).length}
-              onOpenAuth={closeMobileNav}
               onReady={(nextToken, nextUser) => {
                 ctx.acknowledgeSession(nextToken, nextUser);
                 ctx.loadPrivateData(nextToken, nextUser).catch(() => undefined);
@@ -191,7 +189,7 @@ export function MainLayout() {
                 }
                 ctx.setRouteHydrated(true);
               }}
-              onNavigate={(nextView) => {
+              onNavigate={(nextView: View) => {
                 closeMobileNav();
                 if (nextView === 'help') {
                   ctx.navigate('/help', { state: nextHelpOpenState(ctx.location) });
@@ -199,11 +197,7 @@ export function MainLayout() {
                 }
                 ctx.navigate(buildAppPath({ view: nextView }));
               }}
-              onNavigatePath={(path) => {
-                closeMobileNav();
-                ctx.navigate(path);
-              }}
-              onWorkspaceSection={(section) => {
+              onWorkspaceSection={(section: WorkspaceSection) => {
                 closeMobileNav();
                 ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: section }));
               }}
