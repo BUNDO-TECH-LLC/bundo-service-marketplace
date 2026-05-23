@@ -37,6 +37,18 @@ import { buildCloudinaryUploadSignature } from '../../utils/cloudinarySignature'
 
 const router = Router();
 
+function isWithinNigeriaBounds(lat: number, lng: number) {
+  return lat >= 4 && lat <= 14 && lng >= 2 && lng <= 15;
+}
+
+function validateProfileCoordinates(lat: number, lng: number) {
+  if (!isWithinNigeriaBounds(lat, lng)) {
+    return 'lat and lng must be within Nigeria';
+  }
+
+  return null;
+}
+
 router.post(
   '/kyc',
   verifyFirebaseToken,
@@ -163,6 +175,12 @@ router.post(
       });
     }
 
+    const coordinateError = validateProfileCoordinates(lat, lng);
+
+    if (coordinateError) {
+      return res.status(400).json({ message: coordinateError });
+    }
+
     try {
       const profile = await createArtisanProfile({
         userId: (req as any).user.firebaseUid,
@@ -248,6 +266,14 @@ router.patch(
         return res.status(400).json({ message: 'lng must be a number' });
       }
       data.lng = lng;
+    }
+
+    if (data.lat !== undefined && data.lng !== undefined) {
+      const coordinateError = validateProfileCoordinates(data.lat, data.lng);
+
+      if (coordinateError) {
+        return res.status(400).json({ message: coordinateError });
+      }
     }
 
     if (!Object.keys(data).length) {
