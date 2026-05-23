@@ -1,10 +1,10 @@
 import { api } from './api';
+import { formatCloudinaryUploadError } from './cloudinaryUploadError';
+import { assertAcceptableImageFile } from './imageFile';
 import type { CloudinarySignedUpload } from '../types';
 
 export async function uploadChatImage(token: string, file: File) {
-  if (!file.type.startsWith('image/')) {
-    throw new Error('Please choose an image file.');
-  }
+  assertAcceptableImageFile(file);
 
   if (file.size > 5 * 1024 * 1024) {
     throw new Error('Chat images must be 5MB or smaller.');
@@ -28,10 +28,20 @@ export async function uploadChatImage(token: string, file: File) {
       body: formData,
     }
   );
-  const uploadData = await uploadResponse.json();
+  const uploadData = (await uploadResponse.json()) as {
+    secure_url?: string;
+    public_id?: string;
+    error?: { message?: string };
+  };
 
   if (!uploadResponse.ok) {
-    throw new Error(uploadData?.error?.message || 'Could not upload image');
+    throw new Error(
+      formatCloudinaryUploadError(
+        signatureResponse.upload.cloudName,
+        uploadData,
+        'Could not upload image'
+      )
+    );
   }
 
   return {

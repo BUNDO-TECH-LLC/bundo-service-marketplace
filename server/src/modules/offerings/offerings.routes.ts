@@ -1,7 +1,9 @@
 import { Router } from 'express';
-import { Role } from '@prisma/client';
 import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
-import { requireRole } from '../../middlewares/requireRole';
+import { requireArtisanOrApplicant } from '../../middlewares/requireArtisanOrApplicant';
+import { asyncHandler } from '../../middlewares/errorHandler';
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../utils/errors';
+import { throwOnServiceStatus } from '../../utils/resultErrors';
 import {
   countOfferings,
   createOfferingForArtisan,
@@ -73,126 +75,134 @@ const validateOfferingBody = (body: any, partial = false) => {
   return { data };
 };
 
-router.post('/', verifyFirebaseToken, requireRole(Role.ARTISAN), async (req, res) => {
-  const validation = validateOfferingBody(req.body);
+router.post(
+  '/',
+  verifyFirebaseToken,
+  requireArtisanOrApplicant,
+  asyncHandler(async (req, res) => {
+    const validation = validateOfferingBody(req.body);
 
-  if (validation.error || !validation.data) {
-    return res.status(400).json({ message: validation.error });
-  }
+    if (validation.error || !validation.data) {
+      throw new ValidationError(validation.error || 'Invalid offering payload');
+    }
 
-  const result = await createOfferingForArtisan({
-    artisanUserId: (req as any).user.firebaseUid,
-    categoryId: validation.data.categoryId!,
-    title: validation.data.title!,
-    ...(validation.data.description != null
-      ? { description: validation.data.description }
-      : {}),
-    priceFrom: validation.data.priceFrom!,
-    ...(validation.data.priceTo != null ? { priceTo: validation.data.priceTo } : {}),
-  });
-
-  if (result.status === 'missing_artisan') {
-    return res.status(404).json({
-      message: 'Create an artisan profile before adding offerings',
+    const result = await createOfferingForArtisan({
+      artisanUserId: (req as any).user.firebaseUid,
+      categoryId: validation.data.categoryId!,
+      title: validation.data.title!,
+      ...(validation.data.description != null
+        ? { description: validation.data.description }
+        : {}),
+      priceFrom: validation.data.priceFrom!,
+      ...(validation.data.priceTo != null ? { priceTo: validation.data.priceTo } : {}),
     });
-  }
 
-  if (result.status === 'missing_category') {
-    return res.status(404).json({ message: 'Category not found' });
-  }
-
-  return res.status(201).json({
-    message: 'Offering created',
-    offering: result.offering,
-  });
-});
-
-router.get('/me', verifyFirebaseToken, requireRole(Role.ARTISAN), async (req, res) => {
-  const offerings = await getOfferingsForArtisanUser(
-    (req as any).user.firebaseUid
-  );
-
-  if (!offerings) {
-    return res.status(404).json({
-      message: 'Create an artisan profile before fetching offerings',
+    throwOnServiceStatus(result.status, {
+      missing_artisan: new NotFoundError('Artisan profile'),
+      missing_category: new NotFoundError('Category'),
     });
-  }
 
-  return res.json({
-    message: 'My offerings fetched',
-    offerings,
-  });
-});
-
-router.get('/', async (req, res) => {
-  const { artisanId, categoryId, city, state, q, minPrice, maxPrice, sort } =
-    req.query;
-  const pagination = getPagination(req);
-  const location =
-    typeof state === 'string'
-      ? state
-      : typeof city === 'string'
-        ? city
-        : undefined;
-  const filters = {
-    ...(typeof artisanId === 'string' ? { artisanId } : {}),
-    ...(typeof categoryId === 'string' ? { categoryId } : {}),
-    ...(location !== undefined ? { city: location } : {}),
-    ...(typeof q === 'string' ? { q } : {}),
-    ...(typeof minPrice === 'string' ? { minPrice: Number(minPrice) } : {}),
-    ...(typeof maxPrice === 'string' ? { maxPrice: Number(maxPrice) } : {}),
-    ...(typeof sort === 'string' &&
-    ['newest', 'price_low', 'price_high', 'rating'].includes(sort)
-      ? { sort: sort as 'newest' | 'price_low' | 'price_high' | 'rating' }
-      : {}),
-  };
-
-  if (
-    (filters.minPrice !== undefined && Number.isNaN(filters.minPrice)) ||
-    (filters.maxPrice !== undefined && Number.isNaN(filters.maxPrice))
-  ) {
-    return res.status(400).json({
-      message: 'minPrice and maxPrice must be numbers',
+    res.status(201).json({
+      message: 'Offering created',
+      offering: result.offering,
     });
-  }
+  })
+);
 
-  const [offerings, total] = await Promise.all([
-    getOfferings(filters, pagination),
-    countOfferings(filters),
-  ]);
+router.get(
+  '/me',
+  verifyFirebaseToken,
+  requireArtisanOrApplicant,
+  asyncHandler(async (req, res) => {
+    const offerings = await getOfferingsForArtisanUser((req as any).user.firebaseUid);
 
-  return res.json({
-    message: 'Offerings fetched',
-    offerings,
-    meta: {
-      ...paginationMeta(pagination),
-      total,
-    },
-  });
-});
+    if (!offerings) {
+      throw new NotFoundError('Artisan profile');
+    }
 
-router.get('/:id', async (req, res) => {
-  const offering = await getOfferingById(String(req.params.id));
+    res.json({
+      message: 'My offerings fetched',
+      offerings,
+    });
+  })
+);
 
-  if (!offering) {
-    return res.status(404).json({ message: 'Offering not found' });
-  }
+router.get(
+  '/',
+  asyncHandler(async (req, res) => {
+    const { artisanId, categoryId, city, state, q, minPrice, maxPrice, sort, lat, lng } = req.query;
+    const pagination = getPagination(req);
+    const location =
+      typeof state === 'string' ? state : typeof city === 'string' ? city : undefined;
+    const filters = {
+      ...(typeof artisanId === 'string' ? { artisanId } : {}),
+      ...(typeof categoryId === 'string' ? { categoryId } : {}),
+      ...(location !== undefined ? { city: location } : {}),
+      ...(typeof q === 'string' ? { q } : {}),
+      ...(typeof minPrice === 'string' ? { minPrice: Number(minPrice) } : {}),
+      ...(typeof maxPrice === 'string' ? { maxPrice: Number(maxPrice) } : {}),
+      ...(typeof sort === 'string' &&
+      ['newest', 'price_low', 'price_high', 'rating', 'distance'].includes(sort)
+        ? { sort: sort as 'newest' | 'price_low' | 'price_high' | 'rating' | 'distance' }
+        : {}),
+      ...(typeof lat === 'string' && lat.trim() ? { lat: Number(lat) } : {}),
+      ...(typeof lng === 'string' && lng.trim() ? { lng: Number(lng) } : {}),
+    };
 
-  return res.json({
-    message: 'Offering fetched',
-    offering,
-  });
-});
+    if (
+      (filters.minPrice !== undefined && Number.isNaN(filters.minPrice)) ||
+      (filters.maxPrice !== undefined && Number.isNaN(filters.maxPrice)) ||
+      (filters.lat !== undefined && Number.isNaN(filters.lat)) ||
+      (filters.lng !== undefined && Number.isNaN(filters.lng))
+    ) {
+      throw new ValidationError('minPrice, maxPrice, lat, and lng must be numbers');
+    }
+
+    if (filters.sort === 'distance' && (filters.lat === undefined || filters.lng === undefined)) {
+      throw new ValidationError('lat and lng are required when sort=distance');
+    }
+
+    const [offerings, total] = await Promise.all([
+      getOfferings(filters, pagination),
+      countOfferings(filters),
+    ]);
+
+    res.json({
+      message: 'Offerings fetched',
+      offerings,
+      meta: {
+        ...paginationMeta(pagination),
+        total,
+      },
+    });
+  })
+);
+
+router.get(
+  '/:id',
+  asyncHandler(async (req, res) => {
+    const offering = await getOfferingById(String(req.params.id));
+
+    if (!offering) {
+      throw new NotFoundError('Offering');
+    }
+
+    res.json({
+      message: 'Offering fetched',
+      offering,
+    });
+  })
+);
 
 router.patch(
   '/:id',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
-  async (req, res) => {
+  requireArtisanOrApplicant,
+  asyncHandler(async (req, res) => {
     const validation = validateOfferingBody(req.body, true);
 
     if (validation.error || !validation.data) {
-      return res.status(400).json({ message: validation.error });
+      throw new ValidationError(validation.error || 'Invalid offering payload');
     }
 
     const result = await updateOfferingForArtisan({
@@ -201,65 +211,41 @@ router.patch(
       data: validation.data,
     });
 
-    if (result.status === 'missing_artisan') {
-      return res.status(404).json({ message: 'Artisan profile not found' });
-    }
+    throwOnServiceStatus(result.status, {
+      missing_artisan: new NotFoundError('Artisan profile'),
+      missing_offering: new NotFoundError('Offering'),
+      missing_category: new NotFoundError('Category'),
+      forbidden: new ForbiddenError('You can only update your own offerings'),
+    });
 
-    if (result.status === 'missing_offering') {
-      return res.status(404).json({ message: 'Offering not found' });
-    }
-
-    if (result.status === 'missing_category') {
-      return res.status(404).json({ message: 'Category not found' });
-    }
-
-    if (result.status === 'forbidden') {
-      return res.status(403).json({
-        message: 'You can only update your own offerings',
-      });
-    }
-
-    return res.json({
+    res.json({
       message: 'Offering updated',
       offering: result.offering,
     });
-  }
+  })
 );
 
 router.delete(
   '/:id',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
-  async (req, res) => {
+  requireArtisanOrApplicant,
+  asyncHandler(async (req, res) => {
     const result = await deleteOfferingForArtisan({
       offeringId: String(req.params.id),
       artisanUserId: (req as any).user.firebaseUid,
     });
 
-    if (result.status === 'missing_artisan') {
-      return res.status(404).json({ message: 'Artisan profile not found' });
-    }
+    throwOnServiceStatus(result.status, {
+      missing_artisan: new NotFoundError('Artisan profile'),
+      missing_offering: new NotFoundError('Offering'),
+      forbidden: new ForbiddenError('You can only delete your own offerings'),
+      has_bookings: new ConflictError('Offerings with bookings cannot be deleted'),
+    });
 
-    if (result.status === 'missing_offering') {
-      return res.status(404).json({ message: 'Offering not found' });
-    }
-
-    if (result.status === 'forbidden') {
-      return res.status(403).json({
-        message: 'You can only delete your own offerings',
-      });
-    }
-
-    if (result.status === 'has_bookings') {
-      return res.status(409).json({
-        message: 'Offerings with bookings cannot be deleted',
-      });
-    }
-
-    return res.json({
+    res.json({
       message: 'Offering deleted',
     });
-  }
+  })
 );
 
 export default router;

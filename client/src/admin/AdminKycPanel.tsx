@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { api } from '../lib/api';
 import { bookingDate } from '../lib/bookingDisplay';
+import { PromptDialog } from '../components/PromptDialog';
 import type { ActionRunner, AdminArtisanRecord } from '../appTypes';
 import type { ArtisanKycSubmission } from '../types';
+import { AdminPortfolioGallery } from '../components/AdminPortfolioGallery';
 import { EmptyState } from '../components/EmptyState';
 
 export function AdminKycPanel({
@@ -19,37 +22,57 @@ export function AdminKycPanel({
   runAction: ActionRunner;
   refresh: () => Promise<void>;
 }) {
-  async function reviewSubmission(
-    submissionId: string,
-    status: 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED'
-  ) {
-    const reviewNote = window.prompt(
-      status === 'APPROVED'
-        ? 'Optional approval note'
-        : 'Add a short note for the artisan',
-      ''
-    );
+  const [reviewPrompt, setReviewPrompt] = useState<null | {
+    submissionId: string;
+    status: 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED';
+  }>(null);
 
-    await api(`/admin/kyc-submissions/${submissionId}/review`, {
+  async function submitReview(note: string) {
+    if (!reviewPrompt) return;
+    await api(`/admin/kyc-submissions/${reviewPrompt.submissionId}/review`, {
       method: 'PATCH',
       token,
       body: JSON.stringify({
-        status,
-        reviewNote: reviewNote || undefined,
+        status: reviewPrompt.status,
+        reviewNote: note || undefined,
       }),
     });
+    setReviewPrompt(null);
     await refresh();
   }
 
   return (
-    <section className="admin-bookings">
-      <div className="section-head compact">
-        <div>
-          <p className="eyebrow">Compliance</p>
-          <h2>Artisan KYC review</h2>
-          <p>Review submitted identity details before scaling artisan approvals and payouts.</p>
-        </div>
-      </div>
+    <section className="admin-panel admin-kyc-panel">
+      <p className="admin-panel-lead muted">
+        Review identity submissions before approving artisans and releasing payouts.
+      </p>
+
+      <PromptDialog
+        open={reviewPrompt !== null}
+        title={
+          reviewPrompt?.status === 'APPROVED'
+            ? 'Approve KYC'
+            : reviewPrompt?.status === 'REJECTED'
+              ? 'Reject KYC'
+              : 'Request KYC changes'
+        }
+        message="Add an optional note for the artisan."
+        label="Review note"
+        confirmLabel="Save"
+        required={false}
+        busy={busy}
+        onCancel={() => setReviewPrompt(null)}
+        onConfirm={(note) =>
+          runAction(
+            () => submitReview(note),
+            reviewPrompt?.status === 'APPROVED'
+              ? 'KYC approved'
+              : reviewPrompt?.status === 'REJECTED'
+                ? 'KYC rejected'
+                : 'KYC returned for changes'
+          )
+        }
+      />
 
       {submissions.length === 0 && (
         <EmptyState
@@ -58,62 +81,67 @@ export function AdminKycPanel({
         />
       )}
 
-      <div className="booking-list">
+      <div className="admin-inline-table" role="list">
         {submissions.map((submission) => (
-          <article className="booking-detail-card" key={submission.id}>
-            <header className="booking-detail-head">
-              <div className="booking-person">
-                <span>{(submission.legalName || 'K').slice(0, 1).toUpperCase()}</span>
+          <article className="admin-row admin-row--kyc" key={submission.id} role="listitem">
+            <div className="admin-row-grid admin-row-grid--kyc">
+              <div className="admin-row-primary">
+                <strong className="admin-row-title">{submission.legalName}</strong>
+                <p className="admin-row-sub">
+                  {submission.artisan?.displayName || submission.artisan?.user?.email || 'Artisan submission'}
+                </p>
+                <span className={`booking-status ${submission.status.toLowerCase().replace(/_/g, '-')}`}>
+                  {submission.status.toLowerCase().replace(/_/g, ' ')}
+                </span>
+              </div>
+              <dl className="admin-row-fields admin-row-fields--compact">
                 <div>
-                  <h3>{submission.legalName}</h3>
-                  <p>{submission.artisan?.displayName || submission.artisan?.user?.email || 'Artisan submission'}</p>
+                  <dt>Document</dt>
+                  <dd>{submission.documentType}</dd>
                 </div>
-              </div>
-              <span className={`booking-status ${submission.status.toLowerCase().replace(/_/g, '-')}`}>
-                {submission.status.toLowerCase().replace(/_/g, ' ')}
-              </span>
-            </header>
+                <div>
+                  <dt>Number</dt>
+                  <dd>{submission.documentNumber}</dd>
+                </div>
+                <div>
+                  <dt>City</dt>
+                  <dd>{submission.city}</dd>
+                </div>
+                <div>
+                  <dt>Submitted</dt>
+                  <dd>{bookingDate(submission.submittedAt)}</dd>
+                </div>
+                <div className="admin-row-fields-wide">
+                  <dt>Address</dt>
+                  <dd>{submission.address}</dd>
+                </div>
+                <div>
+                  <dt>Document</dt>
+                  <dd>
+                    <a href={submission.documentImageUrl} target="_blank" rel="noreferrer">
+                      Open file
+                    </a>
+                  </dd>
+                </div>
+              </dl>
+            </div>
 
-            <dl className="booking-detail-list">
-              <div>
-                <dt>Document</dt>
-                <dd>{submission.documentType}</dd>
-              </div>
-              <div>
-                <dt>Number</dt>
-                <dd>{submission.documentNumber}</dd>
-              </div>
-              <div>
-                <dt>City</dt>
-                <dd>{submission.city}</dd>
-              </div>
-              <div>
-                <dt>Address</dt>
-                <dd>{submission.address}</dd>
-              </div>
-              <div>
-                <dt>Submitted</dt>
-                <dd>{bookingDate(submission.submittedAt)}</dd>
-              </div>
-              <div>
-                <dt>Document URL</dt>
-                <dd>
-                  <a href={submission.documentImageUrl} target="_blank" rel="noreferrer">
-                    Open document
-                  </a>
-                </dd>
-              </div>
-            </dl>
+            <div className="admin-review-photos admin-review-photos--inline">
+              <p className="admin-row-photo-label">
+                Portfolio ({submission.artisan?.portfolioImages?.length ?? 0})
+              </p>
+              <AdminPortfolioGallery
+                images={submission.artisan?.portfolioImages ?? []}
+                artisanName={submission.artisan?.displayName}
+              />
+            </div>
 
-            <div className="booking-card-actions">
+            <div className="admin-row-actions admin-row-actions--inline">
               <button
                 className="primary-action"
                 disabled={busy || submission.status === 'APPROVED'}
                 onClick={() =>
-                  runAction(
-                    () => reviewSubmission(submission.id, 'APPROVED'),
-                    'KYC approved'
-                  )
+                  setReviewPrompt({ submissionId: submission.id, status: 'APPROVED' })
                 }
               >
                 Approve
@@ -122,10 +150,7 @@ export function AdminKycPanel({
                 className="secondary-button"
                 disabled={busy || submission.status === 'CHANGES_REQUESTED'}
                 onClick={() =>
-                  runAction(
-                    () => reviewSubmission(submission.id, 'CHANGES_REQUESTED'),
-                    'KYC returned for changes'
-                  )
+                  setReviewPrompt({ submissionId: submission.id, status: 'CHANGES_REQUESTED' })
                 }
               >
                 Request changes
@@ -134,10 +159,7 @@ export function AdminKycPanel({
                 className="secondary-button"
                 disabled={busy || submission.status === 'REJECTED'}
                 onClick={() =>
-                  runAction(
-                    () => reviewSubmission(submission.id, 'REJECTED'),
-                    'KYC rejected'
-                  )
+                  setReviewPrompt({ submissionId: submission.id, status: 'REJECTED' })
                 }
               >
                 Reject

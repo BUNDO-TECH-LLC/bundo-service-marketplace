@@ -6,13 +6,17 @@ export type Pagination = {
   skip: number;
 };
 
-export const getPagination = (req: Request, defaultLimit = 20): Pagination => {
+export const getPagination = (
+  req: Request,
+  defaultLimit = 20,
+  maxLimit = 50
+): Pagination => {
   const rawPage = Number(req.query.page);
   const rawLimit = Number(req.query.limit);
   const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1;
   const limit =
     Number.isInteger(rawLimit) && rawLimit > 0
-      ? Math.min(rawLimit, 50)
+      ? Math.min(rawLimit, maxLimit)
       : defaultLimit;
 
   return {

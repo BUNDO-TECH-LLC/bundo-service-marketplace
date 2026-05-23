@@ -1,7 +1,9 @@
-import { NotificationType, Prisma, Role } from '@prisma/client';
+import { ConversationInboxState, NotificationType, Prisma, Role } from '@prisma/client';
 import db from '../../db/client';
 import { getArtisanProfileByUserId } from '../artisans/artisans.service';
+import { workspaceLink } from '../../lib/appLinks';
 import { createNotification } from '../notifications/notifications.service';
+import logger from '../../utils/logger';
 
 async function ensureBookingConversationsForUser(input: {
   firebaseUid: string;
@@ -104,6 +106,14 @@ export const createMessage = async (input: {
       return { status: 'forbidden' as const };
     }
 
+    if (isCustomer && conversation.customerInbox !== ConversationInboxState.ACTIVE) {
+      return { status: 'forbidden' as const };
+    }
+
+    if (isArtisan && conversation.artisanInbox !== ConversationInboxState.ACTIVE) {
+      return { status: 'forbidden' as const };
+    }
+
     const message = await db.$transaction(async (tx: Prisma.TransactionClient) => {
       const createdMessage = await tx.message.create({
         data: {
@@ -148,7 +158,7 @@ export const createMessage = async (input: {
         type: NotificationType.MESSAGE,
         title: 'New message',
         body: 'You have a new chat message waiting.',
-        link: '/?view=workspace&section=messages',
+        link: workspaceLink('messages'),
       });
     }
 
@@ -221,7 +231,7 @@ export const createMessage = async (input: {
     type: NotificationType.MESSAGE,
     title: 'New message',
     body: 'A customer started a conversation with you.',
-    link: '/?view=workspace&section=messages',
+    link: workspaceLink('messages'),
   });
 
   return { status: 'created' as const, conversation, message };
@@ -239,7 +249,7 @@ export const getConversationsForUser = async (input: {
     }
 
     return db.conversation.findMany({
-      where: { artisanId: artisan.id },
+      where: { artisanId: artisan.id, artisanInbox: ConversationInboxState.ACTIVE },
       orderBy: { updatedAt: 'desc' },
       include: {
         customer: {
@@ -261,7 +271,7 @@ export const getConversationsForUser = async (input: {
   await ensureBookingConversationsForUser(input);
 
   return db.conversation.findMany({
-    where: { customerId: input.firebaseUid },
+    where: { customerId: input.firebaseUid, customerInbox: ConversationInboxState.ACTIVE },
     orderBy: { updatedAt: 'desc' },
     include: {
       artisan: true,
@@ -280,6 +290,18 @@ export const getConversationMessages = async (input: {
 }) => {
   const conversation = await db.conversation.findUnique({
     where: { id: input.conversationId },
+    include: {
+      customer: {
+        select: {
+          firebaseUid: true,
+          email: true,
+          phone: true,
+          role: true,
+          status: true,
+        },
+      },
+      artisan: true,
+    },
   });
 
   if (!conversation) {
@@ -295,6 +317,14 @@ export const getConversationMessages = async (input: {
   }
 
   if (!isCustomer && !isArtisan) {
+    return { status: 'forbidden' as const };
+  }
+
+  if (isCustomer && conversation.customerInbox !== ConversationInboxState.ACTIVE) {
+    return { status: 'forbidden' as const };
+  }
+
+  if (isArtisan && conversation.artisanInbox !== ConversationInboxState.ACTIVE) {
     return { status: 'forbidden' as const };
   }
 
@@ -315,3 +345,102 @@ export const getConversationMessages = async (input: {
 
   return { status: 'found' as const, conversation, messages };
 };
+
+export async function updateMyConversationInboxState(input: {
+  conversationId: string;
+  firebaseUid: string;
+  role: Role | null;
+  inbox: 'ACTIVE' | 'SPAM' | 'ARCHIVED';
+}) {
+  const conversation = await db.conversation.findUnique({
+    where: { id: input.conversationId },
+  });
+
+  if (!conversation) {
+    return { status: 'missing_conversation' as const };
+  }
+
+  const isCustomer = conversation.customerId === input.firebaseUid;
+  let isArtisan = false;
+
+  if (input.role === Role.ARTISAN) {
+    const artisan = await getArtisanProfileByUserId(input.firebaseUid);
+    isArtisan = Boolean(artisan?.id === conversation.artisanId);
+  }
+
+  if (!isCustomer && !isArtisan) {
+    return { status: 'forbidden' as const };
+  }
+
+  const prismaState =
+    input.inbox === 'ACTIVE'
+      ? ConversationInboxState.ACTIVE
+      : input.inbox === 'SPAM'
+        ? ConversationInboxState.SPAM
+        : ConversationInboxState.ARCHIVED;
+
+  await db.conversation.update({
+    where: { id: conversation.id },
+    data: isCustomer ? { customerInbox: prismaState } : { artisanInbox: prismaState },
+  });
+
+  return { status: 'ok' as const };
+}
+
+export async function reportUserInConversation(input: {
+  conversationId: string;
+  reporterId: string;
+  role: Role | null;
+  reportedUserId: string;
+  detail?: string | null;
+}) {
+  const conversation = await db.conversation.findUnique({
+    where: { id: input.conversationId },
+    include: {
+      artisan: { select: { userId: true } },
+    },
+  });
+
+  if (!conversation) {
+    return { status: 'missing_conversation' as const };
+  }
+
+  const isCustomer = conversation.customerId === input.reporterId;
+  let isArtisan = false;
+
+  if (input.role === Role.ARTISAN) {
+    const artisan = await getArtisanProfileByUserId(input.reporterId);
+    isArtisan = Boolean(artisan?.id === conversation.artisanId);
+  }
+
+  if (!isCustomer && !isArtisan) {
+    return { status: 'forbidden' as const };
+  }
+
+  const artisanUserId = conversation.artisan.userId;
+  const otherPartyId = isCustomer ? artisanUserId : conversation.customerId;
+
+  if (input.reportedUserId !== otherPartyId) {
+    return { status: 'invalid_reported_user' as const };
+  }
+
+  await db.chatUserReport.create({
+    data: {
+      conversationId: conversation.id,
+      reporterId: input.reporterId,
+      reportedUserId: input.reportedUserId,
+      detail: input.detail?.trim() || null,
+    },
+  });
+
+  logger.info(
+    {
+      conversationId: conversation.id,
+      reporterId: input.reporterId,
+      reportedUserId: input.reportedUserId,
+    },
+    'chat_user_report_created'
+  );
+
+  return { status: 'ok' as const };
+}

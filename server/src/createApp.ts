@@ -15,8 +15,11 @@ import offeringRoutes from './modules/offerings/offerings.routes';
 import paymentRoutes from './modules/payments/payments.routes';
 import reviewRoutes from './modules/reviews/reviews.routes';
 import userRoutes from './modules/users/users.routes';
+import { serializeUser } from './modules/users/users.service';
 import logger from './utils/logger';
 import db from './db/client';
+import { appErrorHandler } from './middlewares/errorHandler';
+import { getCloudinaryHealth } from './utils/cloudinaryUploadConfig';
 
 export function createApp() {
   const app = express();
@@ -28,6 +31,16 @@ export function createApp() {
   if (env.PAYSTACK_SECRET_KEY) {
     const paystackMode = env.PAYSTACK_SECRET_KEY.startsWith('sk_test') ? 'test' : 'live';
     logger.info({ paystackMode }, 'Paystack payments enabled');
+    if (isProduction && env.PAYSTACK_SECRET_KEY.startsWith('sk_test')) {
+      logger.warn(
+        'PAYSTACK_SECRET_KEY is a test key while NODE_ENV is production. Use sk_live when Paystack live is approved.'
+      );
+    }
+    if (!isProduction && env.PAYSTACK_SECRET_KEY.startsWith('sk_live')) {
+      logger.warn(
+        'PAYSTACK_SECRET_KEY is a live key but NODE_ENV is not production. Avoid using live keys on dev machines.'
+      );
+    }
   } else {
     logger.info('Paystack secret not set: payment initialize and payouts return 503 until configured');
   }
@@ -144,10 +157,25 @@ export function createApp() {
   app.get('/ready', async (_req, res) => {
     try {
       await db.$queryRaw`SELECT 1`;
+      const cloudinary = await getCloudinaryHealth();
+
+      if (!cloudinary.ok) {
+        res.status(503).json({
+          status: 'not_ready',
+          service: 'bundo-api',
+          cloudinary,
+        });
+        return;
+      }
+
       res.json({
         status: 'ready',
         service: 'bundo-api',
         timestamp: new Date().toISOString(),
+        cloudinary: {
+          ok: true,
+          cloudName: cloudinary.cloudName,
+        },
       });
     } catch {
       res.status(503).json({
@@ -169,7 +197,7 @@ export function createApp() {
   app.get('/me', verifyFirebaseToken, (req, res) => {
     res.json({
       message: 'User fetched',
-      user: (req as any).user,
+      user: serializeUser((req as any).user),
     });
   });
 
@@ -184,27 +212,7 @@ export function createApp() {
   app.use('/', paymentRoutes);
   app.use('/reviews', reviewRoutes);
 
-  app.use(
-    (
-      error: Error,
-      _req: Request,
-      res: Response,
-      _next: express.NextFunction
-    ) => {
-      logger.error(
-        {
-          error,
-          requestId: (res.req as any)?.requestId,
-        },
-        'Unhandled request error'
-      );
-
-      return res.status(500).json({
-        message: 'Internal server error',
-        requestId: (res.req as any)?.requestId,
-      });
-    }
-  );
+  app.use(appErrorHandler);
 
   return app;
 }

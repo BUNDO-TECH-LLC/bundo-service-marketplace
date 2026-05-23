@@ -1,11 +1,16 @@
 import { Router } from 'express';
 import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
-import { env } from '../../config/env';
-import { buildCloudinaryUploadSignature } from '../../utils/cloudinarySignature';
+import { asyncHandler } from '../../middlewares/errorHandler';
+import { ForbiddenError, NotFoundError, ValidationError } from '../../utils/errors';
+import { respondIfChatSchemaError } from '../../utils/handleChatSchemaError';
+import { throwOnServiceStatus } from '../../utils/resultErrors';
+import { createCloudinarySignedUpload } from '../../utils/cloudinaryUploadConfig';
 import {
   createMessage,
   getConversationMessages,
   getConversationsForUser,
+  reportUserInConversation,
+  updateMyConversationInboxState,
 } from './chat.service';
 
 const router = Router();
@@ -33,157 +38,229 @@ function validateMessagePayload(body: unknown, imageUrl: unknown, imageCloudinar
   return null;
 }
 
-router.post('/messages/sign-upload', verifyFirebaseToken, async (_req, res) => {
-  const timestamp = Math.floor(Date.now() / 1000);
-  const folder = 'bundo/chat-images';
-  const signature = buildCloudinaryUploadSignature(
-    { folder, timestamp },
-    env.CLOUDINARY_API_SECRET
-  );
+router.post(
+  '/messages/sign-upload',
+  verifyFirebaseToken,
+  asyncHandler(async (_req, res) => {
+    const upload = await createCloudinarySignedUpload('bundo/chat-images');
 
-  return res.json({
-    message: 'Upload signature created',
-    upload: {
-      cloudName: env.CLOUDINARY_CLOUD_NAME,
-      apiKey: env.CLOUDINARY_API_KEY,
-      timestamp,
-      folder,
-      signature,
-    },
-  });
-});
-
-router.post('/messages', verifyFirebaseToken, async (req, res) => {
-  const { artisanId, conversationId, body, imageUrl, imageCloudinaryId } = req.body;
-
-  if (artisanId !== undefined && typeof artisanId !== 'string') {
-    return res.status(400).json({ message: 'artisanId must be a string' });
-  }
-
-  if (conversationId !== undefined && typeof conversationId !== 'string') {
-    return res.status(400).json({ message: 'conversationId must be a string' });
-  }
-
-  if (!artisanId && !conversationId) {
-    return res.status(400).json({
-      message: 'artisanId or conversationId is required',
+    res.json({
+      message: 'Upload signature created',
+      upload,
     });
-  }
+  })
+);
 
-  const validationError = validateMessagePayload(body, imageUrl, imageCloudinaryId);
+router.post(
+  '/messages',
+  verifyFirebaseToken,
+  asyncHandler(async (req, res) => {
+    try {
+      const { artisanId, conversationId, body, imageUrl, imageCloudinaryId } = req.body;
 
-  if (validationError) {
-    return res.status(400).json({ message: validationError });
-  }
+      if (artisanId !== undefined && typeof artisanId !== 'string') {
+        throw new ValidationError('artisanId must be a string');
+      }
 
-  const result = await createMessage({
-    senderId: (req as any).user.firebaseUid,
-    senderRole: (req as any).user.role,
-    artisanId,
-    conversationId,
-    body: typeof body === 'string' ? body : '',
-    imageUrl,
-    imageCloudinaryId,
-  });
+      if (conversationId !== undefined && typeof conversationId !== 'string') {
+        throw new ValidationError('conversationId must be a string');
+      }
 
-  if (result.status === 'missing_conversation') {
-    return res.status(404).json({ message: 'Conversation not found' });
-  }
+      if (!artisanId && !conversationId) {
+        throw new ValidationError('artisanId or conversationId is required');
+      }
 
-  if (result.status === 'missing_artisan_id') {
-    return res.status(400).json({ message: 'artisanId is required' });
-  }
+      const validationError = validateMessagePayload(body, imageUrl, imageCloudinaryId);
 
-  if (result.status === 'missing_artisan') {
-    return res.status(404).json({ message: 'Artisan not found' });
-  }
+      if (validationError) {
+        throw new ValidationError(validationError);
+      }
 
-  if (result.status === 'self_message') {
-    return res.status(403).json({ message: 'You cannot message yourself' });
-  }
+      const result = await createMessage({
+        senderId: (req as any).user.firebaseUid,
+        senderRole: (req as any).user.role,
+        artisanId,
+        conversationId,
+        body: typeof body === 'string' ? body : '',
+        imageUrl,
+        imageCloudinaryId,
+      });
 
-  if (result.status === 'forbidden') {
-    return res.status(403).json({
-      message: 'You can only message inside your own conversations',
-    });
-  }
+      throwOnServiceStatus(result.status, {
+        missing_conversation: new NotFoundError('Conversation'),
+        missing_artisan_id: new ValidationError('artisanId is required'),
+        missing_artisan: new NotFoundError('Artisan'),
+        self_message: new ForbiddenError('You cannot message yourself'),
+        forbidden: new ForbiddenError('You can only message inside your own conversations'),
+      });
 
-  return res.status(201).json({
-    message: 'Message sent',
-    conversation: result.conversation,
-    chatMessage: result.message,
-  });
-});
+      res.status(201).json({
+        message: 'Message sent',
+        conversation: result.conversation,
+        chatMessage: result.message,
+      });
+    } catch (error: unknown) {
+      if (respondIfChatSchemaError(error, res)) return;
+      throw error;
+    }
+  })
+);
 
-router.get('/conversations', verifyFirebaseToken, async (req, res) => {
-  const conversations = await getConversationsForUser({
-    firebaseUid: (req as any).user.firebaseUid,
-    role: (req as any).user.role,
-  });
+router.get(
+  '/conversations',
+  verifyFirebaseToken,
+  asyncHandler(async (req, res) => {
+    try {
+      const conversations = await getConversationsForUser({
+        firebaseUid: (req as any).user.firebaseUid,
+        role: (req as any).user.role,
+      });
 
-  return res.json({
-    message: 'Conversations fetched',
-    conversations,
-  });
-});
+      res.json({
+        message: 'Conversations fetched',
+        conversations,
+      });
+    } catch (error: unknown) {
+      if (respondIfChatSchemaError(error, res)) return;
+      throw error;
+    }
+  })
+);
 
-router.post('/conversations/:id/messages', verifyFirebaseToken, async (req, res) => {
-  const { body, imageUrl, imageCloudinaryId } = req.body;
+router.patch(
+  '/conversations/:id/inbox',
+  verifyFirebaseToken,
+  asyncHandler(async (req, res) => {
+    try {
+      const raw = req.body?.inbox;
+      const allowed = ['ACTIVE', 'SPAM', 'ARCHIVED'] as const;
+      if (typeof raw !== 'string' || !allowed.includes(raw as (typeof allowed)[number])) {
+        throw new ValidationError('inbox must be ACTIVE, SPAM, or ARCHIVED');
+      }
 
-  const validationError = validateMessagePayload(body, imageUrl, imageCloudinaryId);
+      const result = await updateMyConversationInboxState({
+        conversationId: String(req.params.id),
+        firebaseUid: (req as any).user.firebaseUid,
+        role: (req as any).user.role,
+        inbox: raw as 'ACTIVE' | 'SPAM' | 'ARCHIVED',
+      });
 
-  if (validationError) {
-    return res.status(400).json({ message: validationError });
-  }
+      throwOnServiceStatus(result.status, {
+        missing_conversation: new NotFoundError('Conversation'),
+        forbidden: new ForbiddenError('You can only update your own conversations'),
+      });
 
-  const result = await createMessage({
-    senderId: (req as any).user.firebaseUid,
-    senderRole: (req as any).user.role,
-    conversationId: String(req.params.id),
-    body: typeof body === 'string' ? body : '',
-    imageUrl,
-    imageCloudinaryId,
-  });
+      res.json({ message: 'Conversation inbox updated' });
+    } catch (error: unknown) {
+      if (respondIfChatSchemaError(error, res)) return;
+      throw error;
+    }
+  })
+);
 
-  if (result.status === 'missing_conversation') {
-    return res.status(404).json({ message: 'Conversation not found' });
-  }
+router.post(
+  '/conversations/:id/report',
+  verifyFirebaseToken,
+  asyncHandler(async (req, res) => {
+    try {
+      const reportedUserId = req.body?.reportedUserId;
+      const detail = req.body?.detail;
 
-  if (result.status === 'forbidden') {
-    return res.status(403).json({
-      message: 'You can only message inside your own conversations',
-    });
-  }
+      if (typeof reportedUserId !== 'string' || !reportedUserId.trim()) {
+        throw new ValidationError('reportedUserId is required');
+      }
 
-  return res.status(201).json({
-    message: 'Message sent',
-    conversation: result.conversation,
-    chatMessage: result.message,
-  });
-});
+      if (detail !== undefined && typeof detail !== 'string') {
+        throw new ValidationError('detail must be a string when provided');
+      }
 
-router.get('/conversations/:id/messages', verifyFirebaseToken, async (req, res) => {
-  const result = await getConversationMessages({
-    conversationId: String(req.params.id),
-    firebaseUid: (req as any).user.firebaseUid,
-    role: (req as any).user.role,
-  });
+      const result = await reportUserInConversation({
+        conversationId: String(req.params.id),
+        reporterId: (req as any).user.firebaseUid,
+        role: (req as any).user.role,
+        reportedUserId: reportedUserId.trim(),
+        detail: typeof detail === 'string' ? detail : null,
+      });
 
-  if (result.status === 'missing_conversation') {
-    return res.status(404).json({ message: 'Conversation not found' });
-  }
+      throwOnServiceStatus(result.status, {
+        missing_conversation: new NotFoundError('Conversation'),
+        forbidden: new ForbiddenError('You can only report from your own conversations'),
+        invalid_reported_user: new ValidationError('You can only report the other person in this chat'),
+      });
 
-  if (result.status === 'forbidden') {
-    return res.status(403).json({
-      message: 'You can only view your own conversations',
-    });
-  }
+      res.status(201).json({ message: 'Report submitted. Our team may review this conversation.' });
+    } catch (error: unknown) {
+      if (respondIfChatSchemaError(error, res)) return;
+      throw error;
+    }
+  })
+);
 
-  return res.json({
-    message: 'Conversation messages fetched',
-    conversation: result.conversation,
-    messages: result.messages,
-  });
-});
+router.post(
+  '/conversations/:id/messages',
+  verifyFirebaseToken,
+  asyncHandler(async (req, res) => {
+    try {
+      const { body, imageUrl, imageCloudinaryId } = req.body;
+
+      const validationError = validateMessagePayload(body, imageUrl, imageCloudinaryId);
+
+      if (validationError) {
+        throw new ValidationError(validationError);
+      }
+
+      const result = await createMessage({
+        senderId: (req as any).user.firebaseUid,
+        senderRole: (req as any).user.role,
+        conversationId: String(req.params.id),
+        body: typeof body === 'string' ? body : '',
+        imageUrl,
+        imageCloudinaryId,
+      });
+
+      throwOnServiceStatus(result.status, {
+        missing_conversation: new NotFoundError('Conversation'),
+        forbidden: new ForbiddenError('You can only message inside your own conversations'),
+      });
+
+      res.status(201).json({
+        message: 'Message sent',
+        conversation: result.conversation,
+        chatMessage: result.message,
+      });
+    } catch (error: unknown) {
+      if (respondIfChatSchemaError(error, res)) return;
+      throw error;
+    }
+  })
+);
+
+router.get(
+  '/conversations/:id/messages',
+  verifyFirebaseToken,
+  asyncHandler(async (req, res) => {
+    try {
+      const result = await getConversationMessages({
+        conversationId: String(req.params.id),
+        firebaseUid: (req as any).user.firebaseUid,
+        role: (req as any).user.role,
+      });
+
+      throwOnServiceStatus(result.status, {
+        missing_conversation: new NotFoundError('Conversation'),
+        forbidden: new ForbiddenError('You can only view your own conversations'),
+      });
+
+      res.json({
+        message: 'Conversation messages fetched',
+        conversation: result.conversation,
+        messages: result.messages,
+      });
+    } catch (error: unknown) {
+      if (respondIfChatSchemaError(error, res)) return;
+      throw error;
+    }
+  })
+);
 
 export default router;

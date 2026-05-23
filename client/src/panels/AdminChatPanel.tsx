@@ -1,8 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import { ChatComposer, type ChatComposerPayload } from '../components/ChatComposer';
+import { EmptyState } from '../components/EmptyState';
 import { uploadChatImage } from '../lib/chatUpload';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import type { ActionRunner } from '../appTypes';
 import type { Conversation } from '../types';
+
+const ADMIN_CHAT_MOBILE_BREAKPOINT = '(max-width: 900px)';
 
 export function AdminChatPanel({
   token,
@@ -10,19 +15,37 @@ export function AdminChatPanel({
   busy,
   runAction,
   refresh,
+  initialConversationId,
+  onConversationOpened,
 }: {
   token: string;
   conversations: Conversation[];
   busy: boolean;
   runAction: ActionRunner;
   refresh: () => Promise<void>;
+  initialConversationId?: string | null;
+  onConversationOpened?: () => void;
 }) {
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
+  const narrowChat = useMediaQuery(ADMIN_CHAT_MOBILE_BREAKPOINT);
+  const mobileInboxMode = narrowChat && !activeConversation;
+  const mobileThreadMode = narrowChat && activeConversation;
 
   async function openConversation(conversationId: string) {
     const response = await api<{ conversation: Conversation }>(`/admin/conversations/${conversationId}`, { token });
     setActiveConversation(response.conversation);
   }
+
+  useEffect(() => {
+    if (!initialConversationId) {
+      return;
+    }
+
+    void (async () => {
+      await openConversation(initialConversationId);
+      onConversationOpened?.();
+    })();
+  }, [initialConversationId, onConversationOpened, token]);
 
   async function createNote(formElement: HTMLFormElement) {
     if (!activeConversation) return;
@@ -39,13 +62,11 @@ export function AdminChatPanel({
     await refresh();
   }
 
-  async function sendAdminReply(formElement: HTMLFormElement) {
+  async function sendAdminReply({ body, imageFile }: ChatComposerPayload) {
     if (!activeConversation) return;
-    const form = new FormData(formElement);
-    const body = String(form.get('body') || '').trim();
-    const imageFile = form.get('image');
+
     const imagePayload =
-      imageFile instanceof File && imageFile.size > 0 ? await uploadChatImage(token, imageFile) : {};
+      imageFile && imageFile.size > 0 ? await uploadChatImage(token, imageFile) : {};
 
     if (!body && !('imageUrl' in imagePayload)) {
       throw new Error('Write a message or attach an image.');
@@ -56,36 +77,78 @@ export function AdminChatPanel({
       token,
       body: JSON.stringify({ body, ...imagePayload }),
     });
-    formElement.reset();
     await openConversation(activeConversation.id);
     await refresh();
   }
 
   return (
-    <section className="admin-chat">
-      <section className="section-head compact">
-        <p className="eyebrow">Support</p>
-        <h2>Conversation access</h2>
-        <p>Admins can inspect customer/artisan chats, reply as Bundo support, and leave private operational notes.</p>
-      </section>
-      <div className="dashboard-grid">
-        <article className="panel-card">
-          <h2>All conversations</h2>
-          {conversations.length === 0 && <p>No conversations yet.</p>}
-          {conversations.map((conversation) => (
-            <button className="list-button" key={conversation.id} onClick={() => openConversation(conversation.id)}>
-              <strong>{conversation.artisan?.displayName || 'Artisan'}</strong>
-              <span>{conversation.customer?.email || conversation.customerId}</span>
-            </button>
-          ))}
+    <section
+      className={`admin-panel admin-chat${mobileInboxMode ? ' admin-chat--mobile-inbox' : ''}${
+        mobileThreadMode ? ' admin-chat--mobile-thread' : ''
+      }`}
+    >
+      <p className="admin-panel-lead muted">
+        Inspect customer–artisan threads, reply as Bundo support, and keep private operational notes.
+      </p>
+
+      <div className="admin-chat-layout">
+        <article className="admin-surface admin-chat-inbox">
+          <div className="admin-surface-head">
+            <div>
+              <p className="eyebrow">Inbox</p>
+              <h3>Conversations</h3>
+            </div>
+            <span className="admin-surface-count">{conversations.length}</span>
+          </div>
+          <div className="admin-chat-inbox-list">
+            {conversations.length === 0 && (
+              <EmptyState title="No conversations yet" body="Threads appear when customers and artisans message each other." />
+            )}
+            {conversations.map((conversation) => (
+              <button
+                className={`admin-chat-inbox-item${activeConversation?.id === conversation.id ? ' active' : ''}`}
+                key={conversation.id}
+                type="button"
+                onClick={() => openConversation(conversation.id)}
+              >
+                <strong>{conversation.artisan?.displayName || 'Artisan'}</strong>
+                <span>{conversation.customer?.email || conversation.customerId}</span>
+              </button>
+            ))}
+          </div>
         </article>
 
-        <article className="panel-card wide-panel">
-          <h2>Thread and notes</h2>
-          {!activeConversation && <p>Select a conversation to review messages and notes.</p>}
+        <article className="admin-surface admin-chat-thread">
+          {narrowChat && activeConversation && (
+            <button
+              type="button"
+              className="chat-back-button chat-back-button--block"
+              onClick={() => setActiveConversation(null)}
+              aria-label="Back to all conversations"
+            >
+              ← Back to inbox
+            </button>
+          )}
+          <div className="admin-surface-head">
+            <div>
+              <p className="eyebrow">Thread</p>
+              <h3>{activeConversation ? 'Messages & notes' : 'Select a conversation'}</h3>
+            </div>
+          </div>
+
+          {!activeConversation && (
+            <EmptyState
+              title="No thread selected"
+              body="Choose a conversation from the inbox to read messages and reply."
+            />
+          )}
+
           {activeConversation && (
             <>
-              <div className="message-list">
+              <div className="admin-chat-messages message-list">
+                {(activeConversation.messages?.length ?? 0) === 0 && (
+                  <p className="muted admin-chat-empty-copy">No messages in this thread yet.</p>
+                )}
                 {activeConversation.messages?.map((message) => (
                   <div className="message-bubble" key={message.id}>
                     <strong>{message.sender?.email || message.sender?.role || 'User'}</strong>
@@ -97,42 +160,40 @@ export function AdminChatPanel({
                 ))}
               </div>
 
-              <form
-                className="reply-form admin-reply-form"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  const form = event.currentTarget;
-                  runAction(() => sendAdminReply(form), 'Admin reply sent');
-                }}
-              >
-                <label className="chat-attach-button">
-                  Photo
-                  <input name="image" type="file" accept="image/*" disabled={busy} />
-                </label>
-                <input name="body" placeholder="Reply in this customer-artisan chat as Bundo support" />
-                <button disabled={busy}>Send reply</button>
-              </form>
+              <ChatComposer
+                busy={busy}
+                className="admin-reply-form"
+                placeholder="Reply as Bundo support"
+                submitLabel="Send reply"
+                onSubmit={(payload) => runAction(() => sendAdminReply(payload), 'Admin reply sent')}
+              />
 
-              <h3>Admin notes</h3>
-              {(activeConversation.adminNotes || []).length === 0 && <p>No notes yet.</p>}
-              {activeConversation.adminNotes?.map((note) => (
-                <div className="note-row" key={note.id}>
-                  <strong>{note.admin?.email || 'Admin'}</strong>
-                  <p>{note.body}</p>
-                </div>
-              ))}
+              <div className="admin-chat-notes">
+                <h4>Internal notes</h4>
+                {(activeConversation.adminNotes || []).length === 0 && (
+                  <p className="muted admin-chat-empty-copy">No internal notes yet.</p>
+                )}
+                {activeConversation.adminNotes?.map((note) => (
+                  <div className="note-row" key={note.id}>
+                    <strong>{note.admin?.email || 'Admin'}</strong>
+                    <p>{note.body}</p>
+                  </div>
+                ))}
 
-              <form
-                className="reply-form"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  const form = event.currentTarget;
-                  runAction(() => createNote(form), 'Admin note saved');
-                }}
-              >
-                <input name="body" placeholder="Add an internal note" required />
-                <button disabled={busy}>Save note</button>
-              </form>
+                <form
+                  className="admin-note-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const form = event.currentTarget;
+                    runAction(() => createNote(form), 'Admin note saved');
+                  }}
+                >
+                  <input name="body" placeholder="Add an internal note (not visible to users)" required />
+                  <button type="submit" className="secondary-button" disabled={busy}>
+                    Save note
+                  </button>
+                </form>
+              </div>
             </>
           )}
         </article>

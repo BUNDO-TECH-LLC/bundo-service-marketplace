@@ -1,10 +1,17 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { formatMessageTime } from '../lib/formatting';
+import { ChatComposer, type ChatComposerPayload } from '../components/ChatComposer';
 import { uploadChatImage } from '../lib/chatUpload';
+import { ChatThreadOverflowMenu } from '../components/ChatThreadOverflowMenu';
+import { useAppRoot } from '../app/appRootContext';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import type { ActionRunner } from '../appTypes';
 import type { Conversation, Message } from '../types';
 import { AppIcon } from '../components/ui/AppIcon';
+
+/** Matches `.messenger-shell` responsive breakpoint in `styles.css`. */
+const MESSENGER_MOBILE_BREAKPOINT = '(max-width: 900px)';
 
 export function ChatPanel({
   token,
@@ -21,9 +28,13 @@ export function ChatPanel({
   runAction: ActionRunner;
   refresh: () => Promise<void>;
 }) {
+  const { openArtisanProfile, me } = useAppRoot();
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [filter, setFilter] = useState<'all' | 'incoming'>('all');
+  const narrowMessenger = useMediaQuery(MESSENGER_MOBILE_BREAKPOINT);
+  const mobileInboxMode = narrowMessenger && !activeConversation;
+  const mobileThreadMode = narrowMessenger && activeConversation;
 
   const incomingConversations = useMemo(
     () =>
@@ -35,7 +46,9 @@ export function ChatPanel({
   );
   const visibleConversations = filter === 'incoming' ? incomingConversations : conversations;
 
-  async function openConversation(conversationId: string) {
+  const CHAT_POLL_MS = 12_000;
+
+  async function fetchMessages(conversationId: string) {
     const response = await api<{
       conversation: Conversation;
       messages: Message[];
@@ -44,13 +57,31 @@ export function ChatPanel({
     setMessages(response.messages);
   }
 
-  async function reply(formElement: HTMLFormElement) {
+  async function openConversation(conversationId: string) {
+    await fetchMessages(conversationId);
+  }
+
+  function backToInbox() {
+    setActiveConversation(null);
+    setMessages([]);
+  }
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      void refresh().catch(() => undefined);
+      if (activeConversation) {
+        void fetchMessages(activeConversation.id).catch(() => undefined);
+      }
+    }, CHAT_POLL_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, [activeConversation?.id, token]);
+
+  async function reply({ body, imageFile }: ChatComposerPayload) {
     if (!activeConversation) return;
-    const form = new FormData(formElement);
-    const body = String(form.get('body') || '').trim();
-    const imageFile = form.get('image');
+
     const imagePayload =
-      imageFile instanceof File && imageFile.size > 0 ? await uploadChatImage(token, imageFile) : {};
+      imageFile && imageFile.size > 0 ? await uploadChatImage(token, imageFile) : {};
 
     if (!body && !('imageUrl' in imagePayload)) {
       throw new Error('Write a message or attach an image.');
@@ -61,7 +92,6 @@ export function ChatPanel({
       token,
       body: JSON.stringify({ body, ...imagePayload }),
     });
-    formElement.reset();
     await openConversation(activeConversation.id);
     await refresh();
   }
@@ -79,8 +109,26 @@ export function ChatPanel({
     return latest?.body || (latest?.imageUrl ? 'Photo attachment' : 'Booking conversation ready');
   }
 
+  const viewerRole = me?.role;
+  const canUseChatActions = viewerRole === 'CUSTOMER' || viewerRole === 'ARTISAN';
+  const otherPartyFirebaseUid =
+    activeConversation && canUseChatActions
+      ? viewerRole === 'CUSTOMER'
+        ? activeConversation.artisan?.userId ?? ''
+        : activeConversation.customerId
+      : '';
+
+  async function afterInboxChange() {
+    await refresh();
+    backToInbox();
+  }
+
   return (
-    <article className="panel-card messages-panel">
+    <article
+      className={`panel-card messages-panel${mobileInboxMode ? ' messages-panel--mobile-inbox' : ''}${
+        mobileThreadMode ? ' messages-panel--mobile-thread' : ''
+      }`}
+    >
       <div className="messages-head">
         <div>
           <p className="eyebrow">Messages</p>
@@ -97,7 +145,11 @@ export function ChatPanel({
         </div>
       </div>
 
-      <div className="messenger-shell">
+      <div
+        className={`messenger-shell${mobileInboxMode ? ' messenger-shell--mobile-inbox' : ''}${
+          mobileThreadMode ? ' messenger-shell--mobile-thread' : ''
+        }`}
+      >
         <aside className="conversation-rail">
           {visibleConversations.length === 0 && (
             <div className="conversation-empty">
@@ -139,16 +191,40 @@ export function ChatPanel({
 
           {activeConversation && (
             <>
-              <header className="chatbox-head">
-                <span className="conversation-avatar">{conversationInitial(activeConversation)}</span>
-                <div>
-                  <h3>{conversationTitle(activeConversation)}</h3>
-                  <p>
-                    {activeConversation.artisan?.city ||
-                      activeConversation.customer?.email ||
-                      'Bundo conversation'}
-                  </p>
+              <header className={`chatbox-head${narrowMessenger ? ' chatbox-head--mobile' : ''}`}>
+                <div className="chatbox-head-main">
+                  {narrowMessenger && (
+                    <button type="button" className="chat-back-button" onClick={backToInbox} aria-label="Back to inbox">
+                      ← Back
+                    </button>
+                  )}
+                  <span className="conversation-avatar">{conversationInitial(activeConversation)}</span>
+                  <div>
+                    <h3>{conversationTitle(activeConversation)}</h3>
+                    <p>
+                      {activeConversation.artisan?.city ||
+                        activeConversation.customer?.email ||
+                        'Bundo conversation'}
+                    </p>
+                  </div>
                 </div>
+                {canUseChatActions && otherPartyFirebaseUid && (
+                  <ChatThreadOverflowMenu
+                    token={token}
+                    conversationId={activeConversation.id}
+                    viewerRole={viewerRole}
+                    artisanProfileId={activeConversation.artisanId}
+                    otherPartyFirebaseUid={otherPartyFirebaseUid}
+                    customerContact={{
+                      email: activeConversation.customer?.email,
+                      phone: activeConversation.customer?.phone,
+                    }}
+                    busy={busy}
+                    runAction={runAction}
+                    onViewArtisanProfile={() => void openArtisanProfile(activeConversation.artisanId)}
+                    onAfterInboxChange={afterInboxChange}
+                  />
+                )}
               </header>
 
               <div className="chat-message-list">
@@ -176,21 +252,12 @@ export function ChatPanel({
                 })}
               </div>
 
-              <form
-                className="chat-composer"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  const form = event.currentTarget;
-                  runAction(() => reply(form), 'Reply sent');
-                }}
-              >
-                <label className="chat-attach-button">
-                  Photo
-                  <input name="image" type="file" accept="image/*" disabled={busy} />
-                </label>
-                <input name="body" placeholder="Write a message" />
-                <button disabled={busy}>Send</button>
-              </form>
+              <ChatComposer
+                busy={busy}
+                placeholder="Write a message"
+                submitLabel="Send"
+                onSubmit={(payload) => runAction(() => reply(payload), 'Reply sent')}
+              />
             </>
           )}
         </section>

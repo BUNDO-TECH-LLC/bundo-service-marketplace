@@ -31,12 +31,19 @@ export type NotificationType =
   | 'REVIEW'
   | 'ADMIN';
 
+export type NotificationPreferences = {
+  bookings: boolean;
+  messages: boolean;
+  marketing: boolean;
+};
+
 export type ApiUser = {
   firebaseUid: string;
   email: string | null;
   phone: string | null;
   role: Role | null;
   status: 'ACTIVE' | 'BANNED';
+  notificationPreferences?: NotificationPreferences;
 };
 
 export type Category = {
@@ -82,15 +89,24 @@ export type Booking = {
   customerId?: string;
   artisanId?: string;
   offeringId?: string;
-  status: 'REQUESTED' | 'ACCEPTED' | 'DECLINED' | 'CANCELLED' | 'COMPLETED';
+  moderatorId?: string | null;
+  status: 'REQUESTED' | 'ACCEPTED' | 'ONGOING' | 'DECLINED' | 'CANCELLED' | 'COMPLETED';
+  conversationId?: string | null;
   note: string | null;
   scheduledAt: string | null;
   customerUser?: Pick<ApiUser, 'firebaseUid' | 'email' | 'phone'>;
+  moderator?: Pick<ApiUser, 'firebaseUid' | 'email' | 'phone'> | null;
   offering?: Offering;
   artisan?: Artisan;
   payment?: Payment | null;
   payouts?: Payout[];
   disputes?: Dispute[];
+  review?: {
+    id: string;
+    rating: number;
+    comment: string | null;
+    createdAt: string;
+  } | null;
 };
 
 export type Payment = {

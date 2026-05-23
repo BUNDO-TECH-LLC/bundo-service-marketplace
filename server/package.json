@@ -12,6 +12,8 @@
     "test:watch": "vitest",
     "start": "node dist/server.js",
     "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:migrate:deploy:pooler": "node scripts/migrate-deploy-pooler.mjs",
     "db:seed": "ts-node prisma/seed.ts",
     "db:studio": "prisma studio"
   },
@@ -30,6 +32,7 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.7.0",
     "@prisma/client": "^7.7.0",
+    "@sentry/node": "^10.53.1",
     "cloudinary": "^2.9.0",
     "cors": "^2.8.6",
     "dotenv": "^16.6.1",

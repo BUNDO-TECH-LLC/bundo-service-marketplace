@@ -9,8 +9,10 @@
     "build": "npm run build:server && npm run build:client",
     "start:server": "npm run start --prefix server",
     "db:migrate": "npm run db:migrate --prefix server",
+    "db:migrate:deploy:pooler": "npm run db:migrate:deploy:pooler --prefix server",
     "db:seed": "npm run db:seed --prefix server",
     "db:studio": "npm run db:studio --prefix server",
-    "test": "npm run test --prefix server"
+    "test": "npm run test --prefix server",
+    "test:smoke": "npm run test:e2e --prefix server -- src/smoke.lifecycle.e2e.test.ts"
   }
 }

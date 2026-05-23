@@ -2,8 +2,8 @@ import type { User } from 'firebase/auth';
 import type { ApiUser } from '../types';
 import { api, ApiError } from './api';
 
-export async function resolveApiSession(user: User) {
-  let idToken = await user.getIdToken();
+export async function resolveApiSession(user: User, forceRefresh = false) {
+  let idToken = await user.getIdToken(forceRefresh);
 
   try {
     const response = await api<{ user: ApiUser }>('/me', { token: idToken });

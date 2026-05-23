@@ -1,6 +1,9 @@
 import { Router } from 'express';
+import { asyncHandler } from '../../middlewares/errorHandler';
+import { BadGatewayError, httpError } from '../../utils/errors';
 import { Prisma, Role } from '@prisma/client';
 import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
+import { requireArtisanOrApplicant } from '../../middlewares/requireArtisanOrApplicant';
 import { requireRole } from '../../middlewares/requireRole';
 import { getReviewsForArtisan } from '../reviews/reviews.service';
 import {
@@ -33,7 +36,7 @@ import {
   updatePortfolioImageForArtisan,
 } from './artisans.service';
 import { env } from '../../config/env';
-import { buildCloudinaryUploadSignature } from '../../utils/cloudinarySignature';
+import { createCloudinarySignedUpload } from '../../utils/cloudinaryUploadConfig';
 
 const router = Router();
 
@@ -52,7 +55,7 @@ function validateProfileCoordinates(lat: number, lng: number) {
 router.post(
   '/kyc',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   async (req, res) => {
     const {
       legalName,
@@ -75,7 +78,7 @@ router.post(
 
     for (const [field, value] of requiredFields) {
       if (!value || typeof value !== 'string' || !value.trim()) {
-        return res.status(400).json({ message: `${field} is required` });
+        throw httpError(400, `${field} is required`);
       }
     }
 
@@ -84,7 +87,7 @@ router.post(
       selfieImageUrl !== null &&
       (typeof selfieImageUrl !== 'string' || !selfieImageUrl.trim())
     ) {
-      return res.status(400).json({ message: 'selfieImageUrl must be a string' });
+      throw httpError(400, 'selfieImageUrl must be a string');
     }
 
     const submission = await createOrUpdateKycSubmission(
@@ -101,12 +104,10 @@ router.post(
     );
 
     if (!submission) {
-      return res.status(404).json({
-        message: 'Create an artisan profile before submitting KYC',
-      });
+      throw httpError(404, 'Create an artisan profile before submitting KYC');
     }
 
-    return res.status(201).json({
+    res.status(201).json({
       message: 'KYC submitted',
       submission,
     });
@@ -116,13 +117,13 @@ router.post(
 router.get(
   '/kyc',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   async (req, res) => {
     const submission = await getKycSubmissionForArtisanUser(
       (req as any).user.firebaseUid
     );
 
-    return res.json({
+    res.json({
       message: 'KYC fetched',
       submission,
     });
@@ -130,49 +131,50 @@ router.get(
 );
 
 router.post(
+  '/kyc/sign-upload',
+  verifyFirebaseToken,
+  requireArtisanOrApplicant,
+  asyncHandler(async (_req, res) => {
+    const upload = await createCloudinarySignedUpload('bundo/artisan-kyc');
+
+    res.json({
+      message: 'KYC upload signature created',
+      upload,
+    });
+  })
+);
+
+router.post(
   '/portfolio-images/sign-upload',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
-  async (_req, res) => {
-    const timestamp = Math.floor(Date.now() / 1000);
-    const folder = 'bundo/artisan-portfolio';
-    const signature = buildCloudinaryUploadSignature(
-      { folder, timestamp },
-      env.CLOUDINARY_API_SECRET
-    );
+  requireArtisanOrApplicant,
+  asyncHandler(async (_req, res) => {
+    const upload = await createCloudinarySignedUpload('bundo/artisan-portfolio');
 
-    return res.json({
+    res.json({
       message: 'Upload signature created',
-      upload: {
-        cloudName: env.CLOUDINARY_CLOUD_NAME,
-        apiKey: env.CLOUDINARY_API_KEY,
-        timestamp,
-        folder,
-        signature,
-      },
+      upload,
     });
-  }
+  })
 );
 
 router.post(
   '/profile',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   async (req, res) => {
     const { displayName, bio, city, area, lat, lng } = req.body;
 
     if (!displayName || typeof displayName !== 'string') {
-      return res.status(400).json({ message: 'displayName is required' });
+      throw httpError(400, 'displayName is required');
     }
 
     if (!city || typeof city !== 'string') {
-      return res.status(400).json({ message: 'city is required' });
+      throw httpError(400, 'city is required');
     }
 
     if (typeof lat !== 'number' || typeof lng !== 'number') {
-      return res.status(400).json({
-        message: 'lat and lng must be numbers',
-      });
+      throw httpError(400, 'lat and lng must be numbers');
     }
 
     const coordinateError = validateProfileCoordinates(lat, lng);
@@ -196,14 +198,12 @@ router.post(
         message: 'Artisan profile created',
         profile,
       });
-    } catch (error: unknown) {
+    } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        return res.status(409).json({
-          message: 'Artisan profile already exists',
-        });
+        throw httpError(409, 'Artisan profile already exists');
       }
 
       throw error;
@@ -214,7 +214,7 @@ router.post(
 router.patch(
   '/profile',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   async (req, res) => {
     const { displayName, bio, city, area, lat, lng } = req.body;
     const data: {
@@ -228,42 +228,42 @@ router.patch(
 
     if (displayName !== undefined) {
       if (typeof displayName !== 'string' || !displayName.trim()) {
-        return res.status(400).json({ message: 'displayName must be a string' });
+        throw httpError(400, 'displayName must be a string');
       }
       data.displayName = displayName;
     }
 
     if (bio !== undefined) {
       if (bio !== null && typeof bio !== 'string') {
-        return res.status(400).json({ message: 'bio must be a string' });
+        throw httpError(400, 'bio must be a string');
       }
       data.bio = bio;
     }
 
     if (city !== undefined) {
       if (typeof city !== 'string' || !city.trim()) {
-        return res.status(400).json({ message: 'city must be a string' });
+        throw httpError(400, 'city must be a string');
       }
       data.city = city;
     }
 
     if (area !== undefined) {
       if (area !== null && typeof area !== 'string') {
-        return res.status(400).json({ message: 'area must be a string' });
+        throw httpError(400, 'area must be a string');
       }
       data.area = area;
     }
 
     if (lat !== undefined) {
       if (typeof lat !== 'number') {
-        return res.status(400).json({ message: 'lat must be a number' });
+        throw httpError(400, 'lat must be a number');
       }
       data.lat = lat;
     }
 
     if (lng !== undefined) {
       if (typeof lng !== 'number') {
-        return res.status(400).json({ message: 'lng must be a number' });
+        throw httpError(400, 'lng must be a number');
       }
       data.lng = lng;
     }
@@ -277,7 +277,7 @@ router.patch(
     }
 
     if (!Object.keys(data).length) {
-      return res.status(400).json({ message: 'No profile fields provided' });
+      throw httpError(400, 'No profile fields provided');
     }
 
     try {
@@ -286,7 +286,7 @@ router.patch(
         data
       );
 
-      return res.json({
+      res.json({
         message: 'Artisan profile updated',
         profile,
       });
@@ -295,9 +295,7 @@ router.patch(
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2025'
       ) {
-        return res.status(404).json({
-          message: 'Create an artisan profile before updating it',
-        });
+        throw httpError(404, 'Create an artisan profile before updating it');
       }
 
       throw error;
@@ -308,65 +306,64 @@ router.patch(
 router.post(
   '/portfolio-images',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
-  async (req, res) => {
+  requireArtisanOrApplicant,
+  asyncHandler(async (req, res) => {
     const { cloudinaryId, url, displayOrder } = req.body;
 
     if (!cloudinaryId || typeof cloudinaryId !== 'string') {
-      return res.status(400).json({ message: 'cloudinaryId is required' });
+      throw httpError(400, 'cloudinaryId is required');
     }
 
     if (!url || typeof url !== 'string') {
-      return res.status(400).json({ message: 'url is required' });
+      throw httpError(400, 'url is required');
     }
 
+    const normalizedOrder =
+      displayOrder === undefined ? undefined : Math.floor(Number(displayOrder));
+
     if (
-      displayOrder !== undefined &&
-      (!Number.isInteger(displayOrder) || displayOrder < 0)
+      normalizedOrder !== undefined &&
+      (!Number.isFinite(normalizedOrder) ||
+        !Number.isInteger(normalizedOrder) ||
+        normalizedOrder < 0)
     ) {
-      return res.status(400).json({
-        message: 'displayOrder must be a non-negative integer',
-      });
+      throw httpError(400, 'displayOrder must be a non-negative integer');
     }
 
     const image = await addPortfolioImage((req as any).user.firebaseUid, {
       cloudinaryId,
       url,
-      displayOrder,
+      ...(normalizedOrder !== undefined ? { displayOrder: normalizedOrder } : {}),
     });
 
     if (!image) {
-      return res.status(404).json({
-        message: 'Create an artisan profile before adding portfolio images',
-      });
+      throw httpError(404, 'Create an artisan profile before adding portfolio images');
     }
 
-    return res.status(201).json({
+    res.status(201).json({
       message: 'Portfolio image added',
       image,
     });
-  }
+  })
 );
 
 router.post(
   '/availability-slots',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   async (req, res) => {
     const { dayOfWeek, startTime, endTime } = req.body;
 
     if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
-      return res.status(400).json({
-        message: 'dayOfWeek must be an integer from 0 to 6',
-      });
+      throw httpError(400, 'dayOfWeek must be an integer from 0 to 6');
     }
 
     if (!startTime || typeof startTime !== 'string') {
-      return res.status(400).json({ message: 'startTime is required' });
+      throw httpError(400, 'startTime is required');
     }
 
     if (!endTime || typeof endTime !== 'string') {
-      return res.status(400).json({ message: 'endTime is required' });
+      throw httpError(400, 'endTime is required');
     }
 
     const slot = await addAvailabilitySlot((req as any).user.firebaseUid, {
@@ -376,22 +373,17 @@ router.post(
     });
 
     if (!slot) {
-      return res.status(404).json({
-        message: 'Create an artisan profile before adding availability slots',
-      });
+      throw httpError(404, 'Create an artisan profile before adding availability slots');
     }
 
-    return res.status(201).json({
-      message: 'Availability slot added',
-      slot,
-    });
+    throw httpError(201, 'Availability slot added');
   }
 );
 
 router.get(
   '/offerings',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   async (req, res) => {
     res.setHeader('Deprecation', 'true');
     res.setHeader('Link', '</offerings/me>; rel="successor-version"');
@@ -400,61 +392,57 @@ router.get(
     );
 
     if (!offerings) {
-      return res.status(404).json({
-        message: 'Create an artisan profile before fetching offerings',
-      });
+      throw httpError(404, 'Create an artisan profile before fetching offerings');
     }
 
-    return res.json({
+    res.json({
       message: 'Offerings fetched',
       offerings,
     });
   }
 );
 
-router.get('/me', verifyFirebaseToken, requireRole(Role.ARTISAN), async (req, res) => {
+router.get('/me', verifyFirebaseToken, requireArtisanOrApplicant, asyncHandler(async (req, res) => {
   const profile = await getArtisanProfileDetailsByUserId(
     (req as any).user.firebaseUid
   );
 
   if (!profile) {
-    return res.status(404).json({
-      message: 'Create an artisan profile before fetching it',
-    });
+    throw httpError(404, 'Create an artisan profile before fetching it');
   }
 
-  return res.json({
+  res.json({
     message: 'My artisan profile fetched',
     profile,
   });
-});
+}));
 
-router.get('/payout-account', verifyFirebaseToken, requireRole(Role.ARTISAN), async (req, res) => {
+router.get('/payout-account', verifyFirebaseToken, requireRole(Role.ARTISAN), asyncHandler(async (req, res) => {
   const account = await getPayoutAccountForArtisanUser((req as any).user.firebaseUid);
 
-  return res.json({
+  res.json({
     message: 'Payout account fetched',
     account,
   });
-});
+}));
 
-router.post('/payout-account', verifyFirebaseToken, requireRole(Role.ARTISAN), async (req, res) => {
+router.post('/payout-account', verifyFirebaseToken, requireRole(Role.ARTISAN), asyncHandler(async (req, res) => {
   const { bankCode, bankName, accountNumber, accountName } = req.body;
 
   if (typeof bankCode !== 'string' || !bankCode.trim()) {
-    return res.status(400).json({ message: 'bankCode is required' });
+    throw httpError(400, 'bankCode is required');
   }
 
   if (typeof accountNumber !== 'string' || !accountNumber.trim()) {
-    return res.status(400).json({ message: 'accountNumber is required' });
+    throw httpError(400, 'accountNumber is required');
   }
 
   if (bankName !== undefined && typeof bankName !== 'string') {
-    return res.status(400).json({ message: 'bankName must be a string' });
+    throw httpError(400, 'bankName must be a string');
   }
 
   if (accountName !== undefined && typeof accountName !== 'string') {
-    return res.status(400).json({ message: 'accountName must be a string' });
+    throw httpError(400, 'accountName must be a string');
   }
 
   const result = await createOrUpdatePayoutAccount({
@@ -466,43 +454,51 @@ router.post('/payout-account', verifyFirebaseToken, requireRole(Role.ARTISAN), a
   });
 
   if (result.status === 'paystack_not_configured') {
-    return res.status(503).json({ message: 'Paystack is not configured' });
+    throw httpError(503, 'Paystack is not configured');
   }
 
   if (result.status === 'missing_artisan') {
-    return res.status(404).json({ message: 'Create an artisan profile before adding payout details' });
+    throw httpError(404, 'Create an artisan profile before adding payout details');
   }
 
-  return res.status(201).json({
+  if (result.status === 'invalid_account_number') {
+    throw httpError(400, result.message);
+  }
+
+  if (result.status === 'paystack_error') {
+    throw new BadGatewayError(result.message, 'PAYSTACK_ERROR');
+  }
+
+  if (result.status !== 'saved') {
+    throw httpError(500, 'Could not save payout account');
+  }
+
+  res.status(201).json({
     message: 'Payout account saved',
     account: result.account,
   });
-});
+}));
 
 router.get(
   '/portfolio-images/me',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
-  async (req, res) => {
+  requireArtisanOrApplicant,
+  asyncHandler(async (req, res) => {
     const images = await getPortfolioImagesForArtisanUser(
       (req as any).user.firebaseUid
     );
 
-    if (!images) {
-      return res.status(404).json({ message: 'Artisan profile not found' });
-    }
-
-    return res.json({
+    res.json({
       message: 'My portfolio images fetched',
-      images,
+      images: images ?? [],
     });
-  }
+  })
 );
 
 router.patch(
   '/portfolio-images/:id',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   async (req, res) => {
     const { cloudinaryId, url, displayOrder } = req.body;
     const data: {
@@ -513,29 +509,27 @@ router.patch(
 
     if (cloudinaryId !== undefined) {
       if (typeof cloudinaryId !== 'string' || !cloudinaryId.trim()) {
-        return res.status(400).json({ message: 'cloudinaryId must be a string' });
+        throw httpError(400, 'cloudinaryId must be a string');
       }
       data.cloudinaryId = cloudinaryId;
     }
 
     if (url !== undefined) {
       if (typeof url !== 'string' || !url.trim()) {
-        return res.status(400).json({ message: 'url must be a string' });
+        throw httpError(400, 'url must be a string');
       }
       data.url = url;
     }
 
     if (displayOrder !== undefined) {
       if (!Number.isInteger(displayOrder) || displayOrder < 0) {
-        return res.status(400).json({
-          message: 'displayOrder must be a non-negative integer',
-        });
+        throw httpError(400, 'displayOrder must be a non-negative integer');
       }
       data.displayOrder = displayOrder;
     }
 
     if (!Object.keys(data).length) {
-      return res.status(400).json({ message: 'No portfolio fields provided' });
+      throw httpError(400, 'No portfolio fields provided');
     }
 
     const result = await updatePortfolioImageForArtisan({
@@ -545,20 +539,18 @@ router.patch(
     });
 
     if (result.status === 'missing_artisan') {
-      return res.status(404).json({ message: 'Artisan profile not found' });
+      throw httpError(404, 'Artisan profile not found');
     }
 
     if (result.status === 'missing_image') {
-      return res.status(404).json({ message: 'Portfolio image not found' });
+      throw httpError(404, 'Portfolio image not found');
     }
 
     if (result.status === 'forbidden') {
-      return res.status(403).json({
-        message: 'You can only update your own portfolio images',
-      });
+      throw httpError(403, 'You can only update your own portfolio images');
     }
 
-    return res.json({
+    res.json({
       message: 'Portfolio image updated',
       image: result.image,
     });
@@ -568,7 +560,7 @@ router.patch(
 router.delete(
   '/portfolio-images/:id',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   async (req, res) => {
     const result = await deletePortfolioImageForArtisan({
       imageId: String(req.params.id),
@@ -576,37 +568,35 @@ router.delete(
     });
 
     if (result.status === 'missing_artisan') {
-      return res.status(404).json({ message: 'Artisan profile not found' });
+      throw httpError(404, 'Artisan profile not found');
     }
 
     if (result.status === 'missing_image') {
-      return res.status(404).json({ message: 'Portfolio image not found' });
+      throw httpError(404, 'Portfolio image not found');
     }
 
     if (result.status === 'forbidden') {
-      return res.status(403).json({
-        message: 'You can only delete your own portfolio images',
-      });
+      throw httpError(403, 'You can only delete your own portfolio images');
     }
 
-    return res.json({ message: 'Portfolio image deleted' });
+    res.json({ message: 'Portfolio image deleted' });
   }
 );
 
 router.get(
   '/availability-slots/me',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   async (req, res) => {
     const slots = await getAvailabilitySlotsForArtisanUser(
       (req as any).user.firebaseUid
     );
 
     if (!slots) {
-      return res.status(404).json({ message: 'Artisan profile not found' });
+      throw httpError(404, 'Artisan profile not found');
     }
 
-    return res.json({
+    res.json({
       message: 'My availability slots fetched',
       slots,
     });
@@ -616,7 +606,7 @@ router.get(
 router.patch(
   '/availability-slots/:id',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   async (req, res) => {
     const { dayOfWeek, startTime, endTime, isActive } = req.body;
     const data: {
@@ -628,36 +618,34 @@ router.patch(
 
     if (dayOfWeek !== undefined) {
       if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
-        return res.status(400).json({
-          message: 'dayOfWeek must be an integer from 0 to 6',
-        });
+        throw httpError(400, 'dayOfWeek must be an integer from 0 to 6');
       }
       data.dayOfWeek = dayOfWeek;
     }
 
     if (startTime !== undefined) {
       if (typeof startTime !== 'string' || !startTime.trim()) {
-        return res.status(400).json({ message: 'startTime must be a string' });
+        throw httpError(400, 'startTime must be a string');
       }
       data.startTime = startTime;
     }
 
     if (endTime !== undefined) {
       if (typeof endTime !== 'string' || !endTime.trim()) {
-        return res.status(400).json({ message: 'endTime must be a string' });
+        throw httpError(400, 'endTime must be a string');
       }
       data.endTime = endTime;
     }
 
     if (isActive !== undefined) {
       if (typeof isActive !== 'boolean') {
-        return res.status(400).json({ message: 'isActive must be a boolean' });
+        throw httpError(400, 'isActive must be a boolean');
       }
       data.isActive = isActive;
     }
 
     if (!Object.keys(data).length) {
-      return res.status(400).json({ message: 'No availability fields provided' });
+      throw httpError(400, 'No availability fields provided');
     }
 
     const result = await updateAvailabilitySlotForArtisan({
@@ -667,20 +655,18 @@ router.patch(
     });
 
     if (result.status === 'missing_artisan') {
-      return res.status(404).json({ message: 'Artisan profile not found' });
+      throw httpError(404, 'Artisan profile not found');
     }
 
     if (result.status === 'missing_slot') {
-      return res.status(404).json({ message: 'Availability slot not found' });
+      throw httpError(404, 'Availability slot not found');
     }
 
     if (result.status === 'forbidden') {
-      return res.status(403).json({
-        message: 'You can only update your own availability slots',
-      });
+      throw httpError(403, 'You can only update your own availability slots');
     }
 
-    return res.json({
+    res.json({
       message: 'Availability slot updated',
       slot: result.slot,
     });
@@ -690,7 +676,7 @@ router.patch(
 router.delete(
   '/availability-slots/:id',
   verifyFirebaseToken,
-  requireRole(Role.ARTISAN),
+  requireArtisanOrApplicant,
   async (req, res) => {
     const result = await deleteAvailabilitySlotForArtisan({
       slotId: String(req.params.id),
@@ -698,24 +684,22 @@ router.delete(
     });
 
     if (result.status === 'missing_artisan') {
-      return res.status(404).json({ message: 'Artisan profile not found' });
+      throw httpError(404, 'Artisan profile not found');
     }
 
     if (result.status === 'missing_slot') {
-      return res.status(404).json({ message: 'Availability slot not found' });
+      throw httpError(404, 'Availability slot not found');
     }
 
     if (result.status === 'forbidden') {
-      return res.status(403).json({
-        message: 'You can only delete your own availability slots',
-      });
+      throw httpError(403, 'You can only delete your own availability slots');
     }
 
-    return res.json({ message: 'Availability slot deleted' });
+    res.json({ message: 'Availability slot deleted' });
   }
 );
 
-router.get('/', async (req, res) => {
+router.get('/', asyncHandler(async (req, res) => {
   const { city, state, area, categoryId, q, sort } = req.query;
   const pagination = getPagination(req);
   const location =
@@ -738,7 +722,7 @@ router.get('/', async (req, res) => {
     countArtisans(filters),
   ]);
 
-  return res.json({
+  res.json({
     message: 'Artisans fetched',
     artisans,
     meta: {
@@ -746,62 +730,64 @@ router.get('/', async (req, res) => {
       total,
     },
   });
-});
+}));
 
-router.get('/:id/portfolio-images', async (req, res) => {
-  const artisan = await getArtisanById(req.params.id);
+router.get('/:id/portfolio-images', asyncHandler(async (req, res) => {
+  const artisanId = String(req.params.id);
+  const artisan = await getArtisanById(artisanId);
 
   if (!artisan) {
-    return res.status(404).json({ message: 'Artisan not found' });
+    throw httpError(404, 'Artisan not found');
   }
 
-  const images = await getPortfolioImagesByArtisanId(req.params.id);
+  const images = await getPortfolioImagesByArtisanId(artisanId);
 
-  return res.json({
+  res.json({
     message: 'Portfolio images fetched',
     images,
   });
-});
+}));
 
-router.get('/:id/availability-slots', async (req, res) => {
-  const artisan = await getArtisanById(req.params.id);
+router.get('/:id/availability-slots', asyncHandler(async (req, res) => {
+  const artisanId = String(req.params.id);
+  const artisan = await getArtisanById(artisanId);
 
   if (!artisan) {
-    return res.status(404).json({ message: 'Artisan not found' });
+    throw httpError(404, 'Artisan not found');
   }
 
-  const slots = await getAvailabilitySlotsByArtisanId(req.params.id);
+  const slots = await getAvailabilitySlotsByArtisanId(artisanId);
 
-  return res.json({
+  res.json({
     message: 'Availability slots fetched',
     slots,
   });
-});
+}));
 
-router.get('/:id/reviews', async (req, res) => {
+router.get('/:id/reviews', asyncHandler(async (req, res) => {
   const reviews = await getReviewsForArtisan(String(req.params.id));
 
   if (!reviews) {
-    return res.status(404).json({ message: 'Artisan not found' });
+    throw httpError(404, 'Artisan not found');
   }
 
-  return res.json({
+  res.json({
     message: 'Artisan reviews fetched',
     reviews,
   });
-});
+}));
 
-router.get('/:id', async (req, res) => {
-  const artisan = await getArtisanById(req.params.id);
+router.get('/:id', asyncHandler(async (req, res) => {
+  const artisan = await getArtisanById(String(req.params.id));
 
   if (!artisan) {
-    return res.status(404).json({ message: 'Artisan not found' });
+    throw httpError(404, 'Artisan not found');
   }
 
-  return res.json({
+  res.json({
     message: 'Artisan fetched',
     artisan,
   });
-});
+}));
 
 export default router;

@@ -1,6 +1,65 @@
 import { NotificationType } from '@prisma/client';
 import admin from '../../config/firebase';
 import db from '../../db/client';
+import { getUserNotificationPreferences } from '../users/users.service';
+
+async function filterByNotificationPreferences(
+  inputs: Array<{
+    userId: string;
+    type: NotificationType;
+    title: string;
+    body: string;
+    link?: string;
+  }>
+) {
+  if (!inputs.length) {
+    return [];
+  }
+
+  const userIds = [...new Set(inputs.map((input) => input.userId))];
+  let prefMap = new Map<string, ReturnType<typeof getUserNotificationPreferences>>();
+
+  try {
+    const users = await db.user.findMany({
+      where: { firebaseUid: { in: userIds } },
+      select: { firebaseUid: true, notificationPreferences: true },
+    });
+    prefMap = new Map(
+      users.map((user) => [user.firebaseUid, getUserNotificationPreferences(user)])
+    );
+  } catch (error: unknown) {
+    const code =
+      typeof error === 'object' && error && 'code' in error
+        ? String((error as { code?: string }).code)
+        : '';
+    // Pre-migration databases without notification_preferences still deliver notifications.
+    if (code !== 'P2022') {
+      throw error;
+    }
+  }
+
+  return inputs.filter((input) => {
+    const prefs = prefMap.get(input.userId);
+    if (!prefs) {
+      return true;
+    }
+
+    switch (input.type) {
+      case NotificationType.BOOKING:
+      case NotificationType.PAYMENT:
+      case NotificationType.DISPUTE:
+        return prefs.bookings;
+      case NotificationType.MESSAGE:
+        return prefs.messages;
+      case NotificationType.REVIEW:
+        return prefs.bookings;
+      case NotificationType.ADMIN:
+        return true;
+      default:
+        return prefs.marketing;
+    }
+  });
+}
 
 const deliverPushNotifications = async (
   inputs: Array<{
@@ -78,11 +137,17 @@ export const createNotification = async (input: {
   body: string;
   link?: string;
 }) => {
+  const [allowed] = await filterByNotificationPreferences([input]);
+
+  if (!allowed) {
+    return null;
+  }
+
   const notification = await db.notification.create({
-    data: input,
+    data: allowed,
   });
 
-  await deliverPushNotifications([input]);
+  await deliverPushNotifications([allowed]);
 
   return notification;
 };
@@ -100,11 +165,17 @@ export const createNotifications = async (
     return;
   }
 
+  const allowed = await filterByNotificationPreferences(inputs);
+
+  if (!allowed.length) {
+    return;
+  }
+
   await db.notification.createMany({
-    data: inputs,
+    data: allowed,
   });
 
-  await deliverPushNotifications(inputs);
+  await deliverPushNotifications(allowed);
 };
 
 export const getNotificationsForUser = async (userId: string) => {

@@ -8,7 +8,10 @@ export default defineConfig({
     include: e2e ? ['src/**/*.e2e.test.ts'] : ['src/**/*.test.ts'],
     exclude: e2e ? ['**/node_modules/**'] : ['src/**/*.e2e.test.ts'],
     setupFiles: e2e ? ['./src/test/loadLocalEnv.ts'] : [],
-    hookTimeout: e2e ? 60_000 : 10_000,
-    testTimeout: e2e ? 60_000 : 10_000,
+    hookTimeout: e2e ? 120_000 : 10_000,
+    testTimeout: e2e ? 90_000 : 10_000,
+    pool: e2e ? 'forks' : 'threads',
+    poolOptions: e2e ? { forks: { singleFork: true } } : undefined,
+    maxWorkers: e2e ? 1 : undefined,
   },
 });

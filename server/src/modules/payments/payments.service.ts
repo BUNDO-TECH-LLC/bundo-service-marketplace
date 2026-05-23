@@ -12,6 +12,7 @@ import db from '../../db/client';
 import logger from '../../utils/logger';
 import { resolvePaymentConfirmationGate } from './paymentConfirmPolicy';
 import { getArtisanProfileByUserId } from '../artisans/artisans.service';
+import { workspaceBookingLink, workspaceLink } from '../../lib/appLinks';
 import { createNotifications } from '../notifications/notifications.service';
 import {
   createPaystackTransferRecipient,
@@ -182,6 +183,17 @@ export const getPaymentForBooking = async (input: {
   return { status: 'found' as const, payment: booking.payment };
 };
 
+async function paymentBookingSummary(bookingId: string) {
+  return db.booking.findUnique({
+    where: { id: bookingId },
+    select: {
+      id: true,
+      offering: { select: { title: true } },
+      artisan: { select: { displayName: true } },
+    },
+  });
+}
+
 export const verifyPaymentReferenceForUser = async (input: {
   reference: string;
   firebaseUid: string;
@@ -223,10 +235,11 @@ export const verifyPaymentReferenceForUser = async (input: {
   }
 
   if (result.status === 'already_processed' || result.status === 'processed') {
-    return { status: 'verified' as const, payment: result.payment };
+    const booking = await paymentBookingSummary(result.payment.bookingId);
+    return { status: 'verified' as const, payment: result.payment, booking };
   }
 
-  return { status: 'verified' as const, payment };
+  return result;
 };
 
 export const markPaymentReferencePaid = async (reference: string) => {
@@ -340,20 +353,30 @@ export const markPaymentReferencePaid = async (reference: string) => {
         type: NotificationType.PAYMENT,
         title: 'Payment secured',
         body: `Your payment for ${booking.offering?.title || 'this booking'} is now held by Bundo.`,
-        link: '/?view=workspace&section=bookings',
+        link: workspaceBookingLink(booking.id),
       },
       {
         userId: booking.artisan.userId,
         type: NotificationType.PAYMENT,
         title: 'Customer payment received',
         body: `Payment for ${booking.offering?.title || 'a booking'} is secured and pending completion.`,
-        link: '/?view=workspace&section=bookings',
+        link: workspaceBookingLink(booking.id),
       },
     ]);
   }
 
   return { status: 'processed' as const, payment: updated };
 };
+
+function normalizeNigerianAccountNumber(raw: string) {
+  return raw.replace(/\s+/g, '').replace(/-/g, '');
+}
+
+function isUniqueConstraintError(error: unknown) {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
+  );
+}
 
 export const createOrUpdatePayoutAccount = async (input: {
   artisanUserId: string;
@@ -372,32 +395,127 @@ export const createOrUpdatePayoutAccount = async (input: {
     return { status: 'missing_artisan' as const };
   }
 
-  const recipient = await createPaystackTransferRecipient({
-    name: input.accountName || artisan.displayName,
-    accountNumber: input.accountNumber,
-    bankCode: input.bankCode,
+  const bankCode = input.bankCode.trim();
+  const accountNumber = normalizeNigerianAccountNumber(input.accountNumber);
+  const accountNameInput = input.accountName?.trim() || undefined;
+  const bankNameInput = input.bankName?.trim() || undefined;
+
+  if (!/^\d{10}$/.test(accountNumber)) {
+    return {
+      status: 'invalid_account_number' as const,
+      message: 'Account number must be exactly 10 digits.',
+    };
+  }
+
+  const existing = await db.providerPayoutAccount.findUnique({
+    where: { artisanId: artisan.id },
   });
-  const bankName = input.bankName || recipient.data.details?.bank_name;
-  const accountName = input.accountName || recipient.data.details?.account_name;
+
+  if (
+    existing &&
+    existing.bankCode === bankCode &&
+    existing.accountNumber === accountNumber
+  ) {
+    const account = await db.providerPayoutAccount.update({
+      where: { artisanId: artisan.id },
+      data: {
+        isVerified: true,
+        ...(bankNameInput !== undefined ? { bankName: bankNameInput } : {}),
+        ...(accountNameInput !== undefined ? { accountName: accountNameInput } : {}),
+      },
+    });
+
+    return { status: 'saved' as const, account };
+  }
+
+  let recipient;
+
+  try {
+    recipient = await createPaystackTransferRecipient({
+      name: accountNameInput || artisan.displayName.trim(),
+      accountNumber,
+      bankCode,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Could not verify bank account with Paystack';
+    return { status: 'paystack_error' as const, message };
+  }
+
+  const recipientCode = recipient.data?.recipient_code?.trim();
+
+  if (!recipientCode) {
+    return {
+      status: 'paystack_error' as const,
+      message: 'Paystack did not return a payout recipient code. Try again in a moment.',
+    };
+  }
+
+  const bankName = bankNameInput || recipient.data.details?.bank_name;
+  const accountName = accountNameInput || recipient.data.details?.account_name;
   const payoutAccountData = {
-    bankCode: input.bankCode,
-    accountNumber: input.accountNumber,
-    paystackRecipientCode: recipient.data.recipient_code,
+    bankCode,
+    accountNumber,
+    paystackRecipientCode: recipientCode,
     isVerified: true,
     ...(bankName !== undefined ? { bankName } : {}),
     ...(accountName !== undefined ? { accountName } : {}),
   };
 
-  const account = await db.providerPayoutAccount.upsert({
-    where: { artisanId: artisan.id },
-    update: payoutAccountData,
-    create: {
-      artisanId: artisan.id,
-      ...payoutAccountData,
-    },
+  const recipientOwner = await db.providerPayoutAccount.findUnique({
+    where: { paystackRecipientCode: recipientCode },
   });
 
-  return { status: 'saved' as const, account };
+  if (recipientOwner && recipientOwner.artisanId !== artisan.id) {
+    return {
+      status: 'paystack_error' as const,
+      message:
+        'This bank account is already linked to another Bundo profile. Use a different account or contact support.',
+    };
+  }
+
+  try {
+    if (existing) {
+      const account = await db.providerPayoutAccount.update({
+        where: { artisanId: artisan.id },
+        data: payoutAccountData,
+      });
+
+      return { status: 'saved' as const, account };
+    }
+
+    const account = await db.providerPayoutAccount.create({
+      data: {
+        artisanId: artisan.id,
+        ...payoutAccountData,
+      },
+    });
+
+    return { status: 'saved' as const, account };
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) {
+      throw error;
+    }
+
+    const linked = await db.providerPayoutAccount.findUnique({
+      where: { artisanId: artisan.id },
+    });
+
+    if (linked) {
+      const account = await db.providerPayoutAccount.update({
+        where: { artisanId: artisan.id },
+        data: payoutAccountData,
+      });
+
+      return { status: 'saved' as const, account };
+    }
+
+    return {
+      status: 'paystack_error' as const,
+      message:
+        'Could not save this payout account because it conflicts with an existing record. Try again or contact support.',
+    };
+  }
 };
 
 export const getPayoutAccountForArtisanUser = async (artisanUserId: string) => {
@@ -454,7 +572,12 @@ export const releaseBookingPayment = async (bookingId: string) => {
     return { status: 'blocked_by_dispute' as const };
   }
 
-  if (booking.payouts.some((payout) => payout.status === PayoutStatus.SENT)) {
+  if (
+    booking.payouts.some(
+      (payout) =>
+        payout.status === PayoutStatus.SENT || payout.status === PayoutStatus.PROCESSING
+    )
+  ) {
     return { status: 'already_released' as const };
   }
 
@@ -468,12 +591,21 @@ export const releaseBookingPayment = async (bookingId: string) => {
   }
 
   const reference = payoutReference(booking.id);
-  const transfer = await initiatePaystackTransfer({
-    amountKobo: toKobo(booking.payment.providerEarning),
-    recipientCode: booking.artisan.payoutAccount.paystackRecipientCode,
-    reason: `Bundo service payout for booking ${booking.id}`,
-    reference,
-  });
+
+  let transfer;
+
+  try {
+    transfer = await initiatePaystackTransfer({
+      amountKobo: toKobo(booking.payment.providerEarning),
+      recipientCode: booking.artisan.payoutAccount.paystackRecipientCode,
+      reason: `Bundo service payout for booking ${booking.id}`,
+      reference,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Paystack could not send this payout';
+    return { status: 'paystack_error' as const, message };
+  }
 
   const result = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const payout = await tx.payout.create({
@@ -482,11 +614,10 @@ export const releaseBookingPayment = async (bookingId: string) => {
         paymentId: booking.payment!.id,
         artisanId: booking.artisanId,
         amount: booking.payment!.providerEarning,
-        status: PayoutStatus.SENT,
+        status: PayoutStatus.PROCESSING,
         paystackTransferCode: transfer.data.transfer_code,
         paystackReference: reference,
         reason: 'Final service payout',
-        sentAt: new Date(),
       },
     });
 
@@ -519,18 +650,59 @@ export const releaseBookingPayment = async (bookingId: string) => {
       type: NotificationType.PAYMENT,
       title: 'Payout released',
       body: `Your payout for ${offering?.title || 'a completed booking'} has been released.`,
-      link: '/?view=workspace&section=bookings',
+      link: workspaceBookingLink(booking.id),
     },
     {
       userId: booking.customerId,
       type: NotificationType.PAYMENT,
       title: 'Provider payout sent',
       body: `Bundo has released payment for ${offering?.title || 'your completed booking'}.`,
-      link: '/?view=workspace&section=bookings',
+      link: workspaceBookingLink(booking.id),
     },
   ]);
 
   return { status: 'released' as const, ...result };
+};
+
+export const syncPayoutFromPaystackTransfer = async (input: {
+  reference: string;
+  event: 'transfer.success' | 'transfer.failed' | 'transfer.reversed';
+}) => {
+  const payout = await db.payout.findFirst({
+    where: { paystackReference: input.reference },
+  });
+
+  if (!payout) {
+    logger.warn({ reference: input.reference, event: input.event }, 'Paystack transfer webhook: payout not found');
+    return { status: 'missing_payout' as const };
+  }
+
+  if (input.event === 'transfer.success') {
+    if (payout.status === PayoutStatus.SENT) {
+      return { status: 'already_confirmed' as const, payout };
+    }
+
+    const updated = await db.payout.update({
+      where: { id: payout.id },
+      data: {
+        status: PayoutStatus.SENT,
+        sentAt: payout.sentAt ?? new Date(),
+      },
+    });
+
+    return { status: 'confirmed' as const, payout: updated };
+  }
+
+  if (input.event === 'transfer.failed' || input.event === 'transfer.reversed') {
+    const updated = await db.payout.update({
+      where: { id: payout.id },
+      data: { status: PayoutStatus.FAILED },
+    });
+
+    return { status: 'failed' as const, payout: updated };
+  }
+
+  return { status: 'ignored' as const };
 };
 
 export const createBookingDispute = async (input: {
@@ -582,14 +754,14 @@ export const createBookingDispute = async (input: {
       type: NotificationType.DISPUTE,
       title: 'Dispute opened',
       body: 'Your dispute has been recorded and is awaiting admin review.',
-      link: '/?view=workspace&section=bookings',
+      link: workspaceBookingLink(booking.id),
     },
     {
       userId: booking.artisan.userId,
       type: NotificationType.DISPUTE,
       title: 'Booking dispute opened',
       body: 'A dispute has been opened on one of your bookings.',
-      link: '/?view=workspace&section=bookings',
+      link: workspaceBookingLink(booking.id),
     },
   ]);
 
@@ -763,7 +935,7 @@ export const resolveBookingDispute = async (input: {
         refundAmount === payment.amount
           ? 'Bundo issued a full refund after dispute resolution.'
           : `Bundo issued a partial refund of ${refundAmount} NGN after dispute resolution.`,
-      link: '/?view=workspace&section=bookings',
+      link: workspaceBookingLink(dispute.booking.id),
     },
     {
       userId: dispute.booking.artisan.userId,
@@ -773,7 +945,7 @@ export const resolveBookingDispute = async (input: {
         refundAmount === payment.amount
           ? 'A disputed booking was resolved with a full refund to the customer.'
           : `A disputed booking was resolved with a partial refund of ${refundAmount} NGN.`,
-      link: '/?view=workspace&section=bookings',
+      link: workspaceBookingLink(dispute.booking.id),
     },
   ]);
 
