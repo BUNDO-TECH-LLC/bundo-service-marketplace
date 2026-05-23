@@ -220,6 +220,7 @@ export default function CustomerWorkspacePage() {
             busy={busy}
             runAction={runAction}
             refresh={refresh}
+            onNavigate={(path) => navigate(path)}
             pushStatus={pushStatus}
             pushEnabled={Boolean(pushToken)}
             enablePushAlerts={enablePushAlerts}

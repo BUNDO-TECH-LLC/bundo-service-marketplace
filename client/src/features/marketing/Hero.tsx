@@ -11,7 +11,7 @@ export function Hero({
   onBrowse,
 }: {
   selectedState: string;
-  states: string[];
+  states: readonly string[];
   onStateChange: (state: string) => Promise<void>;
   searchTerm: string;
   onSearchTermChange: (value: string) => void;

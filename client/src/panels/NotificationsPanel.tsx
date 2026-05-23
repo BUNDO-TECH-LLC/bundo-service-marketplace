@@ -3,7 +3,7 @@ import { EmptyState } from '../components/EmptyState';
 import { api } from '../lib/api';
 import { notificationTypeLabel, relativeNotificationTime } from '../lib/notificationDisplay';
 import { resolveNotificationTarget } from '../lib/notificationNavigation';
-import type { ActionRunner } from '../appTypes';
+import type { ActionRunner, PushStatus } from '../appTypes';
 import type { Notification } from '../types';
 
 export function NotificationsPanel({
@@ -13,6 +13,9 @@ export function NotificationsPanel({
   runAction,
   refresh,
   onNavigate,
+  pushStatus,
+  pushEnabled = false,
+  enablePushAlerts,
 }: {
   token: string;
   notifications: Notification[];
@@ -20,6 +23,9 @@ export function NotificationsPanel({
   runAction: ActionRunner;
   refresh: () => Promise<void>;
   onNavigate: (path: string) => void;
+  pushStatus?: PushStatus;
+  pushEnabled?: boolean;
+  enablePushAlerts?: () => Promise<void>;
 }) {
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
@@ -53,6 +59,16 @@ export function NotificationsPanel({
     await refresh();
   }
 
+  async function sendTestNotification() {
+    await api('/notifications/test', {
+      method: 'POST',
+      token,
+    });
+    await refresh();
+  }
+
+  const showPushBanner = pushStatus !== undefined && enablePushAlerts !== undefined;
+
   return (
     <section className="notifications-page">
       <header className="notifications-page-head">
@@ -67,6 +83,50 @@ export function NotificationsPanel({
           </span>
         )}
       </header>
+
+      {showPushBanner ? (
+        <section className={`push-banner ${pushEnabled ? 'enabled' : ''}`}>
+          <div className="push-banner-copy">
+            <p className="eyebrow">Browser alerts</p>
+            <h3>
+              {pushEnabled
+                ? 'Browser alerts are active'
+                : pushStatus === 'missing-config'
+                  ? 'Push alerts need one more Firebase setting'
+                  : pushStatus === 'denied'
+                    ? 'Browser notifications are blocked for this site'
+                    : 'Turn on push alerts for real-time updates'}
+            </h3>
+            <p>
+              {pushEnabled
+                ? 'New booking, payment, and message activity can reach this browser even when you are away from the page.'
+                : pushStatus === 'missing-config'
+                  ? 'Add VITE_FIREBASE_VAPID_KEY in the client environment to finish web push setup.'
+                  : pushStatus === 'unsupported'
+                    ? 'This browser does not support Firebase web push for the current environment.'
+                    : pushStatus === 'denied'
+                      ? 'Re-enable notifications in your browser site settings, then come back here.'
+                      : 'Enable alerts to get a visible heads-up without needing to keep the notifications page open.'}
+            </p>
+          </div>
+          <div className="push-banner-actions">
+            <button
+              className={pushEnabled ? 'secondary-button' : 'primary-button'}
+              disabled={busy || pushEnabled || pushStatus === 'denied' || pushStatus === 'missing-config'}
+              onClick={() => void runAction(enablePushAlerts!, '')}
+            >
+              {pushEnabled ? 'Alerts enabled' : 'Enable push alerts'}
+            </button>
+            <button
+              className="secondary-button"
+              disabled={busy}
+              onClick={() => void runAction(sendTestNotification, 'Test notification sent')}
+            >
+              Send test notification
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       <section className="notifications-shell">
         <div className="notifications-toolbar">

@@ -1,5 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// Mock Firebase before importing any services that use it
+vi.mock('firebase-admin', () => ({
+  default: {
+    apps: [],
+    initializeApp: vi.fn(),
+    credential: {
+      cert: vi.fn(),
+    },
+  },
+}));
+
 const findUniqueArtisan = vi.fn();
 const findPayoutAccount = vi.fn();
 const updatePayoutAccount = vi.fn();

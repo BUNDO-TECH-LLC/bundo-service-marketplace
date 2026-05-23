@@ -280,10 +280,8 @@ export default function ArtisanDashboardPage({ requireAuth = true }: ArtisanDash
           runAction={runAction}
           refresh={refresh}
           openBookings={() => navigate(buildArtisanDashboardPath('bookings'))}
-          openMessages={() => navigate(buildArtisanDashboardPath('messages'))}
-          openReviews={() => navigate(buildArtisanDashboardPath('reviews'))}
           openProfile={() => navigate(buildArtisanDashboardPath('profile'))}
-          openOffers={() => navigate(buildArtisanDashboardPath('offers'))}
+          openBookingDetail={(_bookingId) => navigate(buildArtisanDashboardPath('bookings'))}
         />
       ) : null}
 
@@ -317,6 +315,7 @@ export default function ArtisanDashboardPage({ requireAuth = true }: ArtisanDash
           busy={busy}
           runAction={runAction}
           refresh={refresh}
+          onNavigate={(path) => navigate(path)}
           pushStatus={pushStatus}
           pushEnabled={Boolean(pushToken)}
           enablePushAlerts={enablePushAlerts}

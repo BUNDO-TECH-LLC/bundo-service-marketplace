@@ -4,7 +4,7 @@ import { heroImage } from '../../lib/marketingAssets';
 type HeroSectionProps = {
   searchTerm: string;
   selectedState: string;
-  states: string[];
+  states: readonly string[];
   onSearchTermChange: (value: string) => void;
   onSelectedStateChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
