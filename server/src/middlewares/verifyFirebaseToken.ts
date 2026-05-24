@@ -4,6 +4,7 @@ import admin from '../config/firebase';
 import { findOrCreateUser } from '../modules/users/users.service';
 import { ForbiddenError, UnauthorizedError } from '../utils/errors';
 import logger from '../utils/logger';
+import { getCachedAuthUser, setCachedAuthUser } from './authSessionCache';
 
 export const verifyFirebaseToken = async (
   req: Request,
@@ -17,6 +18,17 @@ export const verifyFirebaseToken = async (
   }
 
   const token = authHeader.slice('Bearer '.length);
+  const cachedUser = getCachedAuthUser(token);
+
+  if (cachedUser) {
+    if (cachedUser.status === UserStatus.BANNED) {
+      return next(new ForbiddenError('Account banned'));
+    }
+
+    (req as any).user = cachedUser;
+    return next();
+  }
+
   let decoded;
 
   try {
@@ -33,6 +45,7 @@ export const verifyFirebaseToken = async (
       return next(new ForbiddenError('Account banned'));
     }
 
+    setCachedAuthUser(token, user);
     (req as any).user = user;
 
     next();

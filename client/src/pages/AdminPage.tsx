@@ -24,7 +24,8 @@ export default function AdminPage() {
         adminLabel={ctx.firebaseUser?.email || ctx.me?.email || 'Admin'}
         busy={ctx.busy}
         runAction={ctx.withNotice}
-        refresh={() => ctx.loadPrivateData()}
+        refresh={() => ctx.refreshAdminSection(ctx.adminSection)}
+        loadAdminSection={(section) => ctx.loadAdminSection(section)}
         onSignOut={() => {
           ctx.setNotice('Signed out');
           auth && signOut(auth);

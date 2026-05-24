@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BundoLoadingScreen } from '../components/BundoLoadingScreen';
 import { EmptyState } from '../components/EmptyState';
 import { AccountSettingsHub } from '../features/account/AccountSettingsHub';
@@ -19,13 +19,31 @@ import { useAppRoot } from '../app/appRootContext';
 export default function WorkspacePage() {
   const ctx = useAppRoot();
   const { workspaceSection, me, firebaseUser } = ctx;
-  const [artisanGate, setArtisanGate] = useState<'checking' | 'allowed' | 'blocked'>(
-    me?.role === 'ARTISAN' ? 'checking' : 'allowed'
-  );
+  const artisanGateCheckedRef = useRef(false);
+  const [artisanGate, setArtisanGate] = useState<'checking' | 'allowed' | 'blocked'>(() => {
+    if (me?.role !== 'ARTISAN' || !me.firebaseUid) {
+      return 'allowed';
+    }
+
+    const cached = sessionStorage.getItem(`bundo:artisan-gate:${me.firebaseUid}`);
+    return cached === 'approved' ? 'allowed' : 'checking';
+  });
 
   useEffect(() => {
-    if (me?.role !== 'ARTISAN') {
+    if (me?.role !== 'ARTISAN' || !me.firebaseUid) {
       setArtisanGate('allowed');
+      artisanGateCheckedRef.current = false;
+      return;
+    }
+
+    const cacheKey = `bundo:artisan-gate:${me.firebaseUid}`;
+    if (sessionStorage.getItem(cacheKey) === 'approved') {
+      setArtisanGate('allowed');
+      artisanGateCheckedRef.current = true;
+      return;
+    }
+
+    if (artisanGateCheckedRef.current) {
       return;
     }
 
@@ -47,10 +65,13 @@ export default function WorkspacePage() {
         });
 
         if (phase === 'approved') {
+          sessionStorage.setItem(cacheKey, 'approved');
+          artisanGateCheckedRef.current = true;
           setArtisanGate('allowed');
           return;
         }
 
+        sessionStorage.removeItem(cacheKey);
         setArtisanGate('blocked');
         ctx.setNotice('Your profile is awaiting approval. You can check status from your dashboard.');
         ctx.navigate('/');
@@ -64,7 +85,7 @@ export default function WorkspacePage() {
     return () => {
       cancelled = true;
     };
-  }, [ctx, me?.role, ctx.token]);
+  }, [ctx, me?.role, me?.firebaseUid, ctx.token]);
 
   if (me?.role === 'ARTISAN' && artisanGate === 'checking') {
     return <BundoLoadingScreen />;
@@ -120,7 +141,7 @@ export default function WorkspacePage() {
           conversations={ctx.conversations}
           busy={ctx.busy}
           runAction={ctx.withNotice}
-          refresh={() => ctx.loadPrivateData()}
+          refreshConversations={() => ctx.loadConversations()}
         />
       )}
 

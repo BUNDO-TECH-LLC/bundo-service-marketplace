@@ -95,6 +95,9 @@ export type AppRootValue = {
     }
   ) => Promise<void>;
   loadPrivateData: (authToken?: string, user?: ApiUser | null) => Promise<void>;
+  loadConversations: (authToken?: string) => Promise<void>;
+  loadAdminSection: (section: AdminSection, authToken?: string) => Promise<void>;
+  refreshAdminSection: (section: AdminSection) => Promise<void>;
   openArtisanProfile: (artisanId: string) => Promise<void>;
   enablePushAlerts: () => Promise<void>;
   firebaseReady: boolean;

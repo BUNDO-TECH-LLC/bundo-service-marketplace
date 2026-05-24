@@ -18,14 +18,14 @@ export function ChatPanel({
   conversations,
   busy,
   runAction,
-  refresh,
+  refreshConversations,
 }: {
   token: string;
   currentUserId: string;
   conversations: Conversation[];
   busy: boolean;
   runAction: ActionRunner;
-  refresh: () => Promise<void>;
+  refreshConversations: () => Promise<void>;
 }) {
   const { openArtisanProfile, me } = useAppRoot();
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
@@ -67,14 +67,14 @@ export function ChatPanel({
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
-      void refresh().catch(() => undefined);
+      void refreshConversations().catch(() => undefined);
       if (activeConversation) {
         void fetchMessages(activeConversation.id).catch(() => undefined);
       }
     }, CHAT_POLL_MS);
 
     return () => window.clearInterval(intervalId);
-  }, [activeConversation?.id, token]);
+  }, [activeConversation?.id, refreshConversations, token]);
 
   async function reply({ body, imageFile }: ChatComposerPayload) {
     if (!activeConversation) return;
@@ -92,7 +92,7 @@ export function ChatPanel({
       body: JSON.stringify({ body, ...imagePayload }),
     });
     await openConversation(activeConversation.id);
-    await refresh();
+    await refreshConversations();
   }
 
   function conversationTitle(conversation: Conversation) {
@@ -118,7 +118,7 @@ export function ChatPanel({
       : '';
 
   async function afterInboxChange() {
-    await refresh();
+    await refreshConversations();
     backToInbox();
   }
 

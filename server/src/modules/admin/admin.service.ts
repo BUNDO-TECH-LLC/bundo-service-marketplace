@@ -21,74 +21,94 @@ import {
 import { Pagination, paginationArgs } from '../../utils/pagination';
 import { workspaceBookingLink, workspaceLink } from '../../lib/appLinks';
 import { createNotification } from '../notifications/notifications.service';
+import { invalidateCachedAuthUser } from '../../middlewares/authSessionCache';
+
+type AdminStatsRow = {
+  users: bigint;
+  customers: bigint;
+  artisans: bigint;
+  admins: bigint;
+  banned_users: bigint;
+  pending_artisans: bigint;
+  approved_artisans: bigint;
+  pending_kyc_submissions: bigint;
+  offerings: bigint;
+  bookings: bigint;
+  booking_requests: bigint;
+  booking_appointments: bigint;
+  booking_ongoing: bigint;
+  booking_completed: bigint;
+  payments: bigint;
+  open_disputes: bigint;
+  reviews: bigint;
+  conversations: bigint;
+};
+
+let adminStatsCache: { stats: Record<string, number>; expiresAt: number } | null = null;
+const ADMIN_STATS_CACHE_MS = 30_000;
+
+export function clearAdminStatsCache() {
+  adminStatsCache = null;
+}
 
 export const getAdminStats = async () => {
-  const [
-    users,
-    customers,
-    artisans,
-    admins,
-    bannedUsers,
-    pendingArtisans,
-    approvedArtisans,
-    pendingKycSubmissions,
-    offerings,
-    bookings,
-    bookingRequests,
-    bookingAppointments,
-    bookingOngoing,
-    bookingCompleted,
-    payments,
-    openDisputes,
-    reviews,
-    conversations,
-  ] = await Promise.all([
-    db.user.count(),
-    db.user.count({ where: { role: Role.CUSTOMER } }),
-    db.user.count({ where: { role: Role.ARTISAN } }),
-    db.user.count({ where: { role: Role.ADMIN } }),
-    db.user.count({ where: { status: UserStatus.BANNED } }),
-    db.artisanProfile.count({ where: { verifyStatus: VerifyStatus.PENDING } }),
-    db.artisanProfile.count({ where: { verifyStatus: VerifyStatus.APPROVED } }),
-    db.artisanKycSubmission.count({ where: { status: KycStatus.PENDING } }),
-    db.offering.count(),
-    db.booking.count(),
-    db.booking.count({ where: { status: BookingStatus.REQUESTED } }),
-    db.booking.count({ where: { status: BookingStatus.ACCEPTED } }),
-    db.booking.count({ where: { status: BookingStatus.ONGOING } }),
-    db.booking.count({ where: { status: BookingStatus.COMPLETED } }),
-    db.payment.count(),
-    db.dispute.count({
-      where: {
-        status: {
-          in: [DisputeStatus.OPEN, DisputeStatus.UNDER_REVIEW],
-        },
-      },
-    }),
-    db.review.count(),
-    db.conversation.count(),
-  ]);
+  if (adminStatsCache && Date.now() < adminStatsCache.expiresAt) {
+    return adminStatsCache.stats;
+  }
 
-  return {
-    users,
-    customers,
-    artisans,
-    admins,
-    bannedUsers,
-    pendingArtisans,
-    approvedArtisans,
-    pendingKycSubmissions,
-    offerings,
-    bookings,
-    bookingRequests,
-    bookingAppointments,
-    bookingOngoing,
-    bookingCompleted,
-    payments,
-    openDisputes,
-    reviews,
-    conversations,
+  const [row] = await db.$queryRaw<AdminStatsRow[]>`
+    SELECT
+      (SELECT COUNT(*)::bigint FROM users) AS users,
+      (SELECT COUNT(*)::bigint FROM users WHERE role = ${Role.CUSTOMER}::"Role") AS customers,
+      (SELECT COUNT(*)::bigint FROM users WHERE role = ${Role.ARTISAN}::"Role") AS artisans,
+      (SELECT COUNT(*)::bigint FROM users WHERE role = ${Role.ADMIN}::"Role") AS admins,
+      (SELECT COUNT(*)::bigint FROM users WHERE status = ${UserStatus.BANNED}::"UserStatus") AS banned_users,
+      (SELECT COUNT(*)::bigint FROM artisan_profiles WHERE verify_status = ${VerifyStatus.PENDING}::"VerifyStatus") AS pending_artisans,
+      (SELECT COUNT(*)::bigint FROM artisan_profiles WHERE verify_status = ${VerifyStatus.APPROVED}::"VerifyStatus") AS approved_artisans,
+      (SELECT COUNT(*)::bigint FROM artisan_kyc_submissions WHERE status = ${KycStatus.PENDING}::"KycStatus") AS pending_kyc_submissions,
+      (SELECT COUNT(*)::bigint FROM offerings) AS offerings,
+      (SELECT COUNT(*)::bigint FROM bookings) AS bookings,
+      (SELECT COUNT(*)::bigint FROM bookings WHERE status = ${BookingStatus.REQUESTED}::"BookingStatus") AS booking_requests,
+      (SELECT COUNT(*)::bigint FROM bookings WHERE status = ${BookingStatus.ACCEPTED}::"BookingStatus") AS booking_appointments,
+      (SELECT COUNT(*)::bigint FROM bookings WHERE status = ${BookingStatus.ONGOING}::"BookingStatus") AS booking_ongoing,
+      (SELECT COUNT(*)::bigint FROM bookings WHERE status = ${BookingStatus.COMPLETED}::"BookingStatus") AS booking_completed,
+      (SELECT COUNT(*)::bigint FROM payments) AS payments,
+      (SELECT COUNT(*)::bigint FROM disputes WHERE status IN (${DisputeStatus.OPEN}::"DisputeStatus", ${DisputeStatus.UNDER_REVIEW}::"DisputeStatus")) AS open_disputes,
+      (SELECT COUNT(*)::bigint FROM reviews) AS reviews,
+      (SELECT COUNT(*)::bigint FROM conversations) AS conversations
+  `;
+
+  if (!row) {
+    throw new Error('Admin stats query returned no rows');
+  }
+
+  const stats = {
+    users: Number(row.users),
+    customers: Number(row.customers),
+    artisans: Number(row.artisans),
+    admins: Number(row.admins),
+    bannedUsers: Number(row.banned_users),
+    pendingArtisans: Number(row.pending_artisans),
+    approvedArtisans: Number(row.approved_artisans),
+    pendingKycSubmissions: Number(row.pending_kyc_submissions),
+    offerings: Number(row.offerings),
+    bookings: Number(row.bookings),
+    bookingRequests: Number(row.booking_requests),
+    bookingAppointments: Number(row.booking_appointments),
+    bookingOngoing: Number(row.booking_ongoing),
+    bookingCompleted: Number(row.booking_completed),
+    payments: Number(row.payments),
+    openDisputes: Number(row.open_disputes),
+    reviews: Number(row.reviews),
+    conversations: Number(row.conversations),
   };
+
+  adminStatsCache = {
+    stats,
+    expiresAt: Date.now() + ADMIN_STATS_CACHE_MS,
+  };
+
+  return stats;
 };
 
 export const getUsers = async (pagination?: Pagination) => {

@@ -27,6 +27,7 @@ export function AdminConsole({
   busy,
   runAction,
   refresh,
+  loadAdminSection,
   onSignOut,
 }: {
   section: AdminSection;
@@ -44,6 +45,7 @@ export function AdminConsole({
   busy: boolean;
   runAction: ActionRunner;
   refresh: () => Promise<void>;
+  loadAdminSection: (section: AdminSection) => Promise<void>;
   onSignOut: () => void;
 }) {
   const [messagesFocusConversationId, setMessagesFocusConversationId] = useState<string | null>(null);
@@ -89,6 +91,10 @@ export function AdminConsole({
   useEffect(() => {
     closeMobileNav();
   }, [section]);
+
+  useEffect(() => {
+    void loadAdminSection(section).catch(() => undefined);
+  }, [section, loadAdminSection]);
 
   return (
     <section className={`admin-shell ${mobileNavOpen ? 'admin-shell--nav-open' : ''}`}>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import type { ArtisanHeaderActive, BookingSuccessState, PaymentSuccessState } from '../appTypes';
+import type { ArtisanHeaderActive, AdminSection, BookingSuccessState, PaymentSuccessState } from '../appTypes';
 import { isAuthPathname } from '../lib/appRouting';
 import { firebaseReady } from '../lib/firebase';
 import { useActionRunner } from '../hooks/useActionRunner';
@@ -120,8 +120,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     navigate(`/artisans/${artisanId}`);
   }
 
-  const loadPrivateData = (authToken?: string, user?: ApiUser | null) =>
-    appData.loadPrivateData(authToken ?? '', user);
+  const loadPrivateData = useCallback(
+    (authToken?: string, user?: ApiUser | null) =>
+      appData.loadPrivateData(authToken ?? auth.token, user ?? auth.me ?? undefined),
+    [appData.loadPrivateData, auth.token, auth.me]
+  );
+
+  const loadConversations = useCallback(
+    (authToken?: string) => appData.loadConversations(authToken ?? auth.token),
+    [appData.loadConversations, auth.token]
+  );
+
+  const loadAdminSection = useCallback(
+    (section: AdminSection, authToken?: string) =>
+      appData.loadAdminSection(authToken ?? auth.token, section),
+    [appData.loadAdminSection, auth.token]
+  );
+
+  const refreshAdminSection = useCallback(
+    async (section: AdminSection) => {
+      await appData.loadAdminEssentials(auth.token);
+      await appData.loadAdminSection(auth.token, section);
+    },
+    [appData.loadAdminEssentials, appData.loadAdminSection, auth.token]
+  );
 
   const rootValue: AppRootValue = {
     navigate,
@@ -182,6 +204,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     withNotice,
     loadPublicData: appData.loadPublicData,
     loadPrivateData,
+    loadConversations,
+    loadAdminSection,
+    refreshAdminSection,
     openArtisanProfile,
     enablePushAlerts,
     firebaseReady,

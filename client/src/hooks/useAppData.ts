@@ -5,6 +5,7 @@ import { paymentSuccessFromVerify, type VerifyPaymentResponse } from '../lib/pay
 import type {
   AdminArtisanRecord,
   AdminCategoryRecord,
+  AdminSection,
   AdminUserRecord,
   MarketplaceSort,
 } from '../appTypes';
@@ -99,10 +100,15 @@ export function useAppData(filters: MarketplaceFilterState, options?: UseAppData
       }
 
       const query = `?${params.toString()}`;
-      const [categoryRes, artisanRes, offeringRes] = await Promise.all([
-        api<{ categories: Category[] }>('/categories'),
+      const categoryPromise = api<{ categories: Category[] }>('/categories');
+      const marketplacePromise = Promise.all([
         api<{ artisans: Artisan[] }>(`/artisans${query}`),
         api<{ offerings: Offering[] }>(`/offerings${query}`),
+      ]);
+
+      const [categoryRes, [artisanRes, offeringRes]] = await Promise.all([
+        categoryPromise,
+        marketplacePromise,
       ]);
       setCategories(categoryRes.categories);
       setArtisans(artisanRes.artisans);
@@ -110,6 +116,83 @@ export function useAppData(filters: MarketplaceFilterState, options?: UseAppData
     },
     [filters]
   );
+
+  const loadConversations = useCallback(
+    async (authToken: string) => {
+      const conversationRes = await api<{ conversations: Conversation[] }>('/conversations', {
+        token: authToken,
+      }).catch((err) => conversationsFallback(err, notifyConversationError));
+      setConversations(conversationRes.conversations);
+    },
+    [notifyConversationError]
+  );
+
+  const loadAdminEssentials = useCallback(async (authToken: string) => {
+    const [stats, notificationRes] = await Promise.all([
+      api<{ stats: Record<string, number> }>('/admin/stats', { token: authToken }),
+      api<{ notifications: Notification[] }>('/notifications', { token: authToken }).catch(() => ({
+        notifications: [],
+      })),
+    ]);
+    setAdminStats(stats.stats);
+    setNotifications(notificationRes.notifications);
+  }, []);
+
+  const loadAdminSection = useCallback(async (authToken: string, section: AdminSection) => {
+    switch (section) {
+      case 'overview':
+        return;
+      case 'profiles': {
+        const [userRes, artisanRes] = await Promise.all([
+          api<{ users: AdminUserRecord[] }>('/admin/users?page=1&limit=100', { token: authToken }),
+          api<{ artisans: AdminArtisanRecord[] }>('/admin/artisans?page=1&limit=24', {
+            token: authToken,
+          }),
+        ]);
+        setAdminUsers(userRes.users);
+        setAdminArtisans(artisanRes.artisans);
+        return;
+      }
+      case 'jobs': {
+        const bookingRes = await api<{ bookings: Booking[]; meta: { total: number } }>(
+          '/admin/bookings?page=1&limit=200',
+          { token: authToken }
+        );
+        setAdminBookings(bookingRes.bookings);
+        setAdminBookingsTotal(bookingRes.meta?.total ?? bookingRes.bookings.length);
+        return;
+      }
+      case 'messages': {
+        const conversationRes = await api<{ conversations: Conversation[] }>(
+          '/admin/conversations?page=1&limit=20',
+          { token: authToken }
+        );
+        setAdminConversations(conversationRes.conversations);
+        return;
+      }
+      case 'verification': {
+        const kycRes = await api<{ submissions: ArtisanKycSubmission[] }>(
+          '/admin/kyc-submissions?page=1&limit=12',
+          { token: authToken }
+        );
+        setAdminKycSubmissions(kycRes.submissions);
+        return;
+      }
+      case 'catalog': {
+        const categoryRes = await api<{ categories: AdminCategoryRecord[] }>(
+          '/admin/categories?page=1&limit=24',
+          { token: authToken }
+        );
+        setAdminCategories(categoryRes.categories);
+        return;
+      }
+      case 'reviews':
+      case 'finance':
+        return;
+      default:
+        return;
+    }
+  }, []);
 
   const loadPrivateData = useCallback(async (authToken: string, user: ApiUser | null | undefined) => {
     if (!authToken || !user?.role) return;
@@ -160,32 +243,9 @@ export function useAppData(filters: MarketplaceFilterState, options?: UseAppData
     }
 
     if (user.role === 'ADMIN') {
-      const [stats, conversationRes, bookingRes, notificationRes, kycRes, userRes, artisanRes, categoryRes] =
-        await Promise.all([
-          api<{ stats: Record<string, number> }>('/admin/stats', { token: authToken }),
-          api<{ conversations: Conversation[] }>('/admin/conversations?page=1&limit=20', { token: authToken }),
-          api<{ bookings: Booking[]; meta: { total: number } }>('/admin/bookings?page=1&limit=200', {
-            token: authToken,
-          }),
-          api<{ notifications: Notification[] }>('/notifications', { token: authToken }),
-          api<{ submissions: ArtisanKycSubmission[] }>('/admin/kyc-submissions?page=1&limit=12', {
-            token: authToken,
-          }),
-          api<{ users: AdminUserRecord[] }>('/admin/users?page=1&limit=100', { token: authToken }),
-          api<{ artisans: AdminArtisanRecord[] }>('/admin/artisans?page=1&limit=24', { token: authToken }),
-          api<{ categories: AdminCategoryRecord[] }>('/admin/categories?page=1&limit=24', { token: authToken }),
-        ]);
-      setAdminStats(stats.stats);
-      setAdminConversations(conversationRes.conversations);
-      setAdminBookings(bookingRes.bookings);
-      setAdminBookingsTotal(bookingRes.meta?.total ?? bookingRes.bookings.length);
-      setNotifications(notificationRes.notifications);
-      setAdminKycSubmissions(kycRes.submissions);
-      setAdminUsers(userRes.users);
-      setAdminArtisans(artisanRes.artisans);
-      setAdminCategories(categoryRes.categories);
+      await loadAdminEssentials(authToken);
     }
-  }, [notifyConversationError]);
+  }, [loadAdminEssentials, notifyConversationError]);
 
   const clearPrivateData = useCallback(() => {
     setBookings([]);
@@ -237,6 +297,9 @@ export function useAppData(filters: MarketplaceFilterState, options?: UseAppData
     adminCategories,
     loadPublicData,
     loadPrivateData,
+    loadConversations,
+    loadAdminEssentials,
+    loadAdminSection,
     clearPrivateData,
     completePaymentReturn,
   };
