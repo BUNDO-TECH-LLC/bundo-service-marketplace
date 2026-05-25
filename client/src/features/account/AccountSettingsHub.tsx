@@ -3,8 +3,10 @@ import type { User } from 'firebase/auth';
 import { signOut, updateProfile, verifyBeforeUpdateEmail } from 'firebase/auth';
 import { buildAppPath } from '../../lib/appPaths';
 import { api } from '../../lib/api';
+import { formatAuthFlowError } from '../../lib/authErrors';
 import { sendBundoPasswordResetEmail } from '../../lib/authEmailVerification';
 import { auth } from '../../lib/firebase';
+import { validateEmailAddress } from '../../lib/emailValidation';
 import {
   LOCALE_OPTIONS,
   readLocalePreference,
@@ -25,6 +27,23 @@ const defaultPrefs: NotificationPreferences = {
   messages: true,
   marketing: false,
 };
+
+function normalizePhoneInput(phone: string) {
+  const trimmed = phone.trim();
+  const normalized = trimmed.startsWith('+')
+    ? `+${trimmed.slice(1).replace(/\D/g, '')}`
+    : `+${trimmed.replace(/\D/g, '')}`;
+
+  if (!/^\+\d{10,15}$/.test(normalized)) {
+    throw new Error('Enter a valid phone number with country code, e.g. +2348012345678.');
+  }
+
+  return normalized;
+}
+
+function sameEmail(left?: string | null, right?: string | null) {
+  return left?.trim().toLowerCase() === right?.trim().toLowerCase();
+}
 
 const SETTINGS_NAV: {
   id: AccountSettingsSection;
@@ -117,6 +136,10 @@ export function AccountSettingsHub({
   const [prefs, setPrefs] = useState<NotificationPreferences>(me.notificationPreferences || defaultPrefs);
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [artisanProfile, setArtisanProfile] = useState<Artisan | null>(null);
+  const [editingPersonal, setEditingPersonal] = useState(false);
+  const [editingPhone, setEditingPhone] = useState(false);
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [editingLanguage, setEditingLanguage] = useState(false);
 
   const navItems = useMemo(() => {
     const filtered = SETTINGS_NAV.filter((item) => {
@@ -151,6 +174,8 @@ export function AccountSettingsHub({
     setPhone(me.phone || '');
     setPrefs(me.notificationPreferences || defaultPrefs);
   }, [firebaseUser, me]);
+
+  const currentEmail = me.email || firebaseUser?.email || '';
 
   useEffect(() => {
     if (me.role !== 'ARTISAN') {
@@ -189,21 +214,32 @@ export function AccountSettingsHub({
     }
 
     const trimmed = fullName.trim();
-    if (!trimmed) {
-      onNotice('Enter your name.');
+    if (trimmed.length < 2) {
+      onNotice('Enter your full name.');
+      return;
+    }
+
+    if (trimmed.length > 80) {
+      onNotice('Name is too long. Use 80 characters or fewer.');
       return;
     }
 
     await updateProfile(firebaseUser, { displayName: trimmed });
+    setFullName(trimmed);
+    setEditingPersonal(false);
     onNotice('Personal details updated.');
   }
 
   async function savePhone() {
+    const normalizedPhone = normalizePhoneInput(phone);
+
     await api('/users/phone', {
       method: 'PATCH',
       token,
-      body: JSON.stringify({ phone: phone.trim() }),
+      body: JSON.stringify({ phone: normalizedPhone }),
     });
+    setPhone(normalizedPhone);
+    setEditingPhone(false);
     await refresh();
   }
 
@@ -218,6 +254,7 @@ export function AccountSettingsHub({
 
   async function saveLanguage() {
     saveLocalePreference(locale);
+    setEditingLanguage(false);
     onNotice('Language preference saved. More translations are coming soon.');
   }
 
@@ -228,16 +265,29 @@ export function AccountSettingsHub({
     }
 
     const trimmed = newEmail.trim();
-    if (!trimmed) {
-      onNotice('Enter your new email address.');
+    const validation = validateEmailAddress(trimmed);
+
+    if (!validation.ok) {
+      onNotice(validation.message);
       return;
     }
 
-    await verifyBeforeUpdateEmail(firebaseUser, trimmed, {
-      url: `${window.location.origin}/workspace/settings#email`,
-    });
+    if (sameEmail(validation.normalized, currentEmail)) {
+      onNotice('Enter a different email address to update your login email.');
+      return;
+    }
+
+    try {
+      await verifyBeforeUpdateEmail(firebaseUser, validation.normalized, {
+        url: `${window.location.origin}/workspace/settings#email`,
+      });
+    } catch (error) {
+      throw new Error(formatAuthFlowError(error, 'signup'));
+    }
+
     onNotice('Verification link sent. Open it from your new inbox to finish updating your email.');
     setNewEmail('');
+    setEditingEmail(false);
   }
 
   async function sendPasswordReset() {
@@ -249,6 +299,26 @@ export function AccountSettingsHub({
 
     await sendBundoPasswordResetEmail(email);
     onNotice('Password reset link sent. Check your inbox and spam folder.');
+  }
+
+  function cancelPersonalEdit() {
+    setFullName(userDisplayName(firebaseUser, me));
+    setEditingPersonal(false);
+  }
+
+  function cancelPhoneEdit() {
+    setPhone(me.phone || '');
+    setEditingPhone(false);
+  }
+
+  function cancelEmailEdit() {
+    setNewEmail('');
+    setEditingEmail(false);
+  }
+
+  function cancelLanguageEdit() {
+    setLocale(readLocalePreference());
+    setEditingLanguage(false);
   }
 
   async function deleteAccount() {
@@ -373,92 +443,184 @@ export function AccountSettingsHub({
                 ? 'Your name appears on job updates, customer chats, and your Bundo artisan account.'
                 : 'Your name appears on bookings, messages, and your account menu.'}
             </p>
-            <form className="account-settings-form" onSubmit={(event) => void runAction(() => savePersonalDetails(event), 'Personal details saved')}>
-              <label>
-                Full name
-                <input
-                  type="text"
-                  value={fullName}
-                  onChange={(event) => setFullName(event.target.value)}
-                  autoComplete="name"
-                  required
-                />
-              </label>
-              <label>
-                Account email
-                <input type="email" value={me.email || firebaseUser?.email || ''} disabled />
-              </label>
-              <p className="muted account-settings-hint">
-                To change your login email, use <strong>Change email</strong> in the menu.
-              </p>
-              <button type="submit" disabled={busy}>
-                Save personal details
-              </button>
-            </form>
+            {!editingPersonal ? (
+              <div className="account-settings-readonly-card">
+                <dl className="account-settings-summary-grid">
+                  <div>
+                    <dt>Full name</dt>
+                    <dd>{userDisplayName(firebaseUser, me) || 'Not set'}</dd>
+                  </div>
+                  <div>
+                    <dt>Login email</dt>
+                    <dd>{currentEmail || 'Not set'}</dd>
+                  </div>
+                </dl>
+                <button type="button" className="secondary-button" onClick={() => setEditingPersonal(true)}>
+                  Edit personal details
+                </button>
+              </div>
+            ) : (
+              <form className="account-settings-form" onSubmit={(event) => void runAction(() => savePersonalDetails(event), 'Personal details saved')}>
+                <label>
+                  Full name
+                  <input
+                    type="text"
+                    value={fullName}
+                    onChange={(event) => setFullName(event.target.value)}
+                    autoComplete="name"
+                    maxLength={80}
+                    required
+                  />
+                </label>
+                <p className="muted account-settings-hint">
+                  To change your login email, use <strong>Login email</strong> in the menu.
+                </p>
+                <div className="settings-actions">
+                  <button type="button" className="secondary-button" disabled={busy} onClick={cancelPersonalEdit}>
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={busy}>
+                    Save personal details
+                  </button>
+                </div>
+              </form>
+            )}
           </article>
 
           <article id="account-settings-phone" className={`panel-card form-card ${panelClass('phone')}`}>
-            <h2>{isArtisan ? 'Contact phone' : 'Change phone number'}</h2>
+            <h2>{isArtisan ? 'Contact phone' : 'Phone number'}</h2>
             <p className="muted">
               {isArtisan
                 ? 'Customers and Bundo support use this number for your jobs. Include country code (e.g. +234…).'
                 : 'Used for booking updates and support. Include country code (e.g. +234…).'}
             </p>
-            <label>
-              Phone number
-              <input
-                type="tel"
-                value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-                placeholder="+2348012345678"
-                autoComplete="tel"
-              />
-            </label>
-            <button type="button" disabled={busy || !phone.trim()} onClick={() => void runAction(savePhone, 'Phone number saved')}>
-              Save phone number
-            </button>
+            {!editingPhone ? (
+              <div className="account-settings-readonly-card">
+                <dl className="account-settings-summary-grid">
+                  <div>
+                    <dt>Current phone</dt>
+                    <dd>{me.phone || 'Not set'}</dd>
+                  </div>
+                  <div>
+                    <dt>Status</dt>
+                    <dd>{me.phone ? 'Saved for account contact' : 'Add a number for booking support'}</dd>
+                  </div>
+                </dl>
+                <button type="button" className="secondary-button" onClick={() => setEditingPhone(true)}>
+                  {me.phone ? 'Change phone number' : 'Add phone number'}
+                </button>
+              </div>
+            ) : (
+              <div className="account-settings-form">
+                <label>
+                  Phone number
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(event) => setPhone(event.target.value)}
+                    placeholder="+2348012345678"
+                    autoComplete="tel"
+                    inputMode="tel"
+                  />
+                </label>
+                <p className="muted account-settings-hint">
+                  Use international format. Example: <strong>+2348012345678</strong>.
+                </p>
+                <div className="settings-actions">
+                  <button type="button" className="secondary-button" disabled={busy} onClick={cancelPhoneEdit}>
+                    Cancel
+                  </button>
+                  <button type="button" disabled={busy || !phone.trim()} onClick={() => void runAction(savePhone, 'Phone number saved')}>
+                    Save phone number
+                  </button>
+                </div>
+              </div>
+            )}
           </article>
 
           <article id="account-settings-email" className={`panel-card form-card ${panelClass('email')}`}>
-            <h2>Change email</h2>
-            <p className="muted">
-              Current email: <strong>{me.email || firebaseUser?.email || 'Not set'}</strong>
-            </p>
-            <p className="muted account-settings-hint">
-              We will send a verification link to your new address. You must open that link while signed in to finish
-              the change.
-            </p>
-            <label>
-              New email address
-              <input
-                type="email"
-                value={newEmail}
-                onChange={(event) => setNewEmail(event.target.value)}
-                placeholder="you@example.com"
-                autoComplete="email"
-              />
-            </label>
-            <button type="button" disabled={busy || !newEmail.trim()} onClick={() => void runAction(sendEmailChangeLink, '')}>
-              Send verification link
-            </button>
+            <h2>Login email</h2>
+            {!editingEmail ? (
+              <div className="account-settings-readonly-card">
+                <dl className="account-settings-summary-grid">
+                  <div>
+                    <dt>Current email</dt>
+                    <dd>{currentEmail || 'Not set'}</dd>
+                  </div>
+                  <div>
+                    <dt>Email verification</dt>
+                    <dd>{firebaseUser?.emailVerified ? 'Verified' : 'Not verified yet'}</dd>
+                  </div>
+                </dl>
+                <button type="button" className="secondary-button" onClick={() => setEditingEmail(true)}>
+                  Change login email
+                </button>
+              </div>
+            ) : (
+              <div className="account-settings-form">
+                <p className="muted account-settings-hint">
+                  We will send a verification link to your new address. Open that link while signed in to finish the
+                  change.
+                </p>
+                <label>
+                  New email address
+                  <input
+                    type="email"
+                    value={newEmail}
+                    onChange={(event) => setNewEmail(event.target.value)}
+                    placeholder="you@example.com"
+                    autoComplete="email"
+                  />
+                </label>
+                <div className="settings-actions">
+                  <button type="button" className="secondary-button" disabled={busy} onClick={cancelEmailEdit}>
+                    Cancel
+                  </button>
+                  <button type="button" disabled={busy || !newEmail.trim()} onClick={() => void runAction(sendEmailChangeLink, '')}>
+                    Send verification link
+                  </button>
+                </div>
+              </div>
+            )}
           </article>
 
           <article id="account-settings-language" className={`panel-card form-card ${panelClass('language')}`}>
-            <h2>Change language</h2>
+            <h2>Language</h2>
             <p className="muted">Choose your preferred language. Full translations are rolling out across Bundo.</p>
-            <label>
-              Language
-              <select value={locale} onChange={(event) => setLocale(event.target.value as BundoLocale)}>
-                {LOCALE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button type="button" disabled={busy} onClick={() => void runAction(saveLanguage, 'Language preference saved')}>
-              Save language
-            </button>
+            {!editingLanguage ? (
+              <div className="account-settings-readonly-card">
+                <dl className="account-settings-summary-grid">
+                  <div>
+                    <dt>Current language</dt>
+                    <dd>{LOCALE_OPTIONS.find((option) => option.value === locale)?.label ?? 'English'}</dd>
+                  </div>
+                </dl>
+                <button type="button" className="secondary-button" onClick={() => setEditingLanguage(true)}>
+                  Change language
+                </button>
+              </div>
+            ) : (
+              <div className="account-settings-form">
+                <label>
+                  Language
+                  <select value={locale} onChange={(event) => setLocale(event.target.value as BundoLocale)}>
+                    {LOCALE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="settings-actions">
+                  <button type="button" className="secondary-button" disabled={busy} onClick={cancelLanguageEdit}>
+                    Cancel
+                  </button>
+                  <button type="button" disabled={busy} onClick={() => void runAction(saveLanguage, 'Language preference saved')}>
+                    Save language
+                  </button>
+                </div>
+              </div>
+            )}
           </article>
 
           <article id="account-settings-notifications" className={`panel-card ${panelClass('notifications')}`}>

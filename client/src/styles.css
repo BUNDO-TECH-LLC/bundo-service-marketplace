@@ -4630,6 +4630,43 @@ footer h4 {
   opacity: 0.72;
 }
 
+.account-settings-readonly-card {
+  display: grid;
+  gap: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  background: #fff;
+}
+
+.account-settings-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.account-settings-summary-grid div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.account-settings-summary-grid dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.account-settings-summary-grid dd {
+  overflow-wrap: anywhere;
+  margin: 0;
+  color: var(--ink);
+  font-weight: 800;
+}
+
 .account-settings-danger {
   border-color: rgb(180 40 40 / 22%);
   background: rgb(255 246 246);
@@ -4733,6 +4770,10 @@ footer h4 {
 }
 
 @media (max-width: 768px) {
+  .account-settings-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
   .account-settings-page {
     gap: 20px;
   }
