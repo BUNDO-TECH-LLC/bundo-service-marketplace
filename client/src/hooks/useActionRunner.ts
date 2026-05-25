@@ -2,13 +2,42 @@ import { useCallback, useState } from 'react';
 import { ApiError } from '../lib/api';
 import type { ActionRunner } from '../appTypes';
 
+const LOW_SIGNAL_NOTICES = new Set([
+  'Done',
+  'Signed in',
+  'Signed out',
+  'Opening marketplace',
+  'Category selected',
+  'Showing available services',
+]);
+
+function shouldSuppressNotice(message: string) {
+  const normalized = message.trim();
+  return LOW_SIGNAL_NOTICES.has(normalized) || normalized.startsWith('Searching for ');
+}
+
 export function useActionRunner() {
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState('');
+  const [notice, setNoticeState] = useState('');
+
+  const setNotice = useCallback((message: string) => {
+    const normalized = message.trim();
+
+    if (!normalized) {
+      setNoticeState('');
+      return;
+    }
+
+    if (shouldSuppressNotice(normalized)) {
+      return;
+    }
+
+    setNoticeState(normalized);
+  }, []);
 
   const withNotice: ActionRunner = useCallback(async (action, done = 'Done') => {
     setBusy(true);
-    setNotice('');
+    setNoticeState('');
     try {
       await action();
       if (done) {
@@ -25,7 +54,7 @@ export function useActionRunner() {
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [setNotice]);
 
   return { busy, notice, setNotice, withNotice };
 }

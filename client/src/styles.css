@@ -4699,29 +4699,77 @@ footer h4 {
 
 .notice {
   position: fixed;
-  top: 86px;
-  right: 18px;
+  right: 24px;
+  bottom: 24px;
   z-index: 60;
-  width: min(420px, calc(100vw - 36px));
-  border: 1px solid rgba(185, 81, 27, 0.22);
-  border-radius: 10px;
-  padding: 14px 18px;
-  color: #fff;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  width: min(340px, calc(100vw - 32px));
+  border: 1px solid rgb(17 17 17 / 8%);
+  border-radius: 12px;
+  padding: 10px 10px 10px 12px;
+  color: var(--ink);
+  background: rgb(255 255 255 / 96%);
+  box-shadow: 0 12px 34px rgb(17 17 17 / 14%);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+  pointer-events: auto;
+}
+
+.notice::before {
+  position: absolute;
+  top: 12px;
+  left: 0;
+  width: 3px;
+  height: calc(100% - 24px);
+  border-radius: 0 999px 999px 0;
   background: var(--accent);
-  box-shadow: 0 18px 44px rgba(17, 17, 17, 0.14);
-  font-weight: 800;
-  pointer-events: none;
+  content: '';
+}
+
+.notice span {
+  padding-left: 6px;
+}
+
+.notice-dismiss {
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.notice-dismiss:hover,
+.notice-dismiss:focus-visible {
+  color: var(--ink);
+  background: var(--soft);
 }
 
 .notice.setup-notice {
-  top: 104px;
-  right: clamp(16px, 8vw, 120px);
+  right: clamp(16px, 6vw, 72px);
+  bottom: 20px;
 }
 
 .notice.warning {
   position: static;
+  display: block;
+  width: auto;
   margin-bottom: 18px;
   border-radius: 8px;
+  pointer-events: none;
+}
+
+.notice.warning::before {
+  content: none;
 }
 
 .success-overlay {

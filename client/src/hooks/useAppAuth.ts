@@ -74,9 +74,6 @@ export function useAppAuth({
       authInitTimedOut = true;
       setAuthChecked(true);
       setRouteHydrated(true);
-      setNoticeRef.current(
-        'Authentication is taking longer than expected. You can still browse; try signing in again.'
-      );
     }, AUTH_INIT_TIMEOUT_MS);
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {

@@ -31,6 +31,17 @@ export function MainLayout() {
   }, [ctx.location.pathname, ctx.location.search]);
 
   useEffect(() => {
+    if (!ctx.notice) return;
+
+    const isLongerMessage = ctx.notice.length > 90;
+    const timeoutId = window.setTimeout(() => {
+      ctx.setNotice('');
+    }, isLongerMessage ? 8000 : 5000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [ctx.notice, ctx.setNotice]);
+
+  useEffect(() => {
     const parsed = parseAuthDrawerPrompt(ctx.location.search);
     if (!parsed) {
       consumedAuthPromptRef.current = '';
@@ -223,7 +234,21 @@ export function MainLayout() {
       )}
 
       {ctx.notice && (
-        <div className={`notice ${ctx.usesArtisanSetupHeader ? 'setup-notice' : ''}`}>{ctx.notice}</div>
+        <div
+          className={`notice ${ctx.usesArtisanSetupHeader ? 'setup-notice' : ''}`}
+          role="status"
+          aria-live="polite"
+        >
+          <span>{ctx.notice}</span>
+          <button
+            type="button"
+            className="notice-dismiss"
+            aria-label="Dismiss notification"
+            onClick={() => ctx.setNotice('')}
+          >
+            x
+          </button>
+        </div>
       )}
       {ctx.bookingSuccess && (
         <BookingSuccessDialog
