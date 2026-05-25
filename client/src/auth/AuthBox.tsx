@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState, type ReactNode } from 'react';
+import { FormEvent, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { User } from 'firebase/auth';
 import {
@@ -16,15 +16,18 @@ import { formatAuthFlowError } from '../lib/authErrors';
 import {
   clearSessionSignupIntent,
   needsEmailVerification,
+  clearGoogleRedirectIntent,
+  readGoogleRedirectIntent,
   readPendingSignupIntent,
   readPendingSignupPhone,
   resolveSignupIntent,
+  saveGoogleRedirectIntent,
   savePendingSignupIntent,
   savePendingSignupPhone,
   savePendingSignupRole,
   saveSessionSignupIntent,
 } from '../lib/authSignupStorage';
-import { finalizeAuthSession } from '../lib/authSessionFlow';
+import { finalizeAuthSession, getGoogleRedirectResult, signInWithGooglePopup } from '../lib/authSessionFlow';
 import { sendBundoPasswordResetEmail } from '../lib/authEmailVerification';
 import { resolveApiSession } from '../lib/resolveApiSession';
 import { userDisplayName } from '../lib/userDisplayName';
@@ -32,7 +35,6 @@ import type { ApiUser, Role } from '../types';
 import type { SignupRole, View, WorkspaceSection } from '../appTypes';
 import bundoLogo from '../assets/bundo-logo.png';
 import { sendBundoEmailVerification } from '../lib/authEmailVerification';
-import { signInWithGooglePopup } from '../lib/authSessionFlow';
 import { LegalLinks } from '../components/LegalLinks';
 import { PasswordInput } from '../components/PasswordInput';
 import {
@@ -141,6 +143,7 @@ export function AuthBox({
   const [authStep, setAuthStep] = useState<'role' | 'account'>('account');
   const [preferredRole, setPreferredRole] = useState<SignupRole | null>(null);
   const [pendingAuthUser, setPendingAuthUser] = useState<User | null>(null);
+  const processedGoogleRedirectRef = useRef(false);
 
   const narrowViewport = useMediaQuery('(max-width: 768px)');
   const topbarPanelEl = useElementById(
@@ -266,6 +269,24 @@ export function AuthBox({
     setPhone(availability.normalized);
     setPhoneError('');
     return true;
+  }
+
+  async function resolveOptionalSignupPhone(value: string | null | undefined) {
+    const candidate = value?.trim();
+    if (!candidate) {
+      return undefined;
+    }
+
+    const availability = await checkSignupPhoneAvailability(candidate);
+    if (!availability.ok) {
+      setPhoneError(availability.message);
+      onNotice(availability.message);
+      return null;
+    }
+
+    setPhone(availability.normalized);
+    setPhoneError('');
+    return availability.normalized;
   }
 
   function isExistingGoogleAccount(user: User) {
@@ -409,6 +430,53 @@ export function AuthBox({
     }
   }
 
+  async function completeGoogleAuth(
+    googleUser: User,
+    authMode: 'login' | 'signup',
+    roleOverride: SignupRole | null = preferredRole,
+    options: { phoneOverride?: string | null; displayNameOverride?: string | null } = {}
+  ) {
+    const googleEmail = googleUser.email || '';
+    let normalizedPhone: string | undefined;
+
+    if (authMode === 'signup') {
+      const displayName = options.displayNameOverride ?? combinedDisplayName();
+      if (displayName && googleUser.displayName !== displayName) {
+        await updateProfile(googleUser, { displayName });
+      }
+
+      if (roleOverride === 'ARTISAN') {
+        saveSessionSignupIntent('ARTISAN');
+        savePendingSignupIntent(googleEmail, 'ARTISAN');
+      }
+
+      const phoneCandidate =
+        options.phoneOverride !== undefined ? options.phoneOverride : phone.trim();
+      const phoneResult = await resolveOptionalSignupPhone(phoneCandidate);
+      if (phoneResult === null) {
+        await finishAuth(googleUser, 'signup', roleOverride, false, { phoneOverride: null });
+        return;
+      }
+
+      normalizedPhone = phoneResult;
+      if (normalizedPhone) {
+        savePendingSignupPhone(googleEmail, normalizedPhone);
+      }
+    }
+
+    if (authMode === 'signup' && isExistingGoogleAccount(googleUser)) {
+      onNotice(
+        'An account already exists with this Google email. You are signed in—use Log in next time if you prefer.'
+      );
+      await finishAuth(googleUser, 'login');
+      return;
+    }
+
+    await finishAuth(googleUser, authMode, roleOverride, false, {
+      phoneOverride: authMode === 'signup' ? normalizedPhone || null : undefined,
+    });
+  }
+
   async function continueWithGoogle() {
     if (!auth) {
       onNotice('Sign-in is not configured. Add VITE_FIREBASE_* to your client environment and reload.');
@@ -425,38 +493,23 @@ export function AuthBox({
     setGoogleSubmitting(true);
     onNotice('');
     try {
+      saveGoogleRedirectIntent({
+        mode: mode === 'signup' ? 'signup' : 'login',
+        role: mode === 'signup' ? preferredRole : null,
+        phone: mode === 'signup' && phone.trim() ? phone.trim() : null,
+        displayName: mode === 'signup' ? combinedDisplayName() || null : null,
+      });
+
       const credential = await signInWithGooglePopup();
-      const googleEmail = credential.user.email || '';
-
-      if (mode === 'signup') {
-        const displayName = combinedDisplayName();
-        if (displayName) {
-          await updateProfile(credential.user, { displayName });
-        }
-        if (preferredRole === 'ARTISAN') {
-          saveSessionSignupIntent('ARTISAN');
-          savePendingSignupIntent(googleEmail, 'ARTISAN');
-        }
-        if (phone.trim()) {
-          const phoneAvailable = await validateSignupPhoneField();
-          if (!phoneAvailable) {
-            await finishAuth(credential.user, 'signup', preferredRole, false, { phoneOverride: null });
-            return;
-          }
-          savePendingSignupPhone(googleEmail, phone.trim());
-        }
-      }
-
-      if (mode === 'signup' && isExistingGoogleAccount(credential.user)) {
-        onNotice(
-          'An account already exists with this Google email. You are signed in—use Log in next time if you prefer.'
-        );
-        await finishAuth(credential.user, 'login');
+      if (!credential) {
+        onNotice('Redirecting to Google to complete sign-in.');
         return;
       }
 
-      await finishAuth(credential.user, mode);
+      clearGoogleRedirectIntent();
+      await completeGoogleAuth(credential.user, mode === 'signup' ? 'signup' : 'login', preferredRole);
     } catch (error) {
+      clearGoogleRedirectIntent();
       showAuthFieldError(error, mode);
     } finally {
       setSubmitting(false);
@@ -532,6 +585,61 @@ export function AuthBox({
 
     openLogin();
   }
+
+  useEffect(() => {
+    if (!auth || processedGoogleRedirectRef.current) {
+      return;
+    }
+
+    processedGoogleRedirectRef.current = true;
+    let cancelled = false;
+
+    void (async () => {
+      const intent = readGoogleRedirectIntent();
+
+      try {
+        const credential = await getGoogleRedirectResult();
+        if (cancelled || !credential) {
+          return;
+        }
+
+        clearGoogleRedirectIntent();
+        const authMode = intent?.mode ?? 'login';
+        const role = intent?.role ?? null;
+
+        setMode(authMode);
+        setPreferredRole(role);
+        setAuthStep(authMode === 'signup' && !role ? 'role' : 'account');
+        setSubmitting(true);
+        setGoogleSubmitting(true);
+        await completeGoogleAuth(credential.user, authMode, role, {
+          phoneOverride: intent?.phone ?? null,
+          displayNameOverride: intent?.displayName ?? null,
+        });
+      } catch (error) {
+        clearGoogleRedirectIntent();
+        if (cancelled) {
+          return;
+        }
+
+        const authMode = intent?.mode ?? 'login';
+        setMode(authMode);
+        setPreferredRole(intent?.role ?? null);
+        setAuthStep(authMode === 'signup' && !intent?.role ? 'role' : 'account');
+        setDrawerOpen(true);
+        showAuthFieldError(error, authMode);
+      } finally {
+        if (!cancelled) {
+          setSubmitting(false);
+          setGoogleSubmitting(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!authDrawerPrompt) return;

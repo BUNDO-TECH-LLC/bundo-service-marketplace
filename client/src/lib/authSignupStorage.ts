@@ -5,6 +5,16 @@ const pendingSignupRoleStorageKey = 'bundo:pending-signup-role';
 const pendingSignupPhoneStorageKey = 'bundo:pending-signup-phone';
 const pendingSignupIntentStorageKey = 'bundo:pending-signup-intent';
 const sessionSignupIntentStorageKey = 'bundo:session-signup-intent';
+const googleRedirectIntentStorageKey = 'bundo:google-redirect-intent';
+const GOOGLE_REDIRECT_INTENT_TTL_MS = 10 * 60_000;
+
+export type GoogleRedirectIntent = {
+  mode: 'login' | 'signup';
+  role: SignupRole | null;
+  phone: string | null;
+  displayName: string | null;
+  createdAt: number;
+};
 
 function pendingSignupRoleKey(emailAddress: string) {
   return `${pendingSignupRoleStorageKey}:${emailAddress.trim().toLowerCase()}`;
@@ -94,6 +104,52 @@ export function resolveSignupIntent(
     readSessionSignupIntent() ||
     null
   );
+}
+
+export function saveGoogleRedirectIntent(input: Omit<GoogleRedirectIntent, 'createdAt'>) {
+  window.sessionStorage.setItem(
+    googleRedirectIntentStorageKey,
+    JSON.stringify({
+      ...input,
+      createdAt: Date.now(),
+    })
+  );
+}
+
+export function readGoogleRedirectIntent(): GoogleRedirectIntent | null {
+  const stored = window.sessionStorage.getItem(googleRedirectIntentStorageKey);
+  if (!stored) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(stored) as Partial<GoogleRedirectIntent>;
+    if (Date.now() - Number(parsed.createdAt || 0) > GOOGLE_REDIRECT_INTENT_TTL_MS) {
+      clearGoogleRedirectIntent();
+      return null;
+    }
+
+    const mode = parsed.mode === 'signup' ? 'signup' : 'login';
+    const role = parsed.role === 'CUSTOMER' || parsed.role === 'ARTISAN' ? parsed.role : null;
+
+    return {
+      mode,
+      role,
+      phone: typeof parsed.phone === 'string' && parsed.phone.trim() ? parsed.phone.trim() : null,
+      displayName:
+        typeof parsed.displayName === 'string' && parsed.displayName.trim()
+          ? parsed.displayName.trim()
+          : null,
+      createdAt: Number(parsed.createdAt || 0),
+    };
+  } catch {
+    clearGoogleRedirectIntent();
+    return null;
+  }
+}
+
+export function clearGoogleRedirectIntent() {
+  window.sessionStorage.removeItem(googleRedirectIntentStorageKey);
 }
 
 export function needsEmailVerification(user: User) {

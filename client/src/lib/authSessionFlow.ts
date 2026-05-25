@@ -1,4 +1,10 @@
-import { GoogleAuthProvider, signInWithPopup, type User } from 'firebase/auth';
+import {
+  getRedirectResult,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithRedirect,
+  type User,
+} from 'firebase/auth';
 import { api, ApiError } from './api';
 import {
   clearPendingSignupIntent,
@@ -7,26 +13,57 @@ import {
   clearSessionSignupIntent,
   readPendingSignupRole,
 } from './authSignupStorage';
-import { formatAuthFlowError } from './authErrors';
 import { auth } from './firebase';
 import { resolveApiSession } from './resolveApiSession';
 import type { ApiUser, Role } from '../types';
 
 type AccountKind = Extract<Role, 'CUSTOMER' | 'ARTISAN'>;
 
+function createGoogleProvider() {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  return provider;
+}
+
+function authErrorCode(error: unknown) {
+  return error && typeof error === 'object' && 'code' in error
+    ? String((error as { code?: string }).code)
+    : '';
+}
+
+function shouldFallbackToRedirect(error: unknown) {
+  return [
+    'auth/popup-blocked',
+    'auth/cancelled-popup-request',
+    'auth/operation-not-supported-in-this-environment',
+  ].includes(authErrorCode(error));
+}
+
 export async function signInWithGooglePopup() {
   if (!auth) {
     throw new Error('Firebase is not configured for this environment.');
   }
 
-  const provider = new GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: 'select_account' });
+  const provider = createGoogleProvider();
 
   try {
     return await signInWithPopup(auth, provider);
   } catch (error) {
-    throw new Error(formatAuthFlowError(error, 'login'));
+    if (!shouldFallbackToRedirect(error)) {
+      throw error;
+    }
+
+    await signInWithRedirect(auth, provider);
+    return null;
   }
+}
+
+export async function getGoogleRedirectResult() {
+  if (!auth) {
+    return null;
+  }
+
+  return getRedirectResult(auth);
 }
 
 export async function finalizeAuthSession(
