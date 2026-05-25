@@ -42,7 +42,18 @@ export const getSupportedPayoutBanks = async () => {
     return { status: 'paystack_not_configured' as const };
   }
 
-  const response = await listPaystackBanks();
+  let response;
+
+  try {
+    response = await listPaystackBanks();
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'Could not load payout banks from Paystack';
+    return { status: 'paystack_error' as const, message };
+  }
+
   const banks = response.data
     .filter(
       (bank) =>
@@ -432,13 +443,16 @@ export const createOrUpdatePayoutAccount = async (input: {
 
   try {
     recipient = await createPaystackTransferRecipient({
-      name: accountNameInput || artisan.displayName.trim(),
+      name: accountNameInput || artisan.displayName.trim() || 'Bundo artisan',
       accountNumber,
       bankCode,
     });
   } catch (error) {
-    const message =
+    const rawMessage =
       error instanceof Error ? error.message : 'Could not verify bank account with Paystack';
+    const message = rawMessage.toLowerCase().includes('account number')
+      ? 'We could not verify this account number with the selected bank. Check the bank and 10-digit account number, then try again.'
+      : rawMessage;
     return { status: 'paystack_error' as const, message };
   }
 

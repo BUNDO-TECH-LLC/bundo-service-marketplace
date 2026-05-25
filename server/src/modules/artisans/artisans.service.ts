@@ -1,6 +1,7 @@
 import { KycStatus, Prisma, VerifyStatus } from '@prisma/client';
 import db from '../../db/client';
 import { Pagination, paginationArgs } from '../../utils/pagination';
+import { ConflictError } from '../../utils/errors';
 import { workspaceLink } from '../../lib/appLinks';
 import { createNotification } from '../notifications/notifications.service';
 
@@ -318,6 +319,17 @@ export const createOrUpdateKycSubmission = async (
 
   if (!artisan) {
     return null;
+  }
+
+  const existingSubmission = await db.artisanKycSubmission.findUnique({
+    where: { artisanId: artisan.id },
+  });
+
+  if (existingSubmission?.status === KycStatus.APPROVED) {
+    throw new ConflictError(
+      'Your KYC is already approved. Contact support if your verified identity details need to change.',
+      'KYC_ALREADY_APPROVED'
+    );
   }
 
   const submission = await db.artisanKycSubmission.upsert({

@@ -38,6 +38,10 @@ router.get(
 
     throwOnServiceStatus(result.status, {
       paystack_not_configured: paystackUnavailable,
+      paystack_error: new BadGatewayError(
+        'Could not load payout banks right now. Try again in a moment.',
+        'PAYSTACK_ERROR'
+      ),
     });
 
     res.json({

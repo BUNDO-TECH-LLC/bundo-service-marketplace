@@ -162,10 +162,13 @@ export const updateUserStatus = async (
 };
 
 export const updateUserRole = async (firebaseUid: string, role: Role) => {
-  return db.user.update({
+  const user = await db.user.update({
     where: { firebaseUid },
     data: { role },
   });
+  invalidateCachedAuthUser(firebaseUid);
+  clearAdminStatsCache();
+  return user;
 };
 
 export const getAdminArtisans = async (pagination?: Pagination) => {
@@ -317,6 +320,9 @@ export const reviewKycSubmission = async (input: {
 
     return { ...reviewedSubmission, artisan };
   });
+
+  invalidateCachedAuthUser(submission.artisan.userId);
+  clearAdminStatsCache();
 
   await createNotification({
     userId: submission.artisan.userId,

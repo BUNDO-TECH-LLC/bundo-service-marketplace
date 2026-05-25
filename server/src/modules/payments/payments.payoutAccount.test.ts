@@ -68,7 +68,10 @@ describe('createOrUpdatePayoutAccount', () => {
     });
 
     expect(result.status).toBe('paystack_error');
-    expect(result).toMatchObject({ message: 'Account number is not available' });
+    expect(result).toMatchObject({
+      message:
+        'We could not verify this account number with the selected bank. Check the bank and 10-digit account number, then try again.',
+    });
   });
 
   it('saves verified payout account when Paystack succeeds', async () => {
