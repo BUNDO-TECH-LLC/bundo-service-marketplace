@@ -137,6 +137,7 @@ export function AuthBox({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [authStep, setAuthStep] = useState<'role' | 'account'>('account');
   const [preferredRole, setPreferredRole] = useState<SignupRole | null>(null);
   const [pendingAuthUser, setPendingAuthUser] = useState<User | null>(null);
@@ -166,11 +167,16 @@ export function AuthBox({
     firebaseAuthUser: User,
     authMode = mode,
     roleOverride: SignupRole | null = preferredRole,
-    forceTokenRefresh = false
+    forceTokenRefresh = false,
+    options: { phoneOverride?: string | null } = {}
   ) {
     const rememberedPhone = readPendingSignupPhone(firebaseAuthUser.email);
+    const resolvedPhone =
+      options.phoneOverride !== undefined
+        ? options.phoneOverride || undefined
+        : phone.trim() || rememberedPhone || undefined;
     const phoneToApply =
-      authMode === 'signup' ? phone.trim() || rememberedPhone || undefined : undefined;
+      authMode === 'signup' ? resolvedPhone : undefined;
     const resolvedRole = roleOverride || resolveSignupIntent(firebaseAuthUser.email, preferredRole);
     const artisanIntent = resolvedRole === 'ARTISAN';
     const intendedRole = resolvedRole === 'CUSTOMER' ? ('CUSTOMER' as const) : undefined;
@@ -415,29 +421,12 @@ export function AuthBox({
       return;
     }
 
-    if (mode === 'signup' && (!firstName.trim() || !lastName.trim())) {
-      onNotice('Enter your first and last name before continuing with Google.');
-      return;
-    }
-
-    if (mode === 'signup' && !phone.trim()) {
-      onNotice('Enter your phone number before continuing with Google.');
-      return;
-    }
-
-    if (mode === 'signup' && !(await validateSignupPhoneField())) {
-      return;
-    }
-
-    if (!validateEmailField() && mode === 'signup') {
-      onNotice(emailError || 'Enter a valid email address.');
-      return;
-    }
-
     setSubmitting(true);
+    setGoogleSubmitting(true);
     onNotice('');
     try {
       const credential = await signInWithGooglePopup();
+      const googleEmail = credential.user.email || '';
 
       if (mode === 'signup') {
         const displayName = combinedDisplayName();
@@ -446,9 +435,16 @@ export function AuthBox({
         }
         if (preferredRole === 'ARTISAN') {
           saveSessionSignupIntent('ARTISAN');
-          savePendingSignupIntent(credential.user.email, 'ARTISAN');
+          savePendingSignupIntent(googleEmail, 'ARTISAN');
         }
-        savePendingSignupPhone(credential.user.email, phone.trim());
+        if (phone.trim()) {
+          const phoneAvailable = await validateSignupPhoneField();
+          if (!phoneAvailable) {
+            await finishAuth(credential.user, 'signup', preferredRole, false, { phoneOverride: null });
+            return;
+          }
+          savePendingSignupPhone(googleEmail, phone.trim());
+        }
       }
 
       if (mode === 'signup' && isExistingGoogleAccount(credential.user)) {
@@ -464,6 +460,7 @@ export function AuthBox({
       showAuthFieldError(error, mode);
     } finally {
       setSubmitting(false);
+      setGoogleSubmitting(false);
     }
   }
 
@@ -913,7 +910,7 @@ export function AuthBox({
                       disabled={!firebaseReady || submitting}
                     >
                       <span aria-hidden="true">G</span>
-                      Continue with Google
+                      {googleSubmitting ? 'Connecting to Google...' : 'Continue with Google'}
                     </button>
 
                     <div className="auth-divider">
