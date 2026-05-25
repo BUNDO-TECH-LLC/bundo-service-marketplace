@@ -11,7 +11,8 @@ import { api } from '../lib/api';
 import { auth, firebaseReady } from '../lib/firebase';
 import { ARTISAN_ONBOARDING_PATH, markArtisanApplicant } from '../lib/artisanApplication';
 import type { AuthDrawerPrompt } from '../lib/authDrawerPrompt';
-import { checkEmailDeliverability, validateEmailAddress } from '../lib/emailValidation';
+import { checkEmailDeliverability, checkSignupPhoneAvailability, validateEmailAddress } from '../lib/emailValidation';
+import { formatAuthFlowError } from '../lib/authErrors';
 import {
   clearSessionSignupIntent,
   needsEmailVerification,
@@ -128,6 +129,7 @@ export function AuthBox({
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [emailError, setEmailError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -235,7 +237,7 @@ export function AuthBox({
       return false;
     }
 
-    const deliverability = await checkEmailDeliverability(email);
+    const deliverability = await checkEmailDeliverability(email, { purpose: 'signup' });
     if (!deliverability.ok) {
       setEmailError(deliverability.message);
       onNotice(deliverability.message);
@@ -245,6 +247,41 @@ export function AuthBox({
     setEmail(deliverability.normalized);
     setEmailError('');
     return true;
+  }
+
+  async function validateSignupPhoneField() {
+    const availability = await checkSignupPhoneAvailability(phone);
+    if (!availability.ok) {
+      setPhoneError(availability.message);
+      onNotice(availability.message);
+      return false;
+    }
+
+    setPhone(availability.normalized);
+    setPhoneError('');
+    return true;
+  }
+
+  function isExistingGoogleAccount(user: User) {
+    const created = user.metadata.creationTime;
+    const lastSignIn = user.metadata.lastSignInTime;
+    return Boolean(created && lastSignIn && created !== lastSignIn);
+  }
+
+  function showAuthFieldError(error: unknown, authMode: typeof mode) {
+    const message = formatAuthFlowError(error, authMode === 'signup' ? 'signup' : 'login');
+    onNotice(message);
+
+    if (
+      authMode === 'signup' &&
+      (message.toLowerCase().includes('email') || message.toLowerCase().includes('account already exists'))
+    ) {
+      setEmailError(message);
+    }
+
+    if (authMode === 'signup' && message.toLowerCase().includes('phone')) {
+      setPhoneError(message);
+    }
   }
 
   async function resetPassword(event: FormEvent) {
@@ -298,6 +335,10 @@ export function AuthBox({
 
     if (mode === 'signup' && !phone.trim()) {
       onNotice('Enter your phone number (include country code, e.g. +234…).');
+      return;
+    }
+
+    if (mode === 'signup' && !(await validateSignupPhoneField())) {
       return;
     }
 
@@ -356,7 +397,7 @@ export function AuthBox({
         onNotice('Signed in. Resend your verification email anytime from Settings.');
       }
     } catch (error) {
-      onNotice(error instanceof Error ? error.message : 'Could not sign in');
+      showAuthFieldError(error, mode);
     } finally {
       setSubmitting(false);
     }
@@ -384,6 +425,10 @@ export function AuthBox({
       return;
     }
 
+    if (mode === 'signup' && !(await validateSignupPhoneField())) {
+      return;
+    }
+
     if (!validateEmailField() && mode === 'signup') {
       onNotice(emailError || 'Enter a valid email address.');
       return;
@@ -406,9 +451,17 @@ export function AuthBox({
         savePendingSignupPhone(credential.user.email, phone.trim());
       }
 
+      if (mode === 'signup' && isExistingGoogleAccount(credential.user)) {
+        onNotice(
+          'An account already exists with this Google email. You are signed in—use Log in next time if you prefer.'
+        );
+        await finishAuth(credential.user, 'login');
+        return;
+      }
+
       await finishAuth(credential.user, mode);
     } catch (error) {
-      onNotice(error instanceof Error ? error.message : 'Could not continue with Google');
+      showAuthFieldError(error, mode);
     } finally {
       setSubmitting(false);
     }
@@ -435,6 +488,8 @@ export function AuthBox({
     setPreferredRole(null);
     setConfirmPassword('');
     setPhone('');
+    setEmailError('');
+    setPhoneError('');
     setPendingAuthUser(null);
     setMode('login');
     setAuthStep('account');
@@ -450,6 +505,8 @@ export function AuthBox({
     setPreferredRole(role);
     saveSessionSignupIntent(role);
     setConfirmPassword('');
+    setEmailError('');
+    setPhoneError('');
     setPendingAuthUser(null);
     setMode('signup');
     setAuthStep(role ? 'account' : 'role');
@@ -920,12 +977,19 @@ export function AuthBox({
                       Phone number
                       <input
                         value={phone}
-                        onChange={(event) => setPhone(event.target.value)}
+                        onChange={(event) => {
+                          setPhone(event.target.value);
+                          if (phoneError) {
+                            setPhoneError('');
+                          }
+                        }}
                         placeholder="+2348012345678"
                         type="tel"
                         autoComplete="tel"
+                        aria-invalid={phoneError ? 'true' : undefined}
                         required
                       />
+                      {phoneError && <span className="auth-field-error">{phoneError}</span>}
                     </label>
                   )}
                   {mode !== 'reset' && (

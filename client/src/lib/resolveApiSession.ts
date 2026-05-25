@@ -9,6 +9,10 @@ export async function resolveApiSession(user: User, forceRefresh = false) {
     const response = await api<{ user: ApiUser }>('/me', { token: idToken });
     return { token: idToken, user: response.user };
   } catch (error) {
+    if (error instanceof ApiError && error.status === 409) {
+      throw error;
+    }
+
     if (!(error instanceof ApiError) || error.status !== 401) {
       throw error;
     }

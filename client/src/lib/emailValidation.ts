@@ -15,7 +15,7 @@ const COMMON_TYPOS: Record<string, string> = {
   'outlok.com': 'outlook.com',
 };
 
-import { api } from './api';
+import { api, ApiError } from './api';
 
 export function validateEmailAddress(raw: string): EmailValidationResult {
   const normalized = raw.trim().toLowerCase();
@@ -57,7 +57,10 @@ export type EmailDeliverabilityResult =
   | { ok: false; message: string };
 
 /** Format + typo check, then server MX/domain reachability for signup. */
-export async function checkEmailDeliverability(raw: string): Promise<EmailDeliverabilityResult> {
+export async function checkEmailDeliverability(
+  raw: string,
+  options?: { purpose?: 'signup' }
+): Promise<EmailDeliverabilityResult> {
   const format = validateEmailAddress(raw);
   if (!format.ok) {
     return format;
@@ -66,14 +69,47 @@ export async function checkEmailDeliverability(raw: string): Promise<EmailDelive
   try {
     await api<{ email: string }>('/users/validate-email', {
       method: 'POST',
-      body: JSON.stringify({ email: format.normalized }),
+      body: JSON.stringify({
+        email: format.normalized,
+        ...(options?.purpose ? { purpose: options.purpose } : {}),
+      }),
     });
     return { ok: true, normalized: format.normalized };
   } catch (error) {
+    if (error instanceof ApiError && error.status === 409) {
+      return {
+        ok: false,
+        message:
+          error.message ||
+          'An account already exists with this email. Sign in instead, or use Forgot password.',
+      };
+    }
+
     const message =
       error instanceof Error
         ? error.message
         : 'Could not confirm this email domain. Try another address.';
     return { ok: false, message };
+  }
+}
+
+export async function checkSignupPhoneAvailability(raw: string): Promise<EmailDeliverabilityResult> {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return { ok: false, message: 'Enter your phone number (include country code, e.g. +234…).' };
+  }
+
+  try {
+    await api('/users/validate-signup-phone', {
+      method: 'POST',
+      body: JSON.stringify({ phone: trimmed }),
+    });
+    return { ok: true, normalized: trimmed };
+  } catch (error) {
+    if (error instanceof ApiError) {
+      return { ok: false, message: error.message };
+    }
+
+    return { ok: false, message: 'Could not verify this phone number. Try again.' };
   }
 }

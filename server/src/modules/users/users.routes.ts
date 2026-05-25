@@ -12,13 +12,17 @@ import {
   updateUserRole,
 } from './users.service';
 import { validateSignupEmail } from './emailValidation.service';
+import {
+  assertEmailAvailableForSignup,
+  assertPhoneAvailableForSignup,
+} from './signupAvailability.service';
 
 const router = Router();
 
 router.post(
   '/validate-email',
   asyncHandler(async (req, res) => {
-    const { email } = req.body;
+    const { email, purpose } = req.body;
 
     if (typeof email !== 'string') {
       throw new ValidationError('email is required');
@@ -26,10 +30,32 @@ router.post(
 
     const result = await validateSignupEmail(email);
 
+    if (purpose === 'signup') {
+      await assertEmailAvailableForSignup(result.email);
+    }
+
     res.json({
       message: 'Email looks valid',
       email: result.email,
       domainReachable: result.domainReachable,
+      available: purpose === 'signup' ? true : undefined,
+    });
+  })
+);
+
+router.post(
+  '/validate-signup-phone',
+  asyncHandler(async (req, res) => {
+    const { phone } = req.body;
+
+    if (typeof phone !== 'string' || !phone.trim()) {
+      throw new ValidationError('phone is required');
+    }
+
+    await assertPhoneAvailableForSignup(phone);
+
+    res.json({
+      message: 'Phone number is available',
     });
   })
 );

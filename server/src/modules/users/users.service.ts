@@ -175,7 +175,7 @@ export const updateUserFcmToken = async (
   });
 };
 
-function normalizePhoneInput(phone: string) {
+export function normalizePhoneInput(phone: string) {
   const trimmed = phone.trim();
   if (!trimmed) {
     throw new ValidationError('Phone number is required');

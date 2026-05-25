@@ -152,10 +152,13 @@ export const updateUserStatus = async (
   firebaseUid: string,
   status: UserStatus
 ) => {
-  return db.user.update({
+  const user = await db.user.update({
     where: { firebaseUid },
     data: { status },
   });
+  invalidateCachedAuthUser(firebaseUid);
+  clearAdminStatsCache();
+  return user;
 };
 
 export const updateUserRole = async (firebaseUid: string, role: Role) => {
