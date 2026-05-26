@@ -1,4 +1,5 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:3000';
+const API_TIMEOUT_MS = 25_000;
 
 const GET_CACHE_TTL_MS: Record<string, number> = {
   '/categories': 5 * 60_000,
@@ -102,18 +103,44 @@ export async function api<T>(
   }
 
   let response: Response;
+  const controller = new AbortController();
+  let timedOut = false;
+  const timeoutId = window.setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, API_TIMEOUT_MS);
+
+  const externalSignal = options.signal;
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      controller.abort();
+    } else {
+      externalSignal.addEventListener('abort', () => controller.abort(), { once: true });
+    }
+  }
 
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       ...options,
       headers,
+      signal: controller.signal,
     });
   } catch (error) {
+    if (timedOut) {
+      throw new ApiError(
+        `The API took too long to respond. Check your connection and try again.`,
+        0,
+        { timeoutMs: API_TIMEOUT_MS }
+      );
+    }
+
     throw new ApiError(
       `Could not reach the API at ${API_BASE_URL}. Make sure the backend server is running.`,
       0,
       { cause: error instanceof Error ? error.message : 'Network error' }
     );
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 
   const text = await response.text();

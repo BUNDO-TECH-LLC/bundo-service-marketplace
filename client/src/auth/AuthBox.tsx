@@ -383,8 +383,14 @@ export function AuthBox({
     } else if (!validateEmailField()) {
       onNotice(emailError || 'Enter a valid email address.');
       return;
-    } else if (mode === 'login' && (await routeNewLoginEmailToSignup())) {
-      return;
+    } else if (mode === 'login') {
+      setSubmitting(true);
+      onNotice('Checking your account...');
+      const routedToSignup = await routeNewLoginEmailToSignup();
+      if (routedToSignup) {
+        setSubmitting(false);
+        return;
+      }
     }
 
     if (mode === 'signup' && (!firstName.trim() || !lastName.trim())) {
@@ -539,6 +545,7 @@ export function AuthBox({
       }
 
       clearGoogleRedirectIntent();
+      onNotice('Finishing Google sign-in...');
       await completeGoogleAuth(credential.user, mode === 'signup' ? 'signup' : 'login', preferredRole);
     } catch (error) {
       clearGoogleRedirectIntent();
@@ -644,6 +651,7 @@ export function AuthBox({
         setAuthStep(authMode === 'signup' && !role ? 'role' : 'account');
         setSubmitting(true);
         setGoogleSubmitting(true);
+        onNotice('Finishing Google sign-in...');
         await completeGoogleAuth(credential.user, authMode, role, {
           phoneOverride: intent?.phone ?? null,
           displayNameOverride: intent?.displayName ?? null,
