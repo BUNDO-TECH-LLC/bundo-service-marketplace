@@ -69,9 +69,7 @@ export function useAppAuth({
       return;
     }
 
-    let authInitTimedOut = false;
     const authInitTimer = window.setTimeout(() => {
-      authInitTimedOut = true;
       setAuthChecked(true);
       setRouteHydrated(true);
     }, AUTH_INIT_TIMEOUT_MS);
@@ -238,7 +236,7 @@ export function useAppAuth({
             }
           }
         } catch {
-          if (isStale() || authInitTimedOut || authBootstrapCompletedRef.current) {
+          if (isStale() || authBootstrapCompletedRef.current) {
             return;
           }
           await failAuthBootstrap(

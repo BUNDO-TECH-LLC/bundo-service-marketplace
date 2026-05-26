@@ -154,6 +154,7 @@ export function AuthBox({
   const [pendingAuthUser, setPendingAuthUser] = useState<User | null>(null);
   const processedGoogleRedirectRef = useRef(false);
   const recoveredGoogleRedirectUserRef = useRef(false);
+  const sessionRecoveryUserRef = useRef<string | null>(null);
 
   const narrowViewport = useMediaQuery('(max-width: 768px)');
   const topbarPanelEl = useElementById(
@@ -528,6 +529,26 @@ export function AuthBox({
     });
   }
 
+  async function retrySessionSync() {
+    if (!firebaseUser) {
+      return;
+    }
+
+    const authMode = mode === 'signup' ? 'signup' : 'login';
+    setSubmitting(true);
+    onNotice('Finishing sign-in...');
+
+    try {
+      await finishAuth(firebaseUser, authMode, preferredRole, true);
+    } catch (error) {
+      setDrawerOpen(true);
+      showAuthFieldError(error, authMode);
+    } finally {
+      setSubmitting(false);
+      setGoogleSubmitting(false);
+    }
+  }
+
   async function continueWithGoogle() {
     if (!auth) {
       onNotice('Sign-in is not configured. Add VITE_FIREBASE_* to your client environment and reload.');
@@ -738,6 +759,28 @@ export function AuthBox({
   }, [firebaseUser]);
 
   useEffect(() => {
+    if (!firebaseUser) {
+      sessionRecoveryUserRef.current = null;
+      return;
+    }
+
+    if (me || submitting || googleSubmitting || readGoogleRedirectIntent()) {
+      return;
+    }
+
+    if (sessionRecoveryUserRef.current === firebaseUser.uid) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      sessionRecoveryUserRef.current = firebaseUser.uid;
+      void retrySessionSync();
+    }, 1500);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [firebaseUser, me, submitting, googleSubmitting, mode, preferredRole]);
+
+  useEffect(() => {
     if (!authDrawerPrompt) return;
 
     onOpenAuth?.();
@@ -769,6 +812,51 @@ export function AuthBox({
 
     onAuthDrawerPromptHandled?.();
   }, [authDrawerPrompt, firebaseUser, me, onAuthDrawerPromptHandled, onOpenAuth, onNavigate, onNotice]);
+
+  if (firebaseUser && !me) {
+    return (
+      <div className="auth-entry role-completion-entry">
+        <button
+          type="button"
+          disabled={submitting}
+          onClick={() => void retrySessionSync()}
+        >
+          {submitting ? 'Finishing sign-in...' : 'Continue sign-in'}
+        </button>
+
+        <AuthDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} ariaLabel="Finish sign-in">
+          <div className="drawer-head">
+            <img className="drawer-logo" src={bundoLogo} alt="Bundo logo" />
+            <button type="button" onClick={() => setDrawerOpen(false)}>
+              Close
+            </button>
+          </div>
+          <p className="eyebrow">Almost there</p>
+          <h2>Finishing your sign-in</h2>
+          <p className="drawer-copy">
+            Your browser is signed in with Firebase. We are syncing your Bundo account so your dashboard and payments
+            can open correctly.
+          </p>
+          <button type="button" disabled={submitting} onClick={() => void retrySessionSync()}>
+            {submitting ? 'Please wait' : 'Try again'}
+          </button>
+          <button
+            type="button"
+            className="mode-switch"
+            onClick={() => {
+              setDrawerOpen(false);
+              onNotice('Signed out');
+              if (auth) {
+                void signOut(auth);
+              }
+            }}
+          >
+            Use another account
+          </button>
+        </AuthDrawer>
+      </div>
+    );
+  }
 
   if (firebaseUser && me && !me.role) {
     return (
