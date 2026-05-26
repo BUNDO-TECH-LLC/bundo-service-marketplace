@@ -63,6 +63,32 @@ canvas {
   min-height: 100vh;
 }
 
+.app-error-boundary {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--page);
+}
+
+.app-error-boundary section {
+  width: min(520px, 100%);
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--paper);
+  box-shadow: 0 18px 50px var(--shadow-soft);
+}
+
+.app-error-boundary h1 {
+  margin: 0 0 10px;
+}
+
+.app-error-boundary p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
 .topbar {
   position: sticky;
   top: 0;

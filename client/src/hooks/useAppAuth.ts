@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
-import { onAuthStateChanged, type User } from 'firebase/auth';
+import { onAuthStateChanged, signOut, type User } from 'firebase/auth';
 import { ApiError } from '../lib/api';
 import { buildAppPath, legacyQueryToAppPath, parseAppPath } from '../lib/appPaths';
 import { auth } from '../lib/firebase';
@@ -69,12 +69,13 @@ export function useAppAuth({
       return;
     }
 
+    const firebaseAuth = auth;
     const authInitTimer = window.setTimeout(() => {
       setAuthChecked(true);
       setRouteHydrated(true);
     }, AUTH_INIT_TIMEOUT_MS);
 
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
       const generation = ++authListenerGenerationRef.current;
 
       const isStale = () => generation !== authListenerGenerationRef.current;
@@ -97,6 +98,7 @@ export function useAppAuth({
         authBootstrapCompletedRef.current = false;
         window.clearTimeout(authInitTimer);
         setNoticeRef.current(message);
+        await signOut(firebaseAuth).catch(() => undefined);
         if (!isAuthPathname(window.location.pathname)) {
           navigateRef.current({ pathname: '/', search: '' }, { replace: true });
         }
