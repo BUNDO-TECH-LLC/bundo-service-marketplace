@@ -203,7 +203,6 @@ export function AccountSettingsHub({
   function selectSection(section: AccountSettingsSection) {
     setActiveSection(section);
     window.location.hash = section;
-    document.getElementById(`account-settings-${section}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   async function savePersonalDetails(event: FormEvent) {
@@ -417,25 +416,6 @@ export function AccountSettingsHub({
             </article>
           )}
 
-          {me.role === 'CUSTOMER' && (
-            <article id="account-settings-artisan" className={`panel-card form-card ${panelClass('personal')}`}>
-              <p className="eyebrow">Offer services</p>
-              <h2>Become an artisan</h2>
-              <p className="muted">
-                Start onboarding to list services on Bundo. You stay a client until identity verification and admin
-                approval are complete.
-              </p>
-              <BecomeArtisanButton
-                me={me}
-                busy={busy}
-                onStart={() => {
-                  onNavigate(ARTISAN_ONBOARDING_PATH);
-                  onNotice('Continue with artisan onboarding.');
-                }}
-              />
-            </article>
-          )}
-
           <article id="account-settings-personal" className={`panel-card form-card ${panelClass('personal')}`}>
             <h2>Personal details</h2>
             <p className="muted">
@@ -484,6 +464,26 @@ export function AccountSettingsHub({
                   </button>
                 </div>
               </form>
+            )}
+            {me.role === 'CUSTOMER' && (
+              <div className="account-settings-readonly-card">
+                <div>
+                  <p className="eyebrow">Offer services</p>
+                  <h3>Become an artisan</h3>
+                  <p className="muted">
+                    Start onboarding to list services on Bundo. You stay a client until identity verification and admin
+                    approval are complete.
+                  </p>
+                </div>
+                <BecomeArtisanButton
+                  me={me}
+                  busy={busy}
+                  onStart={() => {
+                    onNavigate(ARTISAN_ONBOARDING_PATH);
+                    onNotice('Continue with artisan onboarding.');
+                  }}
+                />
+              </div>
             )}
           </article>
 

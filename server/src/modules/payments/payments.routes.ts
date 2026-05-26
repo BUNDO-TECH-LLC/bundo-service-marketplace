@@ -167,7 +167,7 @@ router.post(
 );
 
 router.post(
-  '/webhooks/paystack',
+  ['/webhooks/paystack', '/payments/webhooks/paystack'],
   asyncHandler(async (req, res) => {
     const signature = req.header('x-paystack-signature');
     const rawBody = (req as any).rawBody || '';

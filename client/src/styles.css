@@ -4595,6 +4595,15 @@ footer h4 {
   scroll-margin-top: 96px;
 }
 
+.account-settings-panel:not(.is-active) {
+  display: none;
+}
+
+.account-settings-panel.is-active {
+  display: grid;
+  gap: 16px;
+}
+
 .account-settings-form {
   display: grid;
   gap: 16px;
@@ -4759,14 +4768,6 @@ footer h4 {
     font-weight: 700;
   }
 
-  .account-settings-panel:not(.is-active) {
-    display: none;
-  }
-
-  .account-settings-panel.is-active {
-    display: grid;
-    gap: 16px;
-  }
 }
 
 @media (max-width: 768px) {

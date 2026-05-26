@@ -172,6 +172,11 @@ export function createApp() {
         status: 'ready',
         service: 'bundo-api',
         timestamp: new Date().toISOString(),
+        payments: {
+          paystackConfigured: Boolean(env.PAYSTACK_SECRET_KEY),
+          paystackMode: env.PAYSTACK_SECRET_KEY?.startsWith('sk_live') ? 'live' : env.PAYSTACK_SECRET_KEY ? 'test' : 'off',
+          callbackConfigured: Boolean(env.PAYSTACK_CALLBACK_URL),
+        },
         cloudinary: {
           ok: true,
           cloudName: cloudinary.cloudName,
