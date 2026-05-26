@@ -1,5 +1,6 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:3000';
 const API_TIMEOUT_MS = 25_000;
+export const AUTH_API_TIMEOUT_MS = 60_000;
 
 const GET_CACHE_TTL_MS: Record<string, number> = {
   '/categories': 5 * 60_000,
@@ -83,10 +84,11 @@ export function invalidateApiCache(prefix?: string) {
 
 export async function api<T>(
   path: string,
-  options: RequestInit & { token?: string } = {}
+  options: RequestInit & { token?: string; timeoutMs?: number } = {}
 ): Promise<T> {
+  const { token, timeoutMs, ...fetchOptions } = options;
   const method = (options.method ?? 'GET').toUpperCase();
-  const cached = method === 'GET' ? readGetCache<T>(path, options.token) : null;
+  const cached = method === 'GET' ? readGetCache<T>(path, token) : null;
 
   if (cached !== null) {
     return cached;
@@ -98,8 +100,8 @@ export async function api<T>(
     headers.set('Content-Type', 'application/json');
   }
 
-  if (options.token) {
-    headers.set('Authorization', `Bearer ${options.token}`);
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
   }
 
   let response: Response;
@@ -108,7 +110,7 @@ export async function api<T>(
   const timeoutId = window.setTimeout(() => {
     timedOut = true;
     controller.abort();
-  }, API_TIMEOUT_MS);
+  }, timeoutMs ?? API_TIMEOUT_MS);
 
   const externalSignal = options.signal;
   if (externalSignal) {
@@ -121,7 +123,7 @@ export async function api<T>(
 
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
-      ...options,
+      ...fetchOptions,
       headers,
       signal: controller.signal,
     });
@@ -130,7 +132,7 @@ export async function api<T>(
       throw new ApiError(
         `The API took too long to respond. Check your connection and try again.`,
         0,
-        { timeoutMs: API_TIMEOUT_MS }
+        { timeoutMs: timeoutMs ?? API_TIMEOUT_MS }
       );
     }
 
@@ -163,7 +165,7 @@ export async function api<T>(
   }
 
   if (method === 'GET') {
-    writeGetCache(path, options.token, data);
+    writeGetCache(path, token, data);
   }
 
   return data as T;

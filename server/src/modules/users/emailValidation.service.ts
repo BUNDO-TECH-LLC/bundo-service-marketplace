@@ -8,7 +8,7 @@ function normalizeEmail(raw: string) {
   return raw.trim().toLowerCase();
 }
 
-export async function validateSignupEmail(raw: string) {
+export function validateEmailFormat(raw: string) {
   const email = normalizeEmail(raw);
 
   if (!email) {
@@ -23,6 +23,12 @@ export async function validateSignupEmail(raw: string) {
   if (!domain || !domain.includes('.')) {
     throw new ValidationError('Enter a valid email domain.');
   }
+
+  return { email, domain };
+}
+
+export async function validateSignupEmail(raw: string) {
+  const { email, domain } = validateEmailFormat(raw);
 
   try {
     const mxRecords = await dns.resolveMx(domain);

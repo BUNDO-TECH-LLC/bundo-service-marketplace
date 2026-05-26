@@ -11,7 +11,7 @@ import {
   updateUserPhone,
   updateUserRole,
 } from './users.service';
-import { validateSignupEmail } from './emailValidation.service';
+import { validateEmailFormat, validateSignupEmail } from './emailValidation.service';
 import {
   assertEmailAvailableForSignup,
   assertPhoneAvailableForSignup,
@@ -70,7 +70,7 @@ router.post(
       throw new ValidationError('email is required');
     }
 
-    const result = await validateSignupEmail(email);
+    const result = validateEmailFormat(email);
     const exists = await emailAccountExists(result.email);
 
     res.json({
