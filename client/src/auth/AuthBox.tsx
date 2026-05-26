@@ -32,7 +32,11 @@ import {
   savePendingSignupRole,
   saveSessionSignupIntent,
 } from '../lib/authSignupStorage';
-import { finalizeAuthSession, getGoogleRedirectResult, signInWithGooglePopup } from '../lib/authSessionFlow';
+import {
+  finalizeAuthSession,
+  getGoogleRedirectResult,
+  startGoogleRedirectSignIn,
+} from '../lib/authSessionFlow';
 import { sendBundoPasswordResetEmail } from '../lib/authEmailVerification';
 import { resolveApiSession } from '../lib/resolveApiSession';
 import { userDisplayName } from '../lib/userDisplayName';
@@ -149,6 +153,7 @@ export function AuthBox({
   const [preferredRole, setPreferredRole] = useState<SignupRole | null>(null);
   const [pendingAuthUser, setPendingAuthUser] = useState<User | null>(null);
   const processedGoogleRedirectRef = useRef(false);
+  const recoveredGoogleRedirectUserRef = useRef(false);
 
   const narrowViewport = useMediaQuery('(max-width: 768px)');
   const topbarPanelEl = useElementById(
@@ -377,7 +382,10 @@ export function AuthBox({
     }
 
     if (mode === 'signup') {
+      setSubmitting(true);
+      onNotice('Checking your details...');
       if (!(await validateSignupEmailField())) {
+        setSubmitting(false);
         return;
       }
     } else if (!validateEmailField()) {
@@ -395,25 +403,30 @@ export function AuthBox({
 
     if (mode === 'signup' && (!firstName.trim() || !lastName.trim())) {
       onNotice('Enter your first and last name.');
+      setSubmitting(false);
       return;
     }
 
     if (mode === 'signup' && !phone.trim()) {
       onNotice('Enter your phone number (include country code, e.g. +234…).');
+      setSubmitting(false);
       return;
     }
 
     if (mode === 'signup' && !(await validateSignupPhoneField())) {
+      setSubmitting(false);
       return;
     }
 
     if (mode === 'signup' && password.length < 8) {
       onNotice('Password must be at least 8 characters.');
+      setSubmitting(false);
       return;
     }
 
     if (mode === 'signup' && password !== confirmPassword) {
       onNotice('Passwords do not match. Please retype them and try again.');
+      setSubmitting(false);
       return;
     }
 
@@ -538,15 +551,8 @@ export function AuthBox({
         displayName: mode === 'signup' ? combinedDisplayName() || null : null,
       });
 
-      const credential = await signInWithGooglePopup();
-      if (!credential) {
-        onNotice('Redirecting to Google to complete sign-in.');
-        return;
-      }
-
-      clearGoogleRedirectIntent();
-      onNotice('Finishing Google sign-in...');
-      await completeGoogleAuth(credential.user, mode === 'signup' ? 'signup' : 'login', preferredRole);
+      onNotice('Redirecting to Google to complete sign-in.');
+      await startGoogleRedirectSignIn();
     } catch (error) {
       clearGoogleRedirectIntent();
       showAuthFieldError(error, mode);
@@ -680,6 +686,56 @@ export function AuthBox({
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!auth || !firebaseUser || recoveredGoogleRedirectUserRef.current) {
+      return;
+    }
+
+    const intent = readGoogleRedirectIntent();
+    if (!intent) {
+      return;
+    }
+
+    recoveredGoogleRedirectUserRef.current = true;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const authMode = intent.mode ?? 'login';
+        const role = intent.role ?? null;
+
+        setMode(authMode);
+        setPreferredRole(role);
+        setAuthStep(authMode === 'signup' && !role ? 'role' : 'account');
+        setSubmitting(true);
+        setGoogleSubmitting(true);
+        onNotice('Finishing Google sign-in...');
+
+        await completeGoogleAuth(firebaseUser, authMode, role, {
+          phoneOverride: intent.phone ?? null,
+          displayNameOverride: intent.displayName ?? null,
+        });
+
+        if (!cancelled) {
+          clearGoogleRedirectIntent();
+        }
+      } catch (error) {
+        if (!cancelled) {
+          showAuthFieldError(error, intent.mode ?? 'login');
+        }
+      } finally {
+        if (!cancelled) {
+          setSubmitting(false);
+          setGoogleSubmitting(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [firebaseUser]);
 
   useEffect(() => {
     if (!authDrawerPrompt) return;

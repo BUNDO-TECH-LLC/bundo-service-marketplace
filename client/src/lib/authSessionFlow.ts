@@ -58,6 +58,14 @@ export async function signInWithGooglePopup() {
   }
 }
 
+export async function startGoogleRedirectSignIn() {
+  if (!auth) {
+    throw new Error('Firebase is not configured for this environment.');
+  }
+
+  await signInWithRedirect(auth, createGoogleProvider());
+}
+
 export async function getGoogleRedirectResult() {
   if (!auth) {
     return null;
