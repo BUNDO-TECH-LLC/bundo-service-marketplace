@@ -382,17 +382,12 @@ export function AuthBox({
       return;
     }
 
-    if (mode === 'signup') {
-      setSubmitting(true);
-      onNotice('Checking your details...');
-      if (!(await validateSignupEmailField())) {
-        setSubmitting(false);
-        return;
-      }
-    } else if (!validateEmailField()) {
+    if (!validateEmailField()) {
       onNotice(emailError || 'Enter a valid email address.');
       return;
-    } else if (mode === 'login') {
+    }
+
+    if (mode === 'login') {
       setSubmitting(true);
       onNotice('Checking your account...');
       const routedToSignup = await routeNewLoginEmailToSignup();
@@ -414,11 +409,6 @@ export function AuthBox({
       return;
     }
 
-    if (mode === 'signup' && !(await validateSignupPhoneField())) {
-      setSubmitting(false);
-      return;
-    }
-
     if (mode === 'signup' && password.length < 8) {
       onNotice('Password must be at least 8 characters.');
       setSubmitting(false);
@@ -429,6 +419,20 @@ export function AuthBox({
       onNotice('Passwords do not match. Please retype them and try again.');
       setSubmitting(false);
       return;
+    }
+
+    if (mode === 'signup') {
+      setSubmitting(true);
+      onNotice('Checking your details...');
+      const [emailAvailable, phoneAvailable] = await Promise.all([
+        validateSignupEmailField(),
+        validateSignupPhoneField(),
+      ]);
+
+      if (!emailAvailable || !phoneAvailable) {
+        setSubmitting(false);
+        return;
+      }
     }
 
     setSubmitting(true);

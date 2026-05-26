@@ -56,7 +56,7 @@ export type EmailDeliverabilityResult =
   | { ok: true; normalized: string }
   | { ok: false; message: string };
 
-/** Format + typo check, then server MX/domain reachability for signup. */
+/** Format + typo check, then server duplicate checks for signup. */
 export async function checkEmailDeliverability(
   raw: string,
   options?: { purpose?: 'signup' }

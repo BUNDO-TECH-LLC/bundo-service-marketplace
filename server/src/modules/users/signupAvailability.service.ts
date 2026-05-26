@@ -28,21 +28,6 @@ export async function assertEmailAvailableForSignup(email: string) {
   if (existingUser) {
     throw new ConflictError(SIGNUP_EMAIL_IN_USE_MESSAGE, 'EMAIL_IN_USE');
   }
-
-  try {
-    await admin.auth().getUserByEmail(normalizedEmail);
-    throw new ConflictError(SIGNUP_EMAIL_IN_USE_MESSAGE, 'EMAIL_IN_USE');
-  } catch (error) {
-    if (error instanceof ConflictError) {
-      throw error;
-    }
-
-    if (isFirebaseUserNotFound(error)) {
-      return;
-    }
-
-    throw error;
-  }
 }
 
 export async function emailAccountExists(email: string) {

@@ -38,24 +38,22 @@ describe('signup availability', () => {
     expect(getUserByEmail).not.toHaveBeenCalled();
   });
 
-  it('rejects signup when email exists in Firebase', async () => {
+  it('does not call Firebase while prechecking a new signup email', async () => {
     findUnique.mockResolvedValueOnce(null);
-    getUserByEmail.mockResolvedValueOnce({ uid: 'firebase-uid' });
 
     const { assertEmailAvailableForSignup } = await import('./signupAvailability.service');
 
-    await expect(assertEmailAvailableForSignup('firebase@example.com')).rejects.toMatchObject({
-      code: 'EMAIL_IN_USE',
-    });
+    await expect(assertEmailAvailableForSignup('firebase@example.com')).resolves.toBeUndefined();
+    expect(getUserByEmail).not.toHaveBeenCalled();
   });
 
   it('allows signup when email is not registered', async () => {
     findUnique.mockResolvedValueOnce(null);
-    getUserByEmail.mockRejectedValueOnce({ code: 'auth/user-not-found' });
 
     const { assertEmailAvailableForSignup } = await import('./signupAvailability.service');
 
     await expect(assertEmailAvailableForSignup('new@example.com')).resolves.toBeUndefined();
+    expect(getUserByEmail).not.toHaveBeenCalled();
   });
 
   it('reports whether an email account exists', async () => {

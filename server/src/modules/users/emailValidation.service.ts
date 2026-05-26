@@ -1,4 +1,3 @@
-import { promises as dns } from 'dns';
 import { ValidationError } from '../../utils/errors';
 
 const EMAIL_PATTERN =
@@ -28,31 +27,6 @@ export function validateEmailFormat(raw: string) {
 }
 
 export async function validateSignupEmail(raw: string) {
-  const { email, domain } = validateEmailFormat(raw);
-
-  try {
-    const mxRecords = await dns.resolveMx(domain);
-    if (mxRecords.length > 0) {
-      return { email, domainReachable: true as const };
-    }
-  } catch {
-    // Fall through to A/AAAA lookup for domains without MX (uncommon).
-  }
-
-  try {
-    let lastError: unknown;
-    for (const lookup of [dns.resolve4(domain), dns.resolve6(domain)]) {
-      try {
-        await lookup;
-        return { email, domainReachable: true as const };
-      } catch (error) {
-        lastError = error;
-      }
-    }
-    throw lastError;
-  } catch {
-    throw new ValidationError(
-      'This email domain does not look reachable. Check the address or try another email provider.'
-    );
-  }
+  const { email } = validateEmailFormat(raw);
+  return { email, domainReachable: true as const };
 }

@@ -92,13 +92,12 @@ export async function finalizeAuthSession(
 
   if (options.phone?.trim()) {
     try {
-      await api('/users/phone', {
+      const phoneResponse = await api<{ user: ApiUser }>('/users/phone', {
         method: 'PATCH',
         token: session.token,
         body: JSON.stringify({ phone: options.phone.trim() }),
       });
-      const refreshed = await api<{ user: ApiUser }>('/me', { token: session.token });
-      session = { token: session.token, user: refreshed.user };
+      session = { token: session.token, user: phoneResponse.user };
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
         throw new Error(error.message);
@@ -113,13 +112,12 @@ export async function finalizeAuthSession(
     session.user.role !== 'ADMIN' &&
     !(session.user.role === 'ARTISAN' && intendedRole === 'CUSTOMER')
   ) {
-    await api('/users/role', {
+    const roleResponse = await api<{ user: ApiUser }>('/users/role', {
       method: 'PATCH',
       token: session.token,
       body: JSON.stringify({ role: intendedRole }),
     });
-    const refreshed = await api<{ user: ApiUser }>('/me', { token: session.token });
-    session = { token: session.token, user: refreshed.user };
+    session = { token: session.token, user: roleResponse.user };
   }
 
   clearPendingSignupRole(firebaseUser.email);
