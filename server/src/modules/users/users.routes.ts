@@ -15,6 +15,7 @@ import { validateSignupEmail } from './emailValidation.service';
 import {
   assertEmailAvailableForSignup,
   assertPhoneAvailableForSignup,
+  emailAccountExists,
 } from './signupAvailability.service';
 
 const router = Router();
@@ -56,6 +57,26 @@ router.post(
 
     res.json({
       message: 'Phone number is available',
+    });
+  })
+);
+
+router.post(
+  '/email-account-status',
+  asyncHandler(async (req, res) => {
+    const { email } = req.body;
+
+    if (typeof email !== 'string') {
+      throw new ValidationError('email is required');
+    }
+
+    const result = await validateSignupEmail(email);
+    const exists = await emailAccountExists(result.email);
+
+    res.json({
+      message: exists ? 'Account found' : 'No account found',
+      email: result.email,
+      exists,
     });
   })
 );

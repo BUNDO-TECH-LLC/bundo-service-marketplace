@@ -45,6 +45,29 @@ export async function assertEmailAvailableForSignup(email: string) {
   }
 }
 
+export async function emailAccountExists(email: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const existingUser = await db.user.findUnique({
+    where: { email: normalizedEmail },
+  });
+
+  if (existingUser) {
+    return true;
+  }
+
+  try {
+    await admin.auth().getUserByEmail(normalizedEmail);
+    return true;
+  } catch (error) {
+    if (isFirebaseUserNotFound(error)) {
+      return false;
+    }
+
+    throw error;
+  }
+}
+
 export async function assertPhoneAvailableForSignup(phone: string) {
   const normalizedPhone = normalizePhoneInput(phone);
 

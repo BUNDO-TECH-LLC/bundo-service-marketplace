@@ -11,7 +11,12 @@ import { api } from '../lib/api';
 import { auth, firebaseReady } from '../lib/firebase';
 import { ARTISAN_ONBOARDING_PATH, markArtisanApplicant } from '../lib/artisanApplication';
 import type { AuthDrawerPrompt } from '../lib/authDrawerPrompt';
-import { checkEmailDeliverability, checkSignupPhoneAvailability, validateEmailAddress } from '../lib/emailValidation';
+import {
+  checkEmailAccountStatus,
+  checkEmailDeliverability,
+  checkSignupPhoneAvailability,
+  validateEmailAddress,
+} from '../lib/emailValidation';
 import { formatAuthFlowError } from '../lib/authErrors';
 import {
   clearSessionSignupIntent,
@@ -258,6 +263,31 @@ export function AuthBox({
     return true;
   }
 
+  async function routeNewLoginEmailToSignup() {
+    const status = await checkEmailAccountStatus(email);
+    if (!status.ok) {
+      setEmailError(status.message);
+      onNotice(status.message);
+      return true;
+    }
+
+    setEmail(status.normalized);
+    if (status.exists) {
+      return false;
+    }
+
+    const message = 'No Bundo account exists with this email yet. Choose how you want to use Bundo to create one.';
+    setPassword('');
+    setConfirmPassword('');
+    setPreferredRole(null);
+    saveSessionSignupIntent(null);
+    setEmailError(message);
+    setMode('signup');
+    setAuthStep('role');
+    onNotice(message);
+    return true;
+  }
+
   async function validateSignupPhoneField() {
     const availability = await checkSignupPhoneAvailability(phone);
     if (!availability.ok) {
@@ -352,6 +382,8 @@ export function AuthBox({
       }
     } else if (!validateEmailField()) {
       onNotice(emailError || 'Enter a valid email address.');
+      return;
+    } else if (mode === 'login' && (await routeNewLoginEmailToSignup())) {
       return;
     }
 
@@ -938,6 +970,7 @@ export function AuthBox({
                   Pick the path that fits you first—like Upwork, you choose client or artisan before creating login
                   details. You can manage profile and verification from your dashboard after signup.
                 </p>
+                {emailError && <p className="auth-form-error">{emailError}</p>}
 
                 <div className="role-choice-grid" aria-label="Choose account type">
                   <button

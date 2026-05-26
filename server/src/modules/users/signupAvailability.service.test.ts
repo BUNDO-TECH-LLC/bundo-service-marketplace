@@ -58,6 +58,17 @@ describe('signup availability', () => {
     await expect(assertEmailAvailableForSignup('new@example.com')).resolves.toBeUndefined();
   });
 
+  it('reports whether an email account exists', async () => {
+    findUnique.mockResolvedValueOnce(null);
+    getUserByEmail.mockRejectedValueOnce({ code: 'auth/user-not-found' });
+    findUnique.mockResolvedValueOnce({ firebaseUid: 'uid-1', email: 'taken@example.com' });
+
+    const { emailAccountExists } = await import('./signupAvailability.service');
+
+    await expect(emailAccountExists('new@example.com')).resolves.toBe(false);
+    await expect(emailAccountExists('taken@example.com')).resolves.toBe(true);
+  });
+
   it('rejects signup when phone is already linked', async () => {
     findFirst.mockResolvedValueOnce({ firebaseUid: 'uid-1', phone: '+2348012345678' });
 

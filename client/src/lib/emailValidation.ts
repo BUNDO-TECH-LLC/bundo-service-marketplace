@@ -113,3 +113,34 @@ export async function checkSignupPhoneAvailability(raw: string): Promise<EmailDe
     return { ok: false, message: 'Could not verify this phone number. Try again.' };
   }
 }
+
+export type EmailAccountStatusResult =
+  | { ok: true; normalized: string; exists: boolean }
+  | { ok: false; message: string };
+
+export async function checkEmailAccountStatus(raw: string): Promise<EmailAccountStatusResult> {
+  const format = validateEmailAddress(raw);
+  if (!format.ok) {
+    return format;
+  }
+
+  try {
+    const response = await api<{ email: string; exists: boolean }>('/users/email-account-status', {
+      method: 'POST',
+      body: JSON.stringify({ email: format.normalized }),
+    });
+
+    return {
+      ok: true,
+      normalized: response.email || format.normalized,
+      exists: response.exists,
+    };
+  } catch (error) {
+    if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
+      return { ok: false, message: error.message };
+    }
+
+    // If the availability check is temporarily unavailable, let Firebase handle login.
+    return { ok: true, normalized: format.normalized, exists: true };
+  }
+}
