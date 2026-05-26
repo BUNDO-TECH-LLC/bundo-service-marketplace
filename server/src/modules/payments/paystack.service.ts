@@ -159,6 +159,27 @@ export const initiatePaystackTransfer = async (input: {
   });
 };
 
+export const finalizePaystackTransfer = async (input: {
+  transferCode: string;
+  otp: string;
+}) => {
+  return paystackRequest<{
+    status: boolean;
+    message: string;
+    data: {
+      transfer_code: string;
+      reference: string;
+      status: string;
+    };
+  }>('/transfer/finalize_transfer', {
+    method: 'POST',
+    body: JSON.stringify({
+      transfer_code: input.transferCode,
+      otp: input.otp,
+    }),
+  });
+};
+
 export const createPaystackRefund = async (input: {
   transactionReference: string;
   amountKobo?: number;

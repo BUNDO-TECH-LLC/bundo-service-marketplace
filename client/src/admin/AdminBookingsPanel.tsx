@@ -13,7 +13,7 @@ import {
   type AdminJobFilter,
 } from '../lib/adminJobStages';
 import type { ActionRunner, AdminSection, AdminUserRecord } from '../appTypes';
-import type { Booking } from '../types';
+import type { Booking, Payout } from '../types';
 import { EmptyState } from '../components/EmptyState';
 import { AdminJobChat } from './AdminJobChat';
 
@@ -64,6 +64,12 @@ export function AdminBookingsPanel({
     action: 'RELEASE' | 'REFUND_FULL' | 'REFUND_PARTIAL';
     step: 'note' | 'amount';
     note?: string;
+  }>(null);
+  const [payoutOtpPrompt, setPayoutOtpPrompt] = useState<null | {
+    payoutId: string;
+    bookingId: string;
+    title: string;
+    resolution?: string;
   }>(null);
 
   useEffect(() => {
@@ -138,7 +144,10 @@ export function AdminBookingsPanel({
         return;
       }
 
-      await api(`/admin/disputes/${disputePrompt.disputeId}/resolve`, {
+      const response = await api<{
+        requiresOtp?: boolean;
+        payout?: Payout;
+      }>(`/admin/disputes/${disputePrompt.disputeId}/resolve`, {
         method: 'POST',
         token,
         body: JSON.stringify({
@@ -146,6 +155,17 @@ export function AdminBookingsPanel({
           resolution: resolutionInput || undefined,
         }),
       });
+
+      if (response.requiresOtp && response.payout) {
+        const booking = jobBookings.find((item) => item.id === response.payout?.bookingId);
+        setPayoutOtpPrompt({
+          payoutId: response.payout.id,
+          bookingId: response.payout.bookingId,
+          title: booking?.offering?.title || booking?.offering?.category?.name || 'this booking',
+          resolution: resolutionInput || undefined,
+        });
+      }
+
       setDisputePrompt(null);
       await refresh();
       return;
@@ -185,10 +205,39 @@ export function AdminBookingsPanel({
   }
 
   async function releasePayment(bookingId: string) {
-    await api(`/admin/bookings/${bookingId}/release-payment`, {
+    const response = await api<{
+      requiresOtp?: boolean;
+      payout?: Payout;
+    }>(`/admin/bookings/${bookingId}/release-payment`, {
       method: 'POST',
       token,
     });
+
+    if (response.requiresOtp && response.payout) {
+      const booking = jobBookings.find((item) => item.id === bookingId);
+      const title = booking?.offering?.title || booking?.offering?.category?.name || 'this booking';
+      setPayoutOtpPrompt({
+        payoutId: response.payout.id,
+        bookingId,
+        title,
+      });
+    }
+
+    await refresh();
+  }
+
+  async function finalizePayoutOtp(otp: string) {
+    if (!payoutOtpPrompt) return;
+
+    await api(`/admin/payouts/${payoutOtpPrompt.payoutId}/finalize-otp`, {
+      method: 'POST',
+      token,
+      body: JSON.stringify({
+        otp,
+        resolution: payoutOtpPrompt.resolution,
+      }),
+    });
+    setPayoutOtpPrompt(null);
     await refresh();
   }
 
@@ -283,10 +332,14 @@ export function AdminBookingsPanel({
               dispute.status === 'OPEN' || dispute.status === 'UNDER_REVIEW'
           );
           const paymentSecured = canStartOrCompleteBooking(booking);
+          const awaitingOtpPayout = booking.payouts?.find((payout) => payout.status === 'PENDING');
+          const processingPayout = booking.payouts?.find((payout) => payout.status === 'PROCESSING');
           const canRelease =
             booking.status === 'COMPLETED' &&
             paymentStatus === 'PAID_HELD' &&
-            !openDispute;
+            !openDispute &&
+            !awaitingOtpPayout &&
+            !processingPayout;
           const isAppointment = booking.status === 'ACCEPTED';
           const chatOpen = expandedChatId === booking.id;
           const actionsOpen = expandedActionsId === booking.id;
@@ -320,6 +373,12 @@ export function AdminBookingsPanel({
                     </span>
                     {openDispute && (
                       <span className="booking-status cancelled">Dispute open</span>
+                    )}
+                    {awaitingOtpPayout && (
+                      <span className="booking-status appointment">Payout OTP required</span>
+                    )}
+                    {processingPayout && (
+                      <span className="booking-status ongoing">Payout processing</span>
                     )}
                   </div>
                 </div>
@@ -515,10 +574,26 @@ export function AdminBookingsPanel({
                       className="primary-action"
                       disabled={busy}
                       onClick={() =>
-                        runAction(() => releasePayment(booking.id), 'Payout released')
+                        runAction(() => releasePayment(booking.id), 'Payout initiated')
                       }
                     >
                       Release payout
+                    </button>
+                  )}
+                  {awaitingOtpPayout && (
+                    <button
+                      type="button"
+                      className="primary-action"
+                      disabled={busy}
+                      onClick={() =>
+                        setPayoutOtpPrompt({
+                          payoutId: awaitingOtpPayout.id,
+                          bookingId: booking.id,
+                          title,
+                        })
+                      }
+                    >
+                      Enter payout OTP
                     </button>
                   )}
                 </div>
@@ -557,6 +632,17 @@ export function AdminBookingsPanel({
         busy={busy}
         onCancel={() => setDisputePrompt(null)}
         onConfirm={(value) => runAction(() => submitDisputeResolution(value), 'Dispute resolved')}
+      />
+      <PromptDialog
+        open={payoutOtpPrompt !== null}
+        title="Authorize Paystack payout"
+        message={`Enter the OTP Paystack sent for ${payoutOtpPrompt?.title || 'this payout'}. Funds stay held until this OTP is accepted.`}
+        label="Paystack OTP"
+        inputType="text"
+        confirmLabel="Authorize payout"
+        busy={busy}
+        onCancel={() => setPayoutOtpPrompt(null)}
+        onConfirm={(value) => runAction(() => finalizePayoutOtp(value), 'Payout authorized')}
       />
     </section>
   );

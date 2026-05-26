@@ -37,6 +37,8 @@ export function PromptDialog({
     return null;
   }
 
+  const inputId = 'prompt-dialog-input';
+
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     onConfirm(value.trim());
@@ -54,9 +56,11 @@ export function PromptDialog({
       >
         <h2 id="prompt-dialog-title">{title}</h2>
         {message && <p className="prompt-dialog-message">{message}</p>}
-        <label>
+        <label htmlFor={inputId}>
           {label}
           <input
+            id={inputId}
+            name="promptValue"
             type={inputType}
             value={value}
             onChange={(event) => setValue(event.target.value)}

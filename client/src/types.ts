@@ -147,6 +147,8 @@ export type Payout = {
   artisanId: string;
   amount: number;
   status: PayoutStatus;
+  paystackTransferCode?: string | null;
+  paystackReference?: string | null;
   sentAt?: string | null;
 };
 

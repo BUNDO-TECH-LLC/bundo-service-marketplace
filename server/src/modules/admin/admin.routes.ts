@@ -7,6 +7,7 @@ import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
 import { requireRole } from '../../middlewares/requireRole';
 import { getPagination, paginationMeta } from '../../utils/pagination';
 import {
+  finalizePayoutTransferOtp,
   releaseBookingPayment,
   resolveBookingDispute,
 } from '../payments/payments.service';
@@ -546,7 +547,17 @@ router.post('/bookings/:id/release-payment', asyncHandler(async (req, res) => {
   }
 
   if (result.status === 'already_released') {
-    throw httpError(409, 'Payment has already been released');
+    throw httpError(409, 'Payment has already been released or is awaiting Paystack confirmation');
+  }
+
+  if (result.status === 'otp_required') {
+    res.status(202).json({
+      message: 'Paystack OTP required to authorize this payout',
+      requiresOtp: true,
+      payment: result.payment,
+      payout: result.payout,
+    });
+    return;
   }
 
   if (result.status !== 'released') {
@@ -554,7 +565,48 @@ router.post('/bookings/:id/release-payment', asyncHandler(async (req, res) => {
   }
 
   res.json({
-    message: 'Payment released to artisan',
+    message: 'Payout initiated and awaiting Paystack confirmation',
+    payment: result.payment,
+    payout: result.payout,
+  });
+}));
+
+router.post('/payouts/:id/finalize-otp', asyncHandler(async (req, res) => {
+  const { otp, resolution } = req.body;
+
+  if (typeof otp !== 'string' || !otp.trim()) {
+    throw httpError(400, 'OTP is required');
+  }
+
+  const result = await finalizePayoutTransferOtp({
+    payoutId: String(req.params.id),
+    otp,
+    adminId: (req as any).user.firebaseUid,
+    ...(typeof resolution === 'string' ? { resolution } : {}),
+  });
+
+  if (result.status === 'paystack_not_configured') {
+    throw httpError(503, 'Paystack is not configured');
+  }
+
+  if (result.status === 'invalid_otp') {
+    throw httpError(400, 'Enter the Paystack OTP sent to the business account');
+  }
+
+  if (result.status === 'missing_payout') {
+    throw httpError(404, 'Payout not found');
+  }
+
+  if (result.status === 'not_awaiting_otp') {
+    throw httpError(409, 'This payout is not waiting for OTP authorization');
+  }
+
+  if (result.status === 'paystack_error') {
+    throw httpError(502, result.message, 'PAYSTACK_ERROR');
+  }
+
+  res.json({
+    message: 'Payout authorized and processing',
     payment: result.payment,
     payout: result.payout,
   });
@@ -630,6 +682,16 @@ router.post('/disputes/:id/resolve', asyncHandler(async (req, res) => {
     throw httpError(409, 'Payout has already been released');
   }
 
+  if (result.status === 'otp_required') {
+    res.status(202).json({
+      message: 'Paystack OTP required to authorize this payout. Enter the OTP from the payout queue.',
+      requiresOtp: true,
+      payment: result.payment,
+      payout: result.payout,
+    });
+    return;
+  }
+
   if (result.status === 'resolved_release') {
     res.json({
       message: 'Dispute resolved and payout released',
@@ -637,6 +699,7 @@ router.post('/disputes/:id/resolve', asyncHandler(async (req, res) => {
       payment: result.payment,
       payout: result.payout,
     });
+    return;
   }
 
   if (result.status === 'resolved_refund') {
@@ -646,6 +709,7 @@ router.post('/disputes/:id/resolve', asyncHandler(async (req, res) => {
       payment: result.payment,
       refundReference: result.refundReference,
     });
+    return;
   }
 
   throw httpError(500, 'Unexpected dispute resolution outcome');

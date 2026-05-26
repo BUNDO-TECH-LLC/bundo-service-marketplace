@@ -17,6 +17,7 @@ import { createNotifications } from '../notifications/notifications.service';
 import {
   createPaystackTransferRecipient,
   createPaystackRefund,
+  finalizePaystackTransfer,
   initializePaystackTransaction,
   initiatePaystackTransfer,
   isPaystackConfigured,
@@ -36,6 +37,12 @@ const paymentReference = (bookingId: string) =>
 
 const payoutReference = (bookingId: string) =>
   `bundo_payout_${bookingId}_${Date.now()}`;
+
+function paystackTransferRequiresOtp(transfer: { data?: { status?: string }; message?: string }) {
+  const status = transfer.data?.status?.toLowerCase();
+  const message = transfer.message?.toLowerCase() || '';
+  return status === 'otp' || message.includes('otp');
+}
 
 export const getSupportedPayoutBanks = async () => {
   if (!isPaystackConfigured()) {
@@ -544,7 +551,10 @@ export const getPayoutAccountForArtisanUser = async (artisanUserId: string) => {
   });
 };
 
-export const releaseBookingPayment = async (bookingId: string) => {
+export const releaseBookingPayment = async (
+  bookingId: string,
+  options: { ignoreBlockingDisputes?: boolean } = {}
+) => {
   if (!isPaystackConfigured()) {
     return { status: 'paystack_not_configured' as const };
   }
@@ -574,6 +584,7 @@ export const releaseBookingPayment = async (bookingId: string) => {
   }
 
   if (
+    !options.ignoreBlockingDisputes &&
     booking.disputes.some((dispute) => {
       const blockingDisputeStatuses: DisputeStatus[] = [
         DisputeStatus.OPEN,
@@ -589,7 +600,9 @@ export const releaseBookingPayment = async (bookingId: string) => {
   if (
     booking.payouts.some(
       (payout) =>
-        payout.status === PayoutStatus.SENT || payout.status === PayoutStatus.PROCESSING
+        payout.status === PayoutStatus.SENT ||
+        payout.status === PayoutStatus.PROCESSING ||
+        payout.status === PayoutStatus.PENDING
     )
   ) {
     return { status: 'already_released' as const };
@@ -621,6 +634,8 @@ export const releaseBookingPayment = async (bookingId: string) => {
     return { status: 'paystack_error' as const, message };
   }
 
+  const requiresOtp = paystackTransferRequiresOtp(transfer);
+
   const result = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const payout = await tx.payout.create({
       data: {
@@ -628,12 +643,16 @@ export const releaseBookingPayment = async (bookingId: string) => {
         paymentId: booking.payment!.id,
         artisanId: booking.artisanId,
         amount: booking.payment!.providerEarning,
-        status: PayoutStatus.PROCESSING,
+        status: requiresOtp ? PayoutStatus.PENDING : PayoutStatus.PROCESSING,
         paystackTransferCode: transfer.data.transfer_code,
         paystackReference: reference,
-        reason: 'Final service payout',
+        reason: requiresOtp ? 'Final service payout awaiting Paystack OTP' : 'Final service payout',
       },
     });
+
+    if (requiresOtp) {
+      return { payout, payment: booking.payment! };
+    }
 
     const payment = await tx.payment.update({
       where: { id: booking.payment!.id },
@@ -652,6 +671,17 @@ export const releaseBookingPayment = async (bookingId: string) => {
 
     return { payout, payment };
   });
+
+  if (requiresOtp) {
+    return {
+      status: 'otp_required' as const,
+      payment: result.payment,
+      payout: result.payout,
+      message:
+        transfer.message ||
+        'Paystack requires OTP authorization before this payout can be released.',
+    };
+  }
 
   const offering = await db.offering.findUnique({
     where: { id: booking.offeringId },
@@ -676,6 +706,122 @@ export const releaseBookingPayment = async (bookingId: string) => {
   ]);
 
   return { status: 'released' as const, ...result };
+};
+
+export const finalizePayoutTransferOtp = async (input: {
+  payoutId: string;
+  otp: string;
+  adminId?: string;
+  resolution?: string;
+}) => {
+  if (!isPaystackConfigured()) {
+    return { status: 'paystack_not_configured' as const };
+  }
+
+  const otp = input.otp.trim();
+  if (!/^\d{4,8}$/.test(otp)) {
+    return { status: 'invalid_otp' as const };
+  }
+
+  const payout = await db.payout.findUnique({
+    where: { id: input.payoutId },
+    include: {
+      payment: true,
+      booking: {
+        include: {
+          offering: true,
+          artisan: true,
+        },
+      },
+    },
+  });
+
+  if (!payout) {
+    return { status: 'missing_payout' as const };
+  }
+
+  if (payout.status !== PayoutStatus.PENDING || !payout.paystackTransferCode) {
+    return { status: 'not_awaiting_otp' as const, payout };
+  }
+
+  try {
+    await finalizePaystackTransfer({
+      transferCode: payout.paystackTransferCode,
+      otp,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Paystack could not finalize this payout';
+    return { status: 'paystack_error' as const, message };
+  }
+
+  const result = await db.$transaction(async (tx: Prisma.TransactionClient) => {
+    const updatedPayout = await tx.payout.update({
+      where: { id: payout.id },
+      data: {
+        status: PayoutStatus.PROCESSING,
+        reason: 'Final service payout authorized with Paystack OTP',
+      },
+    });
+
+    const payment = await tx.payment.update({
+      where: { id: payout.paymentId },
+      data: { status: PaymentStatus.RELEASED },
+    });
+
+    await tx.ledgerEntry.create({
+      data: {
+        bookingId: payout.bookingId,
+        paymentId: payout.paymentId,
+        type: LedgerEntryType.PROVIDER_PAYOUT,
+        amount: payout.amount,
+        note: 'Provider earning release authorized with Paystack OTP',
+      },
+    });
+
+    const openDispute = await tx.dispute.findFirst({
+      where: {
+        bookingId: payout.bookingId,
+        status: { in: [DisputeStatus.OPEN, DisputeStatus.UNDER_REVIEW] },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (openDispute) {
+      await tx.dispute.update({
+        where: { id: openDispute.id },
+        data: {
+          status: DisputeStatus.RESOLVED_RELEASE,
+          resolution:
+            input.resolution?.trim() ||
+            `Resolved by admin ${input.adminId || 'unknown'}: payout authorized with Paystack OTP`,
+        },
+      });
+    }
+
+    return { payout: updatedPayout, payment };
+  });
+
+  const offeringTitle = payout.booking.offering?.title || 'a completed booking';
+
+  await createNotifications([
+    {
+      userId: payout.booking.artisan.userId,
+      type: NotificationType.PAYMENT,
+      title: 'Payout processing',
+      body: `Your payout for ${offeringTitle} has been authorized and is processing.`,
+      link: workspaceBookingLink(payout.bookingId),
+    },
+    {
+      userId: payout.booking.customerId,
+      type: NotificationType.PAYMENT,
+      title: 'Provider payout processing',
+      body: `Bundo has authorized provider payout for ${offeringTitle}.`,
+      link: workspaceBookingLink(payout.bookingId),
+    },
+  ]);
+
+  return { status: 'finalized' as const, ...result };
 };
 
 export const syncPayoutFromPaystackTransfer = async (input: {
@@ -708,9 +854,18 @@ export const syncPayoutFromPaystackTransfer = async (input: {
   }
 
   if (input.event === 'transfer.failed' || input.event === 'transfer.reversed') {
-    const updated = await db.payout.update({
-      where: { id: payout.id },
-      data: { status: PayoutStatus.FAILED },
+    const updated = await db.$transaction(async (tx: Prisma.TransactionClient) => {
+      const failedPayout = await tx.payout.update({
+        where: { id: payout.id },
+        data: { status: PayoutStatus.FAILED },
+      });
+
+      await tx.payment.update({
+        where: { id: payout.paymentId },
+        data: { status: PaymentStatus.PAID_HELD },
+      });
+
+      return failedPayout;
     });
 
     return { status: 'failed' as const, payout: updated };
@@ -837,7 +992,9 @@ export const resolveBookingDispute = async (input: {
   }
 
   if (input.action === 'RELEASE') {
-    const released = await releaseBookingPayment(dispute.booking.id);
+    const released = await releaseBookingPayment(dispute.booking.id, {
+      ignoreBlockingDisputes: true,
+    });
 
     if (released.status !== 'released') {
       return released;
