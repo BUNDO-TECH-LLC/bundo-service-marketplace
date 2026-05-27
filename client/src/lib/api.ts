@@ -1,6 +1,8 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:3000';
 const API_TIMEOUT_MS = 25_000;
 export const AUTH_API_TIMEOUT_MS = 60_000;
+/** Public marketplace bootstrap can hit a cold Render instance on first load. */
+export const PUBLIC_API_TIMEOUT_MS = 60_000;
 
 const GET_CACHE_TTL_MS: Record<string, number> = {
   '/categories': 5 * 60_000,

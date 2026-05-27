@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { ArtisanHeaderActive, AdminSection, BookingSuccessState, PaymentSuccessState } from '../appTypes';
 import { isAuthPathname } from '../lib/appRouting';
+import { ApiError } from '../lib/api';
 import { firebaseReady } from '../lib/firebase';
 import { useActionRunner } from '../hooks/useActionRunner';
 import { useAppAuth } from '../hooks/useAppAuth';
@@ -69,7 +70,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
-    appData.loadPublicData().catch(() => setNotice('Could not load marketplace data'));
+    appData.loadPublicData().catch((error) => {
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : 'Could not load marketplace data. Check your connection and try again.';
+      setNotice(message);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- initial marketplace load once
   }, []);
 

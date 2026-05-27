@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { api, ApiError } from '../lib/api';
+import { api, ApiError, PUBLIC_API_TIMEOUT_MS } from '../lib/api';
 import { isArtisanApplicantSession } from '../lib/artisanApplication';
 import { paymentSuccessFromVerify, type VerifyPaymentResponse } from '../lib/paymentReturn';
 import type {
@@ -100,19 +100,45 @@ export function useAppData(filters: MarketplaceFilterState, options?: UseAppData
       }
 
       const query = `?${params.toString()}`;
-      const categoryPromise = api<{ categories: Category[] }>('/categories');
-      const marketplacePromise = Promise.all([
-        api<{ artisans: Artisan[] }>(`/artisans${query}`),
-        api<{ offerings: Offering[] }>(`/offerings${query}`),
+      const requestOptions = { timeoutMs: PUBLIC_API_TIMEOUT_MS };
+      const [categoriesResult, artisansResult, offeringsResult] = await Promise.allSettled([
+        api<{ categories: Category[] }>('/categories', requestOptions),
+        api<{ artisans: Artisan[] }>(`/artisans${query}`, requestOptions),
+        api<{ offerings: Offering[] }>(`/offerings${query}`, requestOptions),
       ]);
 
-      const [categoryRes, [artisanRes, offeringRes]] = await Promise.all([
-        categoryPromise,
-        marketplacePromise,
-      ]);
-      setCategories(categoryRes.categories);
-      setArtisans(artisanRes.artisans);
-      setPublicOfferings(offeringRes.offerings);
+      let loadedAny = false;
+
+      if (categoriesResult.status === 'fulfilled') {
+        setCategories(categoriesResult.value.categories);
+        loadedAny = true;
+      }
+
+      if (artisansResult.status === 'fulfilled') {
+        setArtisans(artisansResult.value.artisans);
+        loadedAny = true;
+      }
+
+      if (offeringsResult.status === 'fulfilled') {
+        setPublicOfferings(offeringsResult.value.offerings);
+        loadedAny = true;
+      }
+
+      if (!loadedAny) {
+        const firstError = [categoriesResult, artisansResult, offeringsResult].find(
+          (result): result is PromiseRejectedResult => result.status === 'rejected'
+        )?.reason;
+
+        if (firstError instanceof ApiError) {
+          throw firstError;
+        }
+
+        throw new ApiError(
+          'Could not load marketplace data. Check your connection and try again.',
+          0,
+          {}
+        );
+      }
     },
     [filters]
   );
