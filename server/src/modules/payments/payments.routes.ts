@@ -56,16 +56,21 @@ router.post(
   verifyFirebaseToken,
   requireRole(Role.CUSTOMER),
   asyncHandler(async (req, res) => {
-    const { bookingId } = req.body;
+    const { bookingId, amount } = req.body;
 
     if (!bookingId || typeof bookingId !== 'string') {
       throw new ValidationError('bookingId is required');
+    }
+
+    if (amount !== undefined && (typeof amount !== 'number' || !Number.isInteger(amount))) {
+      throw new ValidationError('amount must be a whole number of naira');
     }
 
     try {
       const result = await initializeBookingPayment({
         bookingId,
         customerId: (req as any).user.firebaseUid,
+        amount,
       });
 
       throwOnServiceStatus(result.status, {
@@ -95,7 +100,11 @@ router.post(
         authorizationUrl: result.payment.authorizationUrl,
       });
     } catch (error) {
-      if (error instanceof BadGatewayError || error instanceof ServiceUnavailableError) {
+      if (
+        error instanceof BadGatewayError ||
+        error instanceof ServiceUnavailableError ||
+        error instanceof ValidationError
+      ) {
         throw error;
       }
 

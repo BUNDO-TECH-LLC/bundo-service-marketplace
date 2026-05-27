@@ -207,9 +207,12 @@ export function ArtisanProfilePage({
             </label>
 
             <div className="booking-total">
-              <span>Estimated total</span>
+              <span>Guide price</span>
               <strong>{selectedOffering ? money(selectedOffering.priceFrom) : 'Select service'}</strong>
             </div>
+            <p className="booking-payment-notice">
+              Final price is agreed with your artisan before you pay from My bookings.
+            </p>
 
             <button disabled={!isAuthed || role !== 'CUSTOMER' || busy || !selectedOffering}>Book now</button>
           </form>

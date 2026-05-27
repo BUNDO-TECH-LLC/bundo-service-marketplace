@@ -24,6 +24,7 @@ import {
   listPaystackBanks,
   verifyPaystackTransaction,
 } from './paystack.service';
+import { resolveAgreedPaymentAmount } from './paymentsAmount';
 
 const toKobo = (amount: number) => amount * 100;
 
@@ -81,6 +82,7 @@ export const getSupportedPayoutBanks = async () => {
 export const initializeBookingPayment = async (input: {
   bookingId: string;
   customerId: string;
+  amount?: number;
 }) => {
   if (!isPaystackConfigured()) {
     return { status: 'paystack_not_configured' as const };
@@ -127,17 +129,30 @@ export const initializeBookingPayment = async (input: {
     return { status: 'already_paid' as const, payment: booking.payment };
   }
 
+  const amount = resolveAgreedPaymentAmount({
+    ...(input.amount !== undefined ? { amount: input.amount } : {}),
+    agreedAmount: booking.agreedAmount,
+    guideAmount: booking.offering.priceFrom,
+  });
+
+  await db.booking.update({
+    where: { id: booking.id },
+    data: { agreedAmount: amount },
+  });
+
   if (
     booking.payment?.status === PaymentStatus.PAYMENT_PENDING &&
-    booking.payment.authorizationUrl
+    booking.payment.authorizationUrl &&
+    booking.payment.amount === amount
   ) {
     return { status: 'initialized' as const, payment: booking.payment };
   }
 
-  const amount = booking.offering.priceFrom;
   const platformFee = Math.round(amount * (platformFeePercent() / 100));
   const providerEarning = amount - platformFee;
-  const reference = booking.payment?.paystackReference || paymentReference(booking.id);
+  const pendingReference =
+    booking.payment?.amount === amount ? booking.payment.paystackReference : null;
+  const reference = pendingReference || paymentReference(booking.id);
 
   const transaction = await initializePaystackTransaction({
     email: booking.customerUser.email,

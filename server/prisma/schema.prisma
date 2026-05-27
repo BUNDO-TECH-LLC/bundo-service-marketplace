@@ -211,6 +211,7 @@ model Booking {
   status       BookingStatus  @default(REQUESTED)
   scheduledAt  DateTime?      @map("scheduled_at")
   note         String?
+  agreedAmount Int?           @map("agreed_amount")
   createdAt    DateTime       @default(now()) @map("created_at")
   updatedAt    DateTime       @updatedAt @map("updated_at")
 

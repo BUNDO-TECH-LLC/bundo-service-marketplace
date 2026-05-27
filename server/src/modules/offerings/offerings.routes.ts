@@ -14,6 +14,7 @@ import {
   updateOfferingForArtisan,
 } from './offerings.service';
 import { getPagination, paginationMeta } from '../../utils/pagination';
+import { MIN_AGREED_PAYMENT_NGN } from '../payments/paymentsAmount';
 
 const router = Router();
 
@@ -49,8 +50,10 @@ const validateOfferingBody = (body: any, partial = false) => {
   }
 
   if (!partial || priceFrom !== undefined) {
-    if (!Number.isInteger(priceFrom) || priceFrom < 0) {
-      return { error: 'priceFrom must be a non-negative integer' };
+    if (!Number.isInteger(priceFrom) || priceFrom < MIN_AGREED_PAYMENT_NGN) {
+      return {
+        error: `priceFrom must be a whole number of naira, at least ₦${MIN_AGREED_PAYMENT_NGN.toLocaleString('en-NG')}`,
+      };
     }
     data.priceFrom = priceFrom;
   }

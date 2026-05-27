@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { EmptyState } from '../../components/EmptyState';
 import type { ActionRunner } from '../../appTypes';
 import { api } from '../../lib/api';
+import { MIN_PAYMENT_AMOUNT_NGN } from '../../lib/bookingDisplay';
 import { money } from '../../lib/formatting';
 import type { Artisan, Offering } from '../../types';
 
@@ -78,6 +79,11 @@ export function ArtisanOffersPanel({
     if (priceFrom === undefined) {
       throw new Error('Enter a starting price.');
     }
+    if (priceFrom < MIN_PAYMENT_AMOUNT_NGN) {
+      throw new Error(
+        `Starting price must be at least ₦${MIN_PAYMENT_AMOUNT_NGN.toLocaleString('en-NG')}.`
+      );
+    }
     if (priceToRaw !== undefined && priceToRaw < priceFrom) {
       throw new Error('Maximum price must be at least the starting price.');
     }
@@ -105,6 +111,11 @@ export function ArtisanOffersPanel({
     const priceToRaw = parsePriceInput(form.get('priceTo'));
     if (priceFrom === undefined) {
       throw new Error('Enter a starting price.');
+    }
+    if (priceFrom < MIN_PAYMENT_AMOUNT_NGN) {
+      throw new Error(
+        `Starting price must be at least ₦${MIN_PAYMENT_AMOUNT_NGN.toLocaleString('en-NG')}.`
+      );
     }
     if (priceToRaw !== undefined && priceToRaw < priceFrom) {
       throw new Error('Maximum price must be at least the starting price.');

@@ -5,10 +5,15 @@ import { PromptDialog } from '../components/PromptDialog';
 import { api } from '../lib/api';
 import { formatMessageTime, money } from '../lib/formatting';
 import {
+  agreedAmountInputValue,
   bookingContactName,
   bookingDate,
+  bookingGuidePrice,
   bookingInputValue,
   bookingLocation,
+  bookingPayableAmount,
+  MIN_PAYMENT_AMOUNT_NGN,
+  parseAgreedAmountInput,
   parseBookingInput,
   paymentLabel,
   statusLabel,
@@ -111,6 +116,18 @@ function ArtisanJobsPage({
               <dt>NOTE</dt>
               <dd>{selectedBooking.note || 'No note added'}</dd>
             </div>
+            {bookingGuidePrice(selectedBooking) !== null && (
+              <div>
+                <dt>Guide price</dt>
+                <dd>{money(bookingGuidePrice(selectedBooking)!)}</dd>
+              </div>
+            )}
+            {bookingPayableAmount(selectedBooking) !== null && (
+              <div>
+                <dt>Agreed amount</dt>
+                <dd>{money(bookingPayableAmount(selectedBooking)!)}</dd>
+              </div>
+            )}
           </dl>
         </article>
 
@@ -262,6 +279,7 @@ export function BookingsPage({
     step: 'datetime' | 'note';
     scheduledAt?: string;
   }>(null);
+  const [paymentPrompt, setPaymentPrompt] = useState<Booking | null>(null);
 
   async function submitReview(input: { rating: number; comment: string }) {
     if (!reviewBooking) return;
@@ -295,19 +313,36 @@ export function BookingsPage({
     await refresh();
   }
 
-  async function startPayment(bookingId: string) {
+  async function startPayment(bookingId: string, amount: number) {
     const response = await api<{ authorizationUrl?: string }>('/payments/initialize', {
       method: 'POST',
       token,
-      body: JSON.stringify({ bookingId }),
+      body: JSON.stringify({ bookingId, amount }),
     });
 
     if (response.authorizationUrl) {
+      setPaymentPrompt(null);
       window.location.href = response.authorizationUrl;
       return;
     }
 
+    setPaymentPrompt(null);
     await refresh();
+  }
+
+  async function submitPaymentAmount(raw: string) {
+    if (!paymentPrompt) {
+      return;
+    }
+
+    const amount = parseAgreedAmountInput(raw);
+    if (!amount || amount < MIN_PAYMENT_AMOUNT_NGN) {
+      throw new Error(
+        `Enter a valid amount in naira (minimum ₦${MIN_PAYMENT_AMOUNT_NGN.toLocaleString('en-NG')}).`
+      );
+    }
+
+    await startPayment(paymentPrompt.id, amount);
   }
 
   async function openDispute(bookingId: string) {
@@ -383,6 +418,22 @@ export function BookingsPage({
       />
     )}
     <PromptDialog
+      open={paymentPrompt !== null}
+      title="Confirm payment amount"
+      message={
+        paymentPrompt && bookingGuidePrice(paymentPrompt) !== null
+          ? `The listing price (${money(bookingGuidePrice(paymentPrompt)!)}) is a guide. Enter the amount you agreed on with ${paymentPrompt.artisan?.displayName || 'your artisan'} (minimum ₦${MIN_PAYMENT_AMOUNT_NGN.toLocaleString('en-NG')}).`
+          : `Enter the amount you agreed on with your artisan (minimum ₦${MIN_PAYMENT_AMOUNT_NGN.toLocaleString('en-NG')}).`
+      }
+      label="Amount to pay (₦)"
+      defaultValue={paymentPrompt ? agreedAmountInputValue(paymentPrompt) : ''}
+      inputType="number"
+      confirmLabel="Continue to Paystack"
+      busy={busy}
+      onCancel={() => setPaymentPrompt(null)}
+      onConfirm={(value) => runAction(() => submitPaymentAmount(value), 'Payment checkout opened')}
+    />
+    <PromptDialog
       open={reschedulePrompt !== null}
       title={reschedulePrompt?.step === 'note' ? 'Reschedule note' : 'Reschedule booking'}
       message={
@@ -439,7 +490,20 @@ export function BookingsPage({
             .slice(0, 2)
             .toUpperCase();
           const serviceName = booking.offering?.title || 'Service booking';
-          const price = booking.offering?.priceFrom ? money(booking.offering.priceFrom) : 'To be confirmed';
+          const guidePrice = bookingGuidePrice(booking);
+          const payableAmount = bookingPayableAmount(booking);
+          const priceLabel =
+            payableAmount !== null && guidePrice !== null && payableAmount !== guidePrice
+              ? 'Agreed amount'
+              : payableAmount !== null
+                ? 'Amount'
+                : 'Guide price';
+          const price =
+            payableAmount !== null
+              ? money(payableAmount)
+              : guidePrice !== null
+                ? money(guidePrice)
+                : 'To be confirmed';
           const paymentStatus = booking.payment?.status;
           const latestDispute = booking.disputes?.[0];
           const paymentSecured = isBookingPaymentSecured(paymentStatus);
@@ -505,9 +569,14 @@ export function BookingsPage({
               </dl>
 
               <div className="booking-total-row">
-                <span>Estimated total</span>
+                <span>{priceLabel}</span>
                 <strong>{price}</strong>
               </div>
+              {guidePrice !== null && payableAmount !== null && payableAmount !== guidePrice && (
+                <p className="booking-payment-notice">
+                  Guide price on listing: {money(guidePrice)}
+                </p>
+              )}
 
               {awaitingPaymentToStart && (
                 <p className="booking-payment-notice" role="status">
@@ -520,7 +589,7 @@ export function BookingsPage({
                   <button
                     className="primary-action"
                     disabled={busy}
-                    onClick={() => runAction(() => startPayment(booking.id), 'Payment checkout opened')}
+                    onClick={() => setPaymentPrompt(booking)}
                   >
                     Pay securely
                   </button>

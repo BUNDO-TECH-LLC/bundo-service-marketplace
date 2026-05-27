@@ -403,9 +403,12 @@ export function AdminBookingsPanel({
                   <div>
                     <dt>Amount</dt>
                     <dd>
-                      {booking.payment
-                        ? money(booking.payment.amount)
-                        : money(booking.offering?.priceFrom || 0)}
+                      {money(
+                        booking.payment?.amount ??
+                          booking.agreedAmount ??
+                          booking.offering?.priceFrom ??
+                          0
+                      )}
                     </dd>
                   </div>
                   <div className="admin-row-fields-note">

@@ -224,6 +224,13 @@ export function useArtisanLanding({
       throw new Error('Add at least one service package with a category, name, and price.');
     }
 
+    const minGuidePrice = 500;
+    if (packagesToSave.some((servicePackage) => servicePackage.priceFrom < minGuidePrice)) {
+      throw new Error(
+        `Each guide price must be at least ₦${minGuidePrice.toLocaleString('en-NG')}.`
+      );
+    }
+
     for (const servicePackage of packagesToSave) {
       const alreadyExists = offerings.some(
         (offering) =>

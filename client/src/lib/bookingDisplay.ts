@@ -1,5 +1,8 @@
 import type { Booking, PaymentStatus } from '../types';
 
+/** Must match server MIN_AGREED_PAYMENT_NGN */
+export const MIN_PAYMENT_AMOUNT_NGN = 500;
+
 export function statusLabel(status: Booking['status']) {
   if (status === 'ONGOING') return 'in progress';
   if (status === 'ACCEPTED') return 'appointment';
@@ -51,4 +54,39 @@ export function bookingContactName(booking: Booking) {
 
 export function bookingLocation(booking: Booking) {
   return booking.artisan?.area || booking.offering?.artisan?.area || 'Lagos';
+}
+
+export function bookingGuidePrice(booking: Booking) {
+  return booking.offering?.priceFrom ?? null;
+}
+
+/** Amount the customer will pay or has paid (negotiated when set). */
+export function bookingPayableAmount(booking: Booking) {
+  return booking.payment?.amount ?? booking.agreedAmount ?? booking.offering?.priceFrom ?? null;
+}
+
+export function parseAgreedAmountInput(raw: string) {
+  const digits = raw.replace(/[^\d]/g, '');
+  if (!digits) {
+    return null;
+  }
+
+  const value = Number(digits);
+  return Number.isInteger(value) && value > 0 ? value : null;
+}
+
+export function agreedAmountInputValue(booking: Booking) {
+  const amount = bookingPayableAmount(booking);
+  if (!amount) {
+    return '';
+  }
+  // Guide-only amounts below the payment minimum must be entered explicitly at checkout.
+  if (
+    amount < MIN_PAYMENT_AMOUNT_NGN &&
+    !booking.agreedAmount &&
+    !booking.payment?.amount
+  ) {
+    return '';
+  }
+  return String(amount);
 }

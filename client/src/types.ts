@@ -93,6 +93,7 @@ export type Booking = {
   status: 'REQUESTED' | 'ACCEPTED' | 'ONGOING' | 'DECLINED' | 'CANCELLED' | 'COMPLETED';
   conversationId?: string | null;
   note: string | null;
+  agreedAmount?: number | null;
   scheduledAt: string | null;
   customerUser?: Pick<ApiUser, 'firebaseUid' | 'email' | 'phone'>;
   moderator?: Pick<ApiUser, 'firebaseUid' | 'email' | 'phone'> | null;
