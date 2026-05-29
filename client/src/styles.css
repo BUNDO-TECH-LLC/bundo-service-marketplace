@@ -6474,14 +6474,19 @@ footer h4 {
   position: fixed;
   inset: 0;
   z-index: 1200;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 16px;
+  overflow-y: auto;
   background: rgb(15 18 24 / 55%);
 }
 
 .prompt-dialog {
   width: min(100%, 420px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 20px;
   border-radius: 16px;
   background: #fff;
@@ -6516,6 +6521,33 @@ footer h4 {
 
 .admin-payout-dialog {
   width: min(100%, 460px);
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-payout-dialog .prompt-dialog-actions {
+  position: sticky;
+  bottom: -20px;
+  margin: 8px -20px -20px;
+  padding: 14px 20px;
+  background: #fff;
+  border-top: 1px solid #e6e8ec;
+  border-radius: 0 0 16px 16px;
+}
+
+@media (max-width: 480px) {
+  .admin-payout-dialog {
+    width: 100%;
+    max-height: calc(100dvh - 24px);
+  }
+
+  .admin-payout-percent-presets {
+    flex-wrap: wrap;
+  }
+
+  .admin-payout-mode {
+    flex-wrap: wrap;
+  }
 }
 
 .admin-payout-breakdown {
