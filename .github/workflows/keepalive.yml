@@ -1,0 +1,37 @@
+name: Keep API warm
+
+# Pings the Render free-tier API on a schedule so it doesn't spin down and force
+# a cold start on the next real user. Set repo variable KEEPALIVE_URL to the
+# health endpoint, e.g. https://your-api.onrender.com/health
+#
+# NOTE: GitHub's scheduled runs can be delayed under load, so this is a free,
+# best-effort layer. For tighter intervals use cron-job.org or UptimeRobot.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keepalive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        run: |
+          URL="${{ vars.KEEPALIVE_URL }}"
+          if [ -z "$URL" ]; then
+            echo "KEEPALIVE_URL repo variable is not set; skipping."
+            exit 0
+          fi
+          echo "Pinging $URL"
+          # Retry a few times: the first hit may be waking a sleeping instance.
+          curl --fail --silent --show-error --location \
+            --retry 5 --retry-all-errors --retry-delay 20 \
+            --max-time 90 "$URL" && echo "OK"

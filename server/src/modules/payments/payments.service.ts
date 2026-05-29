@@ -398,13 +398,22 @@ export const markPaymentReferencePaid = async (reference: string) => {
   }
 
   const updated = await db.$transaction(async (tx: Prisma.TransactionClient) => {
-    const paid = await tx.payment.update({
-      where: { id: payment.id },
+    // Conditional flip guards against the webhook and client verify-reference
+    // confirming the same reference concurrently (would otherwise double-write the ledger).
+    const flip = await tx.payment.updateMany({
+      where: {
+        id: payment.id,
+        status: { in: [PaymentStatus.UNPAID, PaymentStatus.PAYMENT_PENDING] },
+      },
       data: {
         status: PaymentStatus.PAID_HELD,
         paidAt: new Date(),
       },
     });
+
+    if (flip.count === 0) {
+      return null;
+    }
 
     await tx.ledgerEntry.createMany({
       data: [
@@ -432,8 +441,13 @@ export const markPaymentReferencePaid = async (reference: string) => {
       ],
     });
 
-    return paid;
+    return tx.payment.findUnique({ where: { id: payment.id } });
   });
+
+  if (!updated) {
+    const current = await db.payment.findUnique({ where: { id: payment.id } });
+    return { status: 'already_processed' as const, payment: current ?? payment };
+  }
 
   const booking = await db.booking.findUnique({
     where: { id: payment.bookingId },

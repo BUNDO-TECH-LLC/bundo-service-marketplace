@@ -25,23 +25,17 @@ async function ensureBookingConversationsForUser(input: {
       },
     });
 
-    await Promise.all(
-      bookingPairs.map((pair) =>
-        db.conversation.upsert({
-          where: {
-            customerId_artisanId: {
-              customerId: pair.customerId,
-              artisanId: pair.artisanId,
-            },
-          },
-          update: {},
-          create: {
-            customerId: pair.customerId,
-            artisanId: pair.artisanId,
-          },
-        })
-      )
-    );
+    // Single insert with skipDuplicates instead of N upserts (the relation has a
+    // unique [customerId, artisanId] constraint, so existing rows are left untouched).
+    if (bookingPairs.length) {
+      await db.conversation.createMany({
+        data: bookingPairs.map((pair) => ({
+          customerId: pair.customerId,
+          artisanId: pair.artisanId,
+        })),
+        skipDuplicates: true,
+      });
+    }
 
     return artisan;
   }
@@ -55,23 +49,15 @@ async function ensureBookingConversationsForUser(input: {
     },
   });
 
-  await Promise.all(
-    bookingPairs.map((pair) =>
-      db.conversation.upsert({
-        where: {
-          customerId_artisanId: {
-            customerId: pair.customerId,
-            artisanId: pair.artisanId,
-          },
-        },
-        update: {},
-        create: {
-          customerId: pair.customerId,
-          artisanId: pair.artisanId,
-        },
-      })
-    )
-  );
+  if (bookingPairs.length) {
+    await db.conversation.createMany({
+      data: bookingPairs.map((pair) => ({
+        customerId: pair.customerId,
+        artisanId: pair.artisanId,
+      })),
+      skipDuplicates: true,
+    });
+  }
 
   return null;
 }
@@ -328,9 +314,12 @@ export const getConversationMessages = async (input: {
     return { status: 'forbidden' as const };
   }
 
-  const messages = await db.message.findMany({
+  // Cap to the most recent messages to bound payload/query cost, then return
+  // them in chronological order for rendering.
+  const recent = await db.message.findMany({
     where: { conversationId: input.conversationId },
-    orderBy: { createdAt: 'asc' },
+    orderBy: { createdAt: 'desc' },
+    take: 200,
     include: {
       sender: {
         select: {
@@ -342,6 +331,7 @@ export const getConversationMessages = async (input: {
       },
     },
   });
+  const messages = recent.reverse();
 
   return { status: 'found' as const, conversation, messages };
 };

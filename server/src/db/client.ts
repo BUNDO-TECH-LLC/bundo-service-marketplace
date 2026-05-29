@@ -19,11 +19,21 @@ function buildPoolConfig(connectionString: string): PoolConfig {
   // stricter SSL semantics from sslmode in the URL during local development.
   parsed.searchParams.delete('sslmode');
 
+  const toInt = (value: string | undefined, fallback: number) => {
+    const parsedValue = value ? Number.parseInt(value, 10) : NaN;
+    return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : fallback;
+  };
+
   return {
     connectionString: parsed.toString(),
     ssl: {
       rejectUnauthorized: false,
     },
+    // Bound the pool so we don't exhaust the database connection limit (Render
+    // managed Postgres caps connections aggressively). Tunable via env.
+    max: toInt(process.env.PG_POOL_MAX, 10),
+    idleTimeoutMillis: toInt(process.env.PG_POOL_IDLE_TIMEOUT_MS, 30_000),
+    connectionTimeoutMillis: toInt(process.env.PG_POOL_CONNECTION_TIMEOUT_MS, 10_000),
   };
 }
 

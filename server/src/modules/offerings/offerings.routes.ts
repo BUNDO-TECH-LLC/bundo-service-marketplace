@@ -170,6 +170,7 @@ router.get(
       countOfferings(filters),
     ]);
 
+    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=120');
     res.json({
       message: 'Offerings fetched',
       offerings,
@@ -190,6 +191,7 @@ router.get(
       throw new NotFoundError('Offering');
     }
 
+    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=120');
     res.json({
       message: 'Offering fetched',
       offering,

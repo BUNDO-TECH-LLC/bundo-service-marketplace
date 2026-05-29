@@ -143,6 +143,9 @@ model ArtisanProfile {
   payoutAccount      ProviderPayoutAccount?
   kycSubmission      ArtisanKycSubmission?
 
+  @@index([verifyStatus])
+  @@index([city])
+  @@index([lat, lng])
   @@map("artisan_profiles")
 }
 
@@ -173,6 +176,8 @@ model Offering {
   category    Category       @relation(fields: [categoryId], references: [id])
   bookings    Booking[]
 
+  @@index([artisanId])
+  @@index([categoryId])
   @@map("offerings")
 }
 
@@ -186,6 +191,7 @@ model AvailabilitySlot {
 
   artisan   ArtisanProfile @relation(fields: [artisanId], references: [id])
 
+  @@index([artisanId])
   @@map("availability_slots")
 }
 
@@ -199,6 +205,7 @@ model PortfolioImage {
 
   artisan      ArtisanProfile @relation(fields: [artisanId], references: [id])
 
+  @@index([artisanId])
   @@map("portfolio_images")
 }
 
@@ -225,6 +232,10 @@ model Booking {
   disputes     Dispute[]
   ledgerEntries LedgerEntry[]
 
+  @@index([customerId])
+  @@index([artisanId])
+  @@index([status])
+  @@index([moderatorId])
   @@map("bookings")
 }
 
@@ -287,6 +298,9 @@ model Payout {
   booking               Booking      @relation(fields: [bookingId], references: [id])
   payment               Payment      @relation(fields: [paymentId], references: [id])
 
+  @@index([bookingId])
+  @@index([paymentId])
+  @@index([artisanId])
   @@map("payouts")
 }
 
@@ -302,6 +316,8 @@ model Dispute {
 
   booking     Booking       @relation(fields: [bookingId], references: [id])
 
+  @@index([bookingId])
+  @@index([status])
   @@map("disputes")
 }
 
@@ -318,6 +334,8 @@ model LedgerEntry {
   booking   Booking         @relation(fields: [bookingId], references: [id])
   payment   Payment?        @relation(fields: [paymentId], references: [id])
 
+  @@index([bookingId])
+  @@index([paymentId])
   @@map("ledger_entries")
 }
 
@@ -334,6 +352,8 @@ model Review {
   customer   User           @relation("CustomerReviews", fields: [customerId], references: [firebaseUid])
   artisan    ArtisanProfile @relation("ArtisanReviews", fields: [artisanId], references: [id])
 
+  @@index([artisanId])
+  @@index([customerId])
   @@map("reviews")
 }
 
@@ -349,6 +369,7 @@ model Notification {
 
   user       User             @relation(fields: [userId], references: [firebaseUid])
 
+  @@index([userId, createdAt])
   @@map("notifications")
 }
 
@@ -419,6 +440,7 @@ model Message {
   conversation   Conversation @relation(fields: [conversationId], references: [id])
   sender         User         @relation("SentMessages", fields: [senderId], references: [firebaseUid])
 
+  @@index([conversationId, createdAt])
   @@map("messages")
 }
 

@@ -114,6 +114,34 @@ type OfferingWithArtisanCoords = Awaited<ReturnType<typeof db.offering.findMany>
   artisan: { lat?: number; lng?: number };
 };
 
+// Distance-sort bounding box. Generous enough to cover a city + suburbs while
+// keeping the candidate set small. Precise ordering is still computed in JS.
+const DISTANCE_SORT_RADIUS_KM = 100;
+const DISTANCE_SORT_CANDIDATE_CAP = 1000;
+const KM_PER_DEGREE_LAT = 111.045;
+
+function withinBoundingBox(
+  where: Prisma.OfferingWhereInput,
+  lat: number,
+  lng: number,
+  radiusKm: number
+): Prisma.OfferingWhereInput {
+  const deltaLat = radiusKm / KM_PER_DEGREE_LAT;
+  const cosLat = Math.max(Math.cos((lat * Math.PI) / 180), 0.01);
+  const deltaLng = radiusKm / (KM_PER_DEGREE_LAT * cosLat);
+
+  const artisanFilter = (where.artisan as Prisma.ArtisanProfileWhereInput | undefined) ?? {};
+
+  return {
+    ...where,
+    artisan: {
+      ...artisanFilter,
+      lat: { gte: lat - deltaLat, lte: lat + deltaLat },
+      lng: { gte: lng - deltaLng, lte: lng + deltaLng },
+    },
+  };
+}
+
 function sortOfferingsByDistance(
   offerings: OfferingWithArtisanCoords[],
   lat: number,
@@ -209,9 +237,14 @@ export const getOfferings = async (
   };
 
   if (useDistanceSort) {
+    // Prefilter to a bounding box around the requested point so we don't load the
+    // whole table into memory just to sort by distance. The box is generous (covers
+    // a metro area + suburbs); precise ordering is still done in JS below.
+    const boundedWhere = withinBoundingBox(where, filters.lat!, filters.lng!, DISTANCE_SORT_RADIUS_KM);
     const rows = await db.offering.findMany({
-      where,
+      where: boundedWhere,
       include,
+      take: DISTANCE_SORT_CANDIDATE_CAP,
     });
     const sorted = sortOfferingsByDistance(rows as OfferingWithArtisanCoords[], filters.lat!, filters.lng!);
     if (!pagination) {

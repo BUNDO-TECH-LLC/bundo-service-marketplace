@@ -22,6 +22,7 @@ import {
   verifyPaymentReferenceForUser,
 } from './payments.service';
 import { verifyPaystackSignature } from './paystack.service';
+import logger from '../../utils/logger';
 
 const router = Router();
 
@@ -188,18 +189,29 @@ router.post(
     const event = req.body?.event;
     const reference = req.body?.data?.reference ? String(req.body.data.reference) : null;
 
+    // Money-critical: let unexpected errors propagate (500) so Paystack retries.
+    // The confirmation path is idempotent, so retries are safe.
     if (event === 'charge.success' && reference) {
-      await markPaymentReferencePaid(reference);
+      const result = await markPaymentReferencePaid(reference);
+      if (result.status === 'verification_failed' || result.status === 'paystack_not_configured') {
+        logger.warn(
+          { reference, status: result.status },
+          'Paystack charge.success webhook could not confirm payment'
+        );
+      }
     }
 
     if (
       reference &&
       (event === 'transfer.success' || event === 'transfer.failed' || event === 'transfer.reversed')
     ) {
-      await syncPayoutFromPaystackTransfer({
-        reference,
-        event,
-      });
+      // Transfer sync is best-effort: a failure here must not drop the webhook ACK,
+      // otherwise Paystack retries can interleave with a concurrent charge.success.
+      try {
+        await syncPayoutFromPaystackTransfer({ reference, event });
+      } catch (error) {
+        logger.error({ err: error, reference, event }, 'Failed to sync Paystack transfer webhook');
+      }
     }
 
     res.json({ received: true });

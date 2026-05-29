@@ -8,6 +8,32 @@ const GET_CACHE_TTL_MS: Record<string, number> = {
   '/categories': 5 * 60_000,
 };
 
+/**
+ * Prefix-based cache TTLs for public listing endpoints that carry query strings
+ * (so they can't be matched by the exact-path map above). Short TTL keeps the
+ * marketplace responsive while bounding staleness; mutations call invalidateApiCache.
+ */
+const GET_CACHE_TTL_PREFIXES: Array<{ prefix: string; ttl: number }> = [
+  { prefix: '/offerings', ttl: 60_000 },
+  { prefix: '/artisans', ttl: 60_000 },
+];
+
+function resolveGetCacheTtl(path: string, token?: string): number | undefined {
+  if (GET_CACHE_TTL_MS[path]) {
+    return GET_CACHE_TTL_MS[path];
+  }
+  // Prefix caching only applies to anonymous requests, which are exactly the
+  // public marketplace calls. Authed reads under these prefixes (e.g. /artisans/me,
+  // /offerings/me) must never be cached so personal data stays fresh.
+  if (token) {
+    return undefined;
+  }
+  const match = GET_CACHE_TTL_PREFIXES.find(
+    (entry) => path === entry.prefix || path.startsWith(`${entry.prefix}?`) || path.startsWith(`${entry.prefix}/`)
+  );
+  return match?.ttl;
+}
+
 type CacheEntry = {
   expiresAt: number;
   data: unknown;
@@ -43,7 +69,7 @@ function getCacheKey(path: string, token?: string) {
 }
 
 function readGetCache<T>(path: string, token?: string): T | null {
-  const ttl = GET_CACHE_TTL_MS[path];
+  const ttl = resolveGetCacheTtl(path, token);
   if (!ttl) {
     return null;
   }
@@ -60,7 +86,7 @@ function readGetCache<T>(path: string, token?: string): T | null {
 }
 
 function writeGetCache(path: string, token: string | undefined, data: unknown) {
-  const ttl = GET_CACHE_TTL_MS[path];
+  const ttl = resolveGetCacheTtl(path, token);
   if (!ttl) {
     return;
   }
@@ -84,17 +110,46 @@ export function invalidateApiCache(prefix?: string) {
   }
 }
 
+// Coalesces concurrent identical GETs (same path + token) so multiple components
+// mounting at once don't each fire the same request.
+const inFlightGets = new Map<string, Promise<unknown>>();
+
 export async function api<T>(
   path: string,
   options: RequestInit & { token?: string; timeoutMs?: number } = {}
 ): Promise<T> {
-  const { token, timeoutMs, ...fetchOptions } = options;
+  const { token } = options;
   const method = (options.method ?? 'GET').toUpperCase();
   const cached = method === 'GET' ? readGetCache<T>(path, token) : null;
 
   if (cached !== null) {
     return cached;
   }
+
+  // Dedupe only plain GETs without an external abort signal (sharing a promise
+  // across consumers must not let one consumer's abort cancel another's request).
+  if (method === 'GET' && !options.signal) {
+    const key = getCacheKey(path, token);
+    const existing = inFlightGets.get(key);
+    if (existing) {
+      return existing as Promise<T>;
+    }
+    const promise = executeRequest<T>(path, options).finally(() => {
+      inFlightGets.delete(key);
+    });
+    inFlightGets.set(key, promise);
+    return promise;
+  }
+
+  return executeRequest<T>(path, options);
+}
+
+async function executeRequest<T>(
+  path: string,
+  options: RequestInit & { token?: string; timeoutMs?: number } = {}
+): Promise<T> {
+  const { token, timeoutMs, ...fetchOptions } = options;
+  const method = (options.method ?? 'GET').toUpperCase();
 
   const headers = new Headers(options.headers);
 

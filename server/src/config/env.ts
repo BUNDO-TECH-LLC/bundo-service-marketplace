@@ -82,6 +82,14 @@ const envSchema = z
      * Never set in production; production without PAYSTACK_SECRET_KEY rejects confirmation.
      */
     ALLOW_PAYMENT_SIMULATION: z.preprocess(emptyToUndefined, z.enum(['true', 'false']).optional()),
+
+    /**
+     * Optional self-ping target to keep the instance and DB pool warm (e.g. the
+     * deployed https://your-api/health URL). Pairs with an external uptime cron
+     * for free-tier cold-start mitigation. Disabled when unset.
+     */
+    KEEP_ALIVE_URL: z.preprocess(emptyToUndefined, z.string().url().optional()),
+    KEEP_ALIVE_INTERVAL_MS: z.preprocess(emptyToUndefined, z.string().optional()),
   })
   .superRefine((data, ctx) => {
     if (data.PAYSTACK_SECRET_KEY && !data.PAYSTACK_CALLBACK_URL) {

@@ -172,6 +172,7 @@ export const getBookingsForUser = async (input: {
     return db.booking.findMany({
       where: { artisanId: artisan.id },
       orderBy: { createdAt: 'desc' },
+      take: 200,
       include: {
         customerUser: {
           select: {
@@ -200,6 +201,7 @@ export const getBookingsForUser = async (input: {
   return db.booking.findMany({
     where: { customerId: input.firebaseUid },
     orderBy: { createdAt: 'desc' },
+    take: 200,
     include: {
       artisan: true,
       payment: true,

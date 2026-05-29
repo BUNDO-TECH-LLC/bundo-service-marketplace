@@ -3,6 +3,7 @@ import { initObservability } from './observability';
 import logger from './utils/logger';
 import { createApp } from './createApp';
 import { getCloudinaryHealth } from './utils/cloudinaryUploadConfig';
+import { startKeepAlive } from './keepAlive';
 
 initObservability();
 
@@ -26,6 +27,7 @@ void getCloudinaryHealth(true).then((cloudinary) => {
 
 const server = app.listen(Number(PORT), () => {
   logger.info({ port: PORT }, 'Server running');
+  startKeepAlive();
 });
 
 server.ref();

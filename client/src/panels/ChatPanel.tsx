@@ -66,14 +66,35 @@ export function ChatPanel({
   }
 
   useEffect(() => {
-    const intervalId = window.setInterval(() => {
+    const refresh = () => {
       void refreshConversations().catch(() => undefined);
       if (activeConversation) {
         void fetchMessages(activeConversation.id).catch(() => undefined);
       }
+    };
+
+    // Skip polling while the tab is hidden to save requests/battery.
+    const intervalId = window.setInterval(() => {
+      if (document.hidden) {
+        return;
+      }
+      refresh();
     }, CHAT_POLL_MS);
 
-    return () => window.clearInterval(intervalId);
+    // Refetch immediately when the user returns to the tab so chat feels live.
+    const onVisible = () => {
+      if (!document.hidden) {
+        refresh();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
   }, [activeConversation?.id, refreshConversations, token]);
 
   async function reply({ body, imageFile }: ChatComposerPayload) {

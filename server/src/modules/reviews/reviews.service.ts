@@ -102,6 +102,7 @@ export const getReviewsForArtisan = async (artisanId: string) => {
   return db.review.findMany({
     where: { artisanId },
     orderBy: { createdAt: 'desc' },
+    take: 100,
     include: {
       customer: {
         select: {
@@ -130,6 +131,7 @@ export const getReviewsByCustomer = async (customerId: string) => {
   return db.review.findMany({
     where: { customerId },
     orderBy: { createdAt: 'desc' },
+    take: 100,
     include: {
       artisan: {
         select: {

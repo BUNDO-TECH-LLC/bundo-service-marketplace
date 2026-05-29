@@ -696,6 +696,7 @@ router.get('/', asyncHandler(async (req, res) => {
     countArtisans(filters),
   ]);
 
+  res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=120');
   res.json({
     message: 'Artisans fetched',
     artisans,
@@ -716,6 +717,7 @@ router.get('/:id/portfolio-images', asyncHandler(async (req, res) => {
 
   const images = await getPortfolioImagesByArtisanId(artisanId);
 
+  res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=120');
   res.json({
     message: 'Portfolio images fetched',
     images,
@@ -732,6 +734,7 @@ router.get('/:id/availability-slots', asyncHandler(async (req, res) => {
 
   const slots = await getAvailabilitySlotsByArtisanId(artisanId);
 
+  res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=120');
   res.json({
     message: 'Availability slots fetched',
     slots,
@@ -745,6 +748,7 @@ router.get('/:id/reviews', asyncHandler(async (req, res) => {
     throw httpError(404, 'Artisan not found');
   }
 
+  res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=120');
   res.json({
     message: 'Artisan reviews fetched',
     reviews,
@@ -758,6 +762,7 @@ router.get('/:id', asyncHandler(async (req, res) => {
     throw httpError(404, 'Artisan not found');
   }
 
+  res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=120');
   res.json({
     message: 'Artisan fetched',
     artisan,

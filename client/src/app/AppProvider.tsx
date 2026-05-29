@@ -123,9 +123,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [appData.categories]
   );
 
-  async function openArtisanProfile(artisanId: string) {
-    navigate(`/artisans/${artisanId}`);
-  }
+  const openArtisanProfile = useCallback(
+    async (artisanId: string) => {
+      navigate(`/artisans/${artisanId}`);
+    },
+    [navigate]
+  );
 
   const loadPrivateData = useCallback(
     (authToken?: string, user?: ApiUser | null) =>
@@ -152,7 +155,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [appData.loadAdminEssentials, appData.loadAdminSection, auth.token]
   );
 
-  const rootValue: AppRootValue = {
+  const rootValue: AppRootValue = useMemo(() => ({
     navigate,
     location,
     view: routeSync.view,
@@ -224,7 +227,78 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setToken: auth.setToken,
     setMe: auth.setMe,
     acknowledgeSession: auth.acknowledgeSession,
-  };
+  }), [
+    navigate,
+    location,
+    routeSync.view,
+    routeSync.workspaceSection,
+    routeSync.adminSection,
+    routeSync.activeHelpTopicId,
+    auth.firebaseUser,
+    auth.token,
+    auth.me,
+    auth.pushStatus,
+    auth.pushToken,
+    auth.routeHydrated,
+    auth.setRouteHydrated,
+    auth.setToken,
+    auth.setMe,
+    auth.acknowledgeSession,
+    appData.categories,
+    appData.artisans,
+    appData.publicOfferings,
+    appData.myOfferings,
+    appData.selectedArtisan,
+    appData.selectedArtisanReviews,
+    appData.bookings,
+    appData.conversations,
+    appData.notifications,
+    appData.adminConversations,
+    appData.adminStats,
+    appData.adminBookings,
+    appData.adminBookingsTotal,
+    appData.adminKycSubmissions,
+    appData.adminUsers,
+    appData.adminArtisans,
+    appData.adminCategories,
+    appData.loadPublicData,
+    marketplaceFilters.selectedState,
+    marketplaceFilters.setSelectedState,
+    marketplaceFilters.searchTerm,
+    marketplaceFilters.setSearchTerm,
+    marketplaceFilters.selectedCategoryId,
+    marketplaceFilters.setSelectedCategoryId,
+    marketplaceFilters.priceMin,
+    marketplaceFilters.setPriceMin,
+    marketplaceFilters.priceMax,
+    marketplaceFilters.setPriceMax,
+    marketplaceFilters.marketplaceSort,
+    marketplaceFilters.setMarketplaceSort,
+    marketplaceFilters.searchLat,
+    marketplaceFilters.searchLng,
+    marketplaceFilters.setSearchCoordinates,
+    notice,
+    setNotice,
+    bookingSuccess,
+    setBookingSuccess,
+    paymentSuccess,
+    setPaymentSuccess,
+    busy,
+    isAuthed,
+    isAppBootstrapping,
+    usesArtisanSetupHeader,
+    usesArtisanWorkspaceHeader,
+    hideGlobalHeader,
+    artisanHeaderActive,
+    categoryOptions,
+    withNotice,
+    loadPrivateData,
+    loadConversations,
+    loadAdminSection,
+    refreshAdminSection,
+    openArtisanProfile,
+    enablePushAlerts,
+  ]);
 
   return <AppRootContext.Provider value={rootValue}>{children}</AppRootContext.Provider>;
 }
