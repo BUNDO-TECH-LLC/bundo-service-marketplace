@@ -6514,6 +6514,125 @@ footer h4 {
   gap: 8px;
 }
 
+.admin-payout-dialog {
+  width: min(100%, 460px);
+}
+
+.admin-payout-breakdown {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 16px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #f6f7f9;
+}
+
+.admin-payout-breakdown div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+}
+
+.admin-payout-breakdown dt {
+  color: var(--muted);
+}
+
+.admin-payout-breakdown dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-payout-mode {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.admin-payout-mode button {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #d8dbe0;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.admin-payout-mode button.active {
+  border-color: var(--accent, #2f6df6);
+  background: rgb(47 109 246 / 8%);
+  font-weight: 600;
+}
+
+.admin-payout-manual {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.admin-payout-manual label {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.admin-payout-resolved {
+  margin: 0;
+  color: #1a7f44;
+}
+
+.admin-payout-error {
+  color: #c0392b;
+}
+
+.admin-amount-split {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.admin-payout-split {
+  margin-bottom: 14px;
+}
+
+.admin-payout-split-label {
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+
+.admin-payout-percent-presets {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.admin-payout-percent-presets button {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #d8dbe0;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.admin-payout-percent-presets button.active {
+  border-color: var(--accent, #2f6df6);
+  background: rgb(47 109 246 / 8%);
+  font-weight: 600;
+}
+
+.admin-payout-percent-custom {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 12px;
+  max-width: 140px;
+}
+
+.admin-payout-now {
+  margin: 0;
+  background: rgb(47 109 246 / 6%);
+}
+
 .availability-form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));

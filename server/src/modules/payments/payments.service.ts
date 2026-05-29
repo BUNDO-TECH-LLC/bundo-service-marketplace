@@ -16,6 +16,7 @@ import { workspaceBookingLink, workspaceLink } from '../../lib/appLinks';
 import { createNotifications } from '../notifications/notifications.service';
 import {
   createPaystackTransferRecipient,
+  resolvePaystackAccount,
   createPaystackRefund,
   finalizePaystackTransfer,
   initializePaystackTransaction,
@@ -44,6 +45,69 @@ function paystackTransferRequiresOtp(transfer: { data?: { status?: string }; mes
   const message = transfer.message?.toLowerCase() || '';
   return status === 'otp' || message.includes('otp');
 }
+
+/** Turn cryptic Paystack transfer errors into actionable admin guidance. */
+export const describePaystackTransferError = (rawMessage: string) => {
+  const message = rawMessage.toLowerCase();
+
+  if (
+    message.includes('client not specified') ||
+    message.includes('recipient') ||
+    message.includes('invalid receiver')
+  ) {
+    return 'Paystack could not identify the payout recipient. The artisan\u2019s saved bank account may be invalid or was created in a different Paystack environment. Use "Pay to a different account" to re-enter the bank details.';
+  }
+
+  if (message.includes('balance') || message.includes('insufficient')) {
+    return 'Your Paystack balance is too low to send this payout. Fund your Paystack balance, then try again.';
+  }
+
+  if (message.includes('transfer') && (message.includes('disabled') || message.includes('not allowed'))) {
+    return 'Transfers are not enabled on your Paystack account yet. Enable transfers in your Paystack dashboard, then retry.';
+  }
+
+  if (message.includes('otp')) {
+    return rawMessage;
+  }
+
+  return `Paystack could not process this payout: ${rawMessage}`;
+};
+
+export const previewPayoutAccount = async (input: {
+  bankCode: string;
+  accountNumber: string;
+}) => {
+  if (!isPaystackConfigured()) {
+    return { status: 'paystack_not_configured' as const };
+  }
+
+  const bankCode = input.bankCode.trim();
+  const accountNumber = normalizeNigerianAccountNumber(input.accountNumber);
+
+  if (!bankCode) {
+    return { status: 'invalid_bank' as const, message: 'Select a bank.' };
+  }
+
+  if (!/^\d{10}$/.test(accountNumber)) {
+    return {
+      status: 'invalid_account_number' as const,
+      message: 'Account number must be exactly 10 digits.',
+    };
+  }
+
+  try {
+    const resolved = await resolvePaystackAccount({ accountNumber, bankCode });
+    return {
+      status: 'resolved' as const,
+      accountName: resolved.data.account_name,
+      accountNumber: resolved.data.account_number,
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Could not resolve this account with Paystack';
+    return { status: 'paystack_error' as const, message: describePaystackTransferError(message) };
+  }
+};
 
 export const getSupportedPayoutBanks = async () => {
   if (!isPaystackConfigured()) {
@@ -568,10 +632,24 @@ export const getPayoutAccountForArtisanUser = async (artisanUserId: string) => {
 
 export const releaseBookingPayment = async (
   bookingId: string,
-  options: { ignoreBlockingDisputes?: boolean } = {}
+  options: {
+    ignoreBlockingDisputes?: boolean;
+    manualAccount?: { bankCode: string; accountNumber: string; accountName?: string };
+    /** Percent (1-100) of the artisan's total earning to release in this payout. Defaults to the full remaining balance. */
+    releasePercent?: number;
+  } = {}
 ) => {
   if (!isPaystackConfigured()) {
     return { status: 'paystack_not_configured' as const };
+  }
+
+  if (
+    options.releasePercent !== undefined &&
+    (!Number.isFinite(options.releasePercent) ||
+      options.releasePercent <= 0 ||
+      options.releasePercent > 100)
+  ) {
+    return { status: 'invalid_release_percent' as const };
   }
 
   const booking = await db.booking.findUnique({
@@ -590,11 +668,16 @@ export const releaseBookingPayment = async (
     return { status: 'missing_booking' as const };
   }
 
-  if (booking.status !== BookingStatus.COMPLETED) {
-    return { status: 'booking_not_completed' as const };
+  const releaseBlockedStatuses: BookingStatus[] = [
+    BookingStatus.CANCELLED,
+    BookingStatus.DECLINED,
+  ];
+
+  if (releaseBlockedStatuses.includes(booking.status)) {
+    return { status: 'booking_not_payable' as const };
   }
 
-  if (!booking.artisan.payoutAccount?.isVerified) {
+  if (!options.manualAccount && !booking.artisan.payoutAccount?.isVerified) {
     return { status: 'missing_payout_account' as const };
   }
 
@@ -615,21 +698,116 @@ export const releaseBookingPayment = async (
   if (
     booking.payouts.some(
       (payout) =>
-        payout.status === PayoutStatus.SENT ||
-        payout.status === PayoutStatus.PROCESSING ||
-        payout.status === PayoutStatus.PENDING
+        payout.status === PayoutStatus.PROCESSING || payout.status === PayoutStatus.PENDING
     )
   ) {
-    return { status: 'already_released' as const };
+    return { status: 'payout_in_progress' as const };
   }
 
   const releasablePaymentStatuses: PaymentStatus[] = [
     PaymentStatus.PAID_HELD,
+    PaymentStatus.PARTIALLY_RELEASED,
     PaymentStatus.PARTIALLY_REFUNDED,
   ];
 
   if (!booking.payment || !releasablePaymentStatuses.includes(booking.payment.status)) {
     return { status: 'payment_not_held' as const };
+  }
+
+  const totalEarning = booking.payment.providerEarning;
+  const alreadyReleased = booking.payment.releasedAmount;
+  const remaining = totalEarning - alreadyReleased;
+
+  if (remaining <= 0) {
+    return { status: 'already_released' as const };
+  }
+
+  const requestedAmount =
+    options.releasePercent === undefined
+      ? remaining
+      : Math.round(totalEarning * (options.releasePercent / 100));
+  const releaseAmount = Math.min(Math.max(requestedAmount, 0), remaining);
+
+  if (releaseAmount <= 0) {
+    return { status: 'invalid_release_percent' as const };
+  }
+
+  const isFinalRelease = alreadyReleased + releaseAmount >= totalEarning;
+
+  let recipientCode = booking.artisan.payoutAccount?.isVerified
+    ? booking.artisan.payoutAccount.paystackRecipientCode
+    : null;
+
+  if (options.manualAccount) {
+    const bankCode = options.manualAccount.bankCode.trim();
+    const accountNumber = normalizeNigerianAccountNumber(options.manualAccount.accountNumber);
+    const accountNameInput = options.manualAccount.accountName?.trim() || undefined;
+
+    if (!bankCode) {
+      return { status: 'invalid_bank' as const, message: 'Select a bank for the manual payout.' };
+    }
+
+    if (!/^\d{10}$/.test(accountNumber)) {
+      return {
+        status: 'invalid_account_number' as const,
+        message: 'Account number must be exactly 10 digits.',
+      };
+    }
+
+    let recipient;
+
+    try {
+      recipient = await createPaystackTransferRecipient({
+        name: accountNameInput || booking.artisan.displayName.trim() || 'Bundo artisan',
+        accountNumber,
+        bankCode,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Could not verify bank account with Paystack';
+      return { status: 'paystack_error' as const, message: describePaystackTransferError(message) };
+    }
+
+    recipientCode = recipient.data?.recipient_code?.trim() || null;
+
+    if (!recipientCode) {
+      return {
+        status: 'paystack_error' as const,
+        message: 'Paystack did not return a payout recipient code. Try again in a moment.',
+      };
+    }
+
+    const resolvedBankName = recipient.data.details?.bank_name;
+    const resolvedAccountName = accountNameInput || recipient.data.details?.account_name;
+    const payoutAccountData = {
+      bankCode,
+      accountNumber,
+      paystackRecipientCode: recipientCode,
+      isVerified: true,
+      ...(resolvedBankName ? { bankName: resolvedBankName } : {}),
+      ...(resolvedAccountName ? { accountName: resolvedAccountName } : {}),
+    };
+
+    try {
+      await db.providerPayoutAccount.upsert({
+        where: { artisanId: booking.artisanId },
+        update: payoutAccountData,
+        create: { artisanId: booking.artisanId, ...payoutAccountData },
+      });
+    } catch (error) {
+      if (!isUniqueConstraintError(error)) {
+        throw error;
+      }
+      return {
+        status: 'paystack_error' as const,
+        message:
+          'This bank account is already linked to another Bundo profile. Use a different account or contact support.',
+      };
+    }
+  }
+
+  if (!recipientCode) {
+    return { status: 'missing_payout_account' as const };
   }
 
   const reference = payoutReference(booking.id);
@@ -638,18 +816,22 @@ export const releaseBookingPayment = async (
 
   try {
     transfer = await initiatePaystackTransfer({
-      amountKobo: toKobo(booking.payment.providerEarning),
-      recipientCode: booking.artisan.payoutAccount.paystackRecipientCode,
+      amountKobo: toKobo(releaseAmount),
+      recipientCode,
       reason: `Bundo service payout for booking ${booking.id}`,
       reference,
     });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Paystack could not send this payout';
-    return { status: 'paystack_error' as const, message };
+    return { status: 'paystack_error' as const, message: describePaystackTransferError(message) };
   }
 
   const requiresOtp = paystackTransferRequiresOtp(transfer);
+
+  const payoutReason = isFinalRelease
+    ? 'Final service payout'
+    : `Partial service payout (${Math.round((releaseAmount / totalEarning) * 100)}% of artisan earning)`;
 
   const result = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const payout = await tx.payout.create({
@@ -657,11 +839,11 @@ export const releaseBookingPayment = async (
         bookingId: booking.id,
         paymentId: booking.payment!.id,
         artisanId: booking.artisanId,
-        amount: booking.payment!.providerEarning,
+        amount: releaseAmount,
         status: requiresOtp ? PayoutStatus.PENDING : PayoutStatus.PROCESSING,
         paystackTransferCode: transfer.data.transfer_code,
         paystackReference: reference,
-        reason: requiresOtp ? 'Final service payout awaiting Paystack OTP' : 'Final service payout',
+        reason: requiresOtp ? `${payoutReason} awaiting Paystack OTP` : payoutReason,
       },
     });
 
@@ -671,7 +853,10 @@ export const releaseBookingPayment = async (
 
     const payment = await tx.payment.update({
       where: { id: booking.payment!.id },
-      data: { status: PaymentStatus.RELEASED },
+      data: {
+        status: isFinalRelease ? PaymentStatus.RELEASED : PaymentStatus.PARTIALLY_RELEASED,
+        releasedAmount: { increment: releaseAmount },
+      },
     });
 
     await tx.ledgerEntry.create({
@@ -679,8 +864,10 @@ export const releaseBookingPayment = async (
         bookingId: booking.id,
         paymentId: booking.payment!.id,
         type: LedgerEntryType.PROVIDER_PAYOUT,
-        amount: booking.payment!.providerEarning,
-        note: 'Provider earning released',
+        amount: releaseAmount,
+        note: isFinalRelease
+          ? 'Provider earning released'
+          : 'Provider earning partially released',
       },
     });
 
@@ -703,24 +890,33 @@ export const releaseBookingPayment = async (
     select: { title: true },
   });
 
+  const offeringTitle = offering?.title || 'a booking';
+
   await createNotifications([
     {
       userId: booking.artisan.userId,
       type: NotificationType.PAYMENT,
-      title: 'Payout released',
-      body: `Your payout for ${offering?.title || 'a completed booking'} has been released.`,
+      title: isFinalRelease ? 'Payout released' : 'Partial payout sent',
+      body: isFinalRelease
+        ? `Your full payout for ${offeringTitle} has been released.`
+        : `A partial payout of \u20a6${releaseAmount.toLocaleString('en-NG')} for ${offeringTitle} has been sent.`,
       link: workspaceBookingLink(booking.id),
     },
     {
       userId: booking.customerId,
       type: NotificationType.PAYMENT,
       title: 'Provider payout sent',
-      body: `Bundo has released payment for ${offering?.title || 'your completed booking'}.`,
+      body: `Bundo has released payment for ${offeringTitle}.`,
       link: workspaceBookingLink(booking.id),
     },
   ]);
 
-  return { status: 'released' as const, ...result };
+  return {
+    status: 'released' as const,
+    fullyReleased: isFinalRelease,
+    releaseAmount,
+    ...result,
+  };
 };
 
 export const finalizePayoutTransferOtp = async (input: {
@@ -770,18 +966,26 @@ export const finalizePayoutTransferOtp = async (input: {
     return { status: 'paystack_error' as const, message };
   }
 
+  const willBeFullyReleased =
+    payout.payment.releasedAmount + payout.amount >= payout.payment.providerEarning;
+
   const result = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const updatedPayout = await tx.payout.update({
       where: { id: payout.id },
       data: {
         status: PayoutStatus.PROCESSING,
-        reason: 'Final service payout authorized with Paystack OTP',
+        reason: 'Service payout authorized with Paystack OTP',
       },
     });
 
     const payment = await tx.payment.update({
       where: { id: payout.paymentId },
-      data: { status: PaymentStatus.RELEASED },
+      data: {
+        status: willBeFullyReleased
+          ? PaymentStatus.RELEASED
+          : PaymentStatus.PARTIALLY_RELEASED,
+        releasedAmount: { increment: payout.amount },
+      },
     });
 
     await tx.ledgerEntry.create({
@@ -790,7 +994,9 @@ export const finalizePayoutTransferOtp = async (input: {
         paymentId: payout.paymentId,
         type: LedgerEntryType.PROVIDER_PAYOUT,
         amount: payout.amount,
-        note: 'Provider earning release authorized with Paystack OTP',
+        note: willBeFullyReleased
+          ? 'Provider earning release authorized with Paystack OTP'
+          : 'Provider earning partial release authorized with Paystack OTP',
       },
     });
 
@@ -999,11 +1205,16 @@ export const resolveBookingDispute = async (input: {
 
   const disputablePaymentStatuses: PaymentStatus[] = [
     PaymentStatus.PAID_HELD,
+    PaymentStatus.PARTIALLY_RELEASED,
     PaymentStatus.PARTIALLY_REFUNDED,
   ];
 
   if (!disputablePaymentStatuses.includes(payment.status)) {
     return { status: 'payment_not_held' as const };
+  }
+
+  if (input.action !== 'RELEASE' && payment.releasedAmount > 0) {
+    return { status: 'refund_after_release' as const };
   }
 
   if (input.action === 'RELEASE') {

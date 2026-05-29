@@ -16,6 +16,7 @@ import type { ActionRunner, AdminSection, AdminUserRecord } from '../appTypes';
 import type { Booking, Payout } from '../types';
 import { EmptyState } from '../components/EmptyState';
 import { AdminJobChat } from './AdminJobChat';
+import { AdminPayoutDialog } from './AdminPayoutDialog';
 
 const filters: Array<{ id: AdminJobFilter; label: string }> = [
   { id: 'all', label: 'All' },
@@ -71,6 +72,7 @@ export function AdminBookingsPanel({
     title: string;
     resolution?: string;
   }>(null);
+  const [payoutDialogBooking, setPayoutDialogBooking] = useState<Booking | null>(null);
 
   useEffect(() => {
     setJobs(bookings);
@@ -204,21 +206,15 @@ export function AdminBookingsPanel({
     await updateStatus(bookingId, 'ACCEPTED');
   }
 
-  async function releasePayment(bookingId: string) {
-    const response = await api<{
-      requiresOtp?: boolean;
-      payout?: Payout;
-    }>(`/admin/bookings/${bookingId}/release-payment`, {
-      method: 'POST',
-      token,
-    });
-
+  async function handlePayoutReleased(
+    response: { requiresOtp?: boolean; payout?: Payout },
+    booking: Booking
+  ) {
     if (response.requiresOtp && response.payout) {
-      const booking = jobBookings.find((item) => item.id === bookingId);
-      const title = booking?.offering?.title || booking?.offering?.category?.name || 'this booking';
+      const title = booking.offering?.title || booking.offering?.category?.name || 'this booking';
       setPayoutOtpPrompt({
         payoutId: response.payout.id,
-        bookingId,
+        bookingId: booking.id,
         title,
       });
     }
@@ -334,9 +330,13 @@ export function AdminBookingsPanel({
           const paymentSecured = canStartOrCompleteBooking(booking);
           const awaitingOtpPayout = booking.payouts?.find((payout) => payout.status === 'PENDING');
           const processingPayout = booking.payouts?.find((payout) => payout.status === 'PROCESSING');
+          const releasableNow =
+            paymentStatus === 'PAID_HELD' ||
+            paymentStatus === 'PARTIALLY_RELEASED' ||
+            paymentStatus === 'PARTIALLY_REFUNDED';
           const canRelease =
-            booking.status === 'COMPLETED' &&
-            paymentStatus === 'PAID_HELD' &&
+            releasableNow &&
+            !['CANCELLED', 'DECLINED'].includes(booking.status) &&
             !openDispute &&
             !awaitingOtpPayout &&
             !processingPayout;
@@ -408,6 +408,15 @@ export function AdminBookingsPanel({
                           booking.agreedAmount ??
                           booking.offering?.priceFrom ??
                           0
+                      )}
+                      {booking.payment && (
+                        <span className="admin-amount-split">
+                          Fee {money(booking.payment.platformFee)} · Artisan{' '}
+                          {money(booking.payment.providerEarning)}
+                          {(booking.payment.releasedAmount ?? 0) > 0 && (
+                            <> · Released {money(booking.payment.releasedAmount ?? 0)}</>
+                          )}
+                        </span>
                       )}
                     </dd>
                   </div>
@@ -576,11 +585,9 @@ export function AdminBookingsPanel({
                       type="button"
                       className="primary-action"
                       disabled={busy}
-                      onClick={() =>
-                        runAction(() => releasePayment(booking.id), 'Payout initiated')
-                      }
+                      onClick={() => setPayoutDialogBooking(booking)}
                     >
-                      Release payout
+                      {paymentStatus === 'PARTIALLY_RELEASED' ? 'Release more' : 'Release payout'}
                     </button>
                   )}
                   {awaitingOtpPayout && (
@@ -635,6 +642,13 @@ export function AdminBookingsPanel({
         busy={busy}
         onCancel={() => setDisputePrompt(null)}
         onConfirm={(value) => runAction(() => submitDisputeResolution(value), 'Dispute resolved')}
+      />
+      <AdminPayoutDialog
+        open={payoutDialogBooking !== null}
+        booking={payoutDialogBooking}
+        token={token}
+        onClose={() => setPayoutDialogBooking(null)}
+        onReleased={handlePayoutReleased}
       />
       <PromptDialog
         open={payoutOtpPrompt !== null}

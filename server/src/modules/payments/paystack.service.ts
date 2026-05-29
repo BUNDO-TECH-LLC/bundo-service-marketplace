@@ -106,6 +106,25 @@ export const verifyPaystackTransaction = async (reference: string) => {
   }>(`/transaction/verify/${encodeURIComponent(reference)}`);
 };
 
+export const resolvePaystackAccount = async (input: {
+  accountNumber: string;
+  bankCode: string;
+}) => {
+  const query = new URLSearchParams({
+    account_number: input.accountNumber,
+    bank_code: input.bankCode,
+  });
+
+  return paystackRequest<{
+    status: boolean;
+    message: string;
+    data: {
+      account_number: string;
+      account_name: string;
+    };
+  }>(`/bank/resolve?${query.toString()}`);
+};
+
 export const createPaystackTransferRecipient = async (input: {
   name: string;
   accountNumber: string;

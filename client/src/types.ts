@@ -118,6 +118,7 @@ export type Payment = {
   amount: number;
   platformFee: number;
   providerEarning: number;
+  releasedAmount?: number;
   currency: string;
   status: PaymentStatus;
   authorizationUrl?: string | null;

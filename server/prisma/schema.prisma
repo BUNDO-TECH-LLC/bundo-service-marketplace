@@ -236,6 +236,7 @@ model Payment {
   amount              Int
   platformFee         Int           @map("platform_fee")
   providerEarning     Int           @map("provider_earning")
+  releasedAmount      Int           @default(0) @map("released_amount")
   currency            String        @default("NGN")
   status              PaymentStatus @default(UNPAID)
   paystackReference   String        @unique @map("paystack_reference")

@@ -8,6 +8,8 @@ import { requireRole } from '../../middlewares/requireRole';
 import { getPagination, paginationMeta } from '../../utils/pagination';
 import {
   finalizePayoutTransferOtp,
+  getSupportedPayoutBanks,
+  previewPayoutAccount,
   releaseBookingPayment,
   resolveBookingDispute,
 } from '../payments/payments.service';
@@ -512,19 +514,91 @@ router.patch('/bookings/:id/moderator', asyncHandler(async (req, res) => {
   });
 }));
 
-router.post('/bookings/:id/release-payment', asyncHandler(async (req, res) => {
-  const result = await releaseBookingPayment(String(req.params.id));
+router.get('/payout/banks', asyncHandler(async (_req, res) => {
+  const result = await getSupportedPayoutBanks();
 
   if (result.status === 'paystack_not_configured') {
     throw httpError(503, 'Paystack is not configured');
+  }
+
+  if (result.status === 'paystack_error') {
+    throw httpError(502, result.message, 'PAYSTACK_ERROR');
+  }
+
+  res.json({ message: 'Supported payout banks fetched', banks: result.banks });
+}));
+
+router.post('/payout/resolve-account', asyncHandler(async (req, res) => {
+  const { bankCode, accountNumber } = req.body;
+
+  if (typeof bankCode !== 'string' || typeof accountNumber !== 'string') {
+    throw httpError(400, 'bankCode and accountNumber are required');
+  }
+
+  const result = await previewPayoutAccount({ bankCode, accountNumber });
+
+  if (result.status === 'paystack_not_configured') {
+    throw httpError(503, 'Paystack is not configured');
+  }
+
+  if (result.status === 'invalid_bank' || result.status === 'invalid_account_number') {
+    throw httpError(400, result.message);
+  }
+
+  if (result.status === 'paystack_error') {
+    throw httpError(502, result.message, 'PAYSTACK_ERROR');
+  }
+
+  res.json({
+    message: 'Account resolved',
+    accountName: result.accountName,
+    accountNumber: result.accountNumber,
+  });
+}));
+
+router.post('/bookings/:id/release-payment', asyncHandler(async (req, res) => {
+  const { bankCode, accountNumber, accountName, releasePercent } = req.body || {};
+  const hasManualAccount =
+    typeof bankCode === 'string' && bankCode.trim() && typeof accountNumber === 'string';
+
+  if (
+    releasePercent !== undefined &&
+    (typeof releasePercent !== 'number' || !Number.isFinite(releasePercent))
+  ) {
+    throw httpError(400, 'releasePercent must be a number between 1 and 100');
+  }
+
+  const result = await releaseBookingPayment(String(req.params.id), {
+    ...(hasManualAccount
+      ? {
+          manualAccount: {
+            bankCode,
+            accountNumber,
+            ...(typeof accountName === 'string' ? { accountName } : {}),
+          },
+        }
+      : {}),
+    ...(typeof releasePercent === 'number' ? { releasePercent } : {}),
+  });
+
+  if (result.status === 'paystack_not_configured') {
+    throw httpError(503, 'Paystack is not configured');
+  }
+
+  if (result.status === 'invalid_bank' || result.status === 'invalid_account_number') {
+    throw httpError(400, result.message);
+  }
+
+  if (result.status === 'invalid_release_percent') {
+    throw httpError(400, 'Release percentage must be between 1 and 100');
   }
 
   if (result.status === 'missing_booking') {
     throw httpError(404, 'Booking not found');
   }
 
-  if (result.status === 'booking_not_completed') {
-    throw httpError(409, 'Only completed bookings can be released');
+  if (result.status === 'booking_not_payable') {
+    throw httpError(409, 'Cancelled or declined bookings cannot be paid out');
   }
 
   if (result.status === 'payment_not_held') {
@@ -535,10 +609,14 @@ router.post('/bookings/:id/release-payment', asyncHandler(async (req, res) => {
     throw httpError(409, 'Resolve the active dispute before releasing payout');
   }
 
+  if (result.status === 'payout_in_progress') {
+    throw httpError(409, 'A payout for this booking is already awaiting Paystack confirmation');
+  }
+
   if (result.status === 'missing_payout_account') {
     throw httpError(
       409,
-      'Artisan payout account is missing or unverified. Ask the artisan to add a bank account under Settings → Payout bank account.'
+      'Artisan payout account is missing or unverified. Ask the artisan to add a bank account under Settings → Payout bank account, or use "Pay to a different account".'
     );
   }
 
@@ -547,7 +625,7 @@ router.post('/bookings/:id/release-payment', asyncHandler(async (req, res) => {
   }
 
   if (result.status === 'already_released') {
-    throw httpError(409, 'Payment has already been released or is awaiting Paystack confirmation');
+    throw httpError(409, 'This booking payout has already been fully released');
   }
 
   if (result.status === 'otp_required') {
@@ -565,7 +643,11 @@ router.post('/bookings/:id/release-payment', asyncHandler(async (req, res) => {
   }
 
   res.json({
-    message: 'Payout initiated and awaiting Paystack confirmation',
+    message: result.fullyReleased
+      ? 'Full payout initiated and awaiting Paystack confirmation'
+      : 'Partial payout initiated and awaiting Paystack confirmation',
+    fullyReleased: result.fullyReleased,
+    releaseAmount: result.releaseAmount,
     payment: result.payment,
     payout: result.payout,
   });
@@ -659,10 +741,6 @@ router.post('/disputes/:id/resolve', asyncHandler(async (req, res) => {
     throw httpError(400, 'refundAmount cannot be greater than the original payment amount');
   }
 
-  if (result.status === 'booking_not_completed') {
-    throw httpError(409, 'Booking must be completed before payout release');
-  }
-
   if (result.status === 'missing_payout_account') {
     throw httpError(
       409,
@@ -680,6 +758,21 @@ router.post('/disputes/:id/resolve', asyncHandler(async (req, res) => {
 
   if (result.status === 'already_released') {
     throw httpError(409, 'Payout has already been released');
+  }
+
+  if (result.status === 'refund_after_release') {
+    throw httpError(
+      409,
+      'A payout has already been released to the artisan, so this booking can no longer be refunded.'
+    );
+  }
+
+  if (result.status === 'booking_not_payable') {
+    throw httpError(409, 'Cancelled or declined bookings cannot be paid out');
+  }
+
+  if (result.status === 'payout_in_progress') {
+    throw httpError(409, 'A payout for this booking is already awaiting Paystack confirmation');
   }
 
   if (result.status === 'otp_required') {
