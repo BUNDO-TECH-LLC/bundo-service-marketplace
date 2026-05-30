@@ -185,8 +185,6 @@ export function AdminConsole({
         {section === 'profiles' && (
           <AdminProfilesPanel
             token={token}
-            users={users}
-            artisans={artisans}
             busy={busy}
             runAction={runAction}
             refresh={refresh}
@@ -197,7 +195,6 @@ export function AdminConsole({
             token={token}
             bookings={bookings}
             bookingsTotal={bookingsTotal}
-            adminUsers={users}
             busy={busy}
             runAction={runAction}
             refresh={refresh}
@@ -219,8 +216,6 @@ export function AdminConsole({
         {section === 'verification' && (
           <AdminKycPanel
             token={token}
-            submissions={submissions}
-            artisans={artisans}
             busy={busy}
             runAction={runAction}
             refresh={refresh}
@@ -229,7 +224,6 @@ export function AdminConsole({
         {section === 'catalog' && (
           <AdminCatalogPanel
             token={token}
-            categories={categories}
             busy={busy}
             runAction={runAction}
             refresh={refresh}

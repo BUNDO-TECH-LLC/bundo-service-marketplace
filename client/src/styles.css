@@ -6470,6 +6470,50 @@ footer h4 {
   margin: 12px 0;
 }
 
+.admin-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgb(15 18 24 / 8%);
+}
+
+.admin-pagination-info {
+  font-size: 13px;
+  color: rgb(15 18 24 / 60%);
+}
+
+.admin-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-pagination-controls .secondary-button {
+  padding: 6px 14px;
+}
+
+.admin-pagination-page {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgb(15 18 24 / 80%);
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .admin-pagination {
+    justify-content: center;
+  }
+
+  .admin-pagination-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
 .prompt-dialog-backdrop {
   position: fixed;
   inset: 0;

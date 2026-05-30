@@ -2,22 +2,42 @@ import { useState } from 'react';
 import { api } from '../lib/api';
 import { CategoryFormDialog, type CategoryFormValues } from '../components/CategoryFormDialog';
 import type { ActionRunner, AdminCategoryRecord } from '../appTypes';
+import { EmptyState } from '../components/EmptyState';
+import { Pagination } from '../components/Pagination';
+import { useAdminList } from '../hooks/useAdminList';
 
 export function AdminCatalogPanel({
   token,
-  categories,
   busy,
   runAction,
   refresh,
 }: {
   token: string;
-  categories: AdminCategoryRecord[];
   busy: boolean;
   runAction: ActionRunner;
   refresh: () => Promise<void>;
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<AdminCategoryRecord | null>(null);
+  const {
+    items: categories,
+    total,
+    page,
+    limit,
+    loading,
+    setPage,
+    reload,
+  } = useAdminList<AdminCategoryRecord>({
+    token,
+    path: '/admin/categories',
+    limit: 24,
+    select: (response) => (response.categories as AdminCategoryRecord[]) ?? [],
+  });
+
+  async function refreshAfterMutation() {
+    await reload();
+    await refresh();
+  }
 
   async function saveCategory(values: CategoryFormValues) {
     if (editingCategory) {
@@ -35,7 +55,7 @@ export function AdminCatalogPanel({
     }
     setDialogOpen(false);
     setEditingCategory(null);
-    await refresh();
+    await refreshAfterMutation();
   }
 
   return (
@@ -73,6 +93,11 @@ export function AdminCatalogPanel({
         }}
         onConfirm={(values) => runAction(() => saveCategory(values), editingCategory ? 'Category updated' : 'Category created')}
       />
+
+      {loading && <p className="muted">Loading categories…</p>}
+      {!loading && categories.length === 0 && (
+        <EmptyState title="No categories yet" body="Create your first service category to power marketplace search." />
+      )}
 
       <div className="admin-record-list">
         {categories.map((category) => (
@@ -115,7 +140,7 @@ export function AdminCatalogPanel({
                       method: 'DELETE',
                       token,
                     });
-                    await refresh();
+                    await refreshAfterMutation();
                   }, 'Category deleted')
                 }
               >
@@ -125,6 +150,8 @@ export function AdminCatalogPanel({
           </article>
         ))}
       </div>
+
+      <Pagination page={page} limit={limit} total={total} busy={busy || loading} onPageChange={setPage} />
     </section>
   );
 }

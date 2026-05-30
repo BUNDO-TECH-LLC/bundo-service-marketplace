@@ -166,19 +166,7 @@ export function useAppData(filters: MarketplaceFilterState, options?: UseAppData
 
   const loadAdminSection = useCallback(async (authToken: string, section: AdminSection) => {
     switch (section) {
-      case 'overview':
-        return;
-      case 'profiles': {
-        const [userRes, artisanRes] = await Promise.all([
-          api<{ users: AdminUserRecord[] }>('/admin/users?page=1&limit=100', { token: authToken }),
-          api<{ artisans: AdminArtisanRecord[] }>('/admin/artisans?page=1&limit=24', {
-            token: authToken,
-          }),
-        ]);
-        setAdminUsers(userRes.users);
-        setAdminArtisans(artisanRes.artisans);
-        return;
-      }
+      // Jobs and messages still feed their panels via context props.
       case 'jobs': {
         const bookingRes = await api<{ bookings: Booking[]; meta: { total: number } }>(
           '/admin/bookings?page=1&limit=200',
@@ -196,25 +184,8 @@ export function useAppData(filters: MarketplaceFilterState, options?: UseAppData
         setAdminConversations(conversationRes.conversations);
         return;
       }
-      case 'verification': {
-        const kycRes = await api<{ submissions: ArtisanKycSubmission[] }>(
-          '/admin/kyc-submissions?page=1&limit=12',
-          { token: authToken }
-        );
-        setAdminKycSubmissions(kycRes.submissions);
-        return;
-      }
-      case 'catalog': {
-        const categoryRes = await api<{ categories: AdminCategoryRecord[] }>(
-          '/admin/categories?page=1&limit=24',
-          { token: authToken }
-        );
-        setAdminCategories(categoryRes.categories);
-        return;
-      }
-      case 'reviews':
-      case 'finance':
-        return;
+      // profiles, catalog, verification, reviews, finance self-fetch with their
+      // own pagination inside the panels.
       default:
         return;
     }

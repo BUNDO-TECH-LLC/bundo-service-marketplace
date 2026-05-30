@@ -2,29 +2,43 @@ import { api } from '../lib/api';
 import { EmptyState } from '../components/EmptyState';
 import type { ActionRunner, AdminArtisanRecord, AdminUserRecord } from '../appTypes';
 import { AdminPortfolioGallery } from '../components/AdminPortfolioGallery';
+import { Pagination } from '../components/Pagination';
+import { useAdminList } from '../hooks/useAdminList';
 import type { Artisan, Role } from '../types';
 
 export function AdminProfilesPanel({
   token,
-  users,
-  artisans,
   busy,
   runAction,
   refresh,
 }: {
   token: string;
-  users: AdminUserRecord[];
-  artisans: AdminArtisanRecord[];
   busy: boolean;
   runAction: ActionRunner;
   refresh: () => Promise<void>;
 }) {
+  const usersList = useAdminList<AdminUserRecord>({
+    token,
+    path: '/admin/users',
+    limit: 20,
+    select: (response) => (response.users as AdminUserRecord[]) ?? [],
+  });
+  const artisansList = useAdminList<AdminArtisanRecord>({
+    token,
+    path: '/admin/artisans',
+    limit: 12,
+    select: (response) => (response.artisans as AdminArtisanRecord[]) ?? [],
+  });
+  const users = usersList.items;
+  const artisans = artisansList.items;
+
   async function updateStatus(firebaseUid: string, status: 'ACTIVE' | 'BANNED') {
     await api(`/admin/users/${firebaseUid}/status`, {
       method: 'PATCH',
       token,
       body: JSON.stringify({ status }),
     });
+    await usersList.reload();
     await refresh();
   }
 
@@ -34,6 +48,7 @@ export function AdminProfilesPanel({
       token,
       body: JSON.stringify({ role }),
     });
+    await usersList.reload();
     await refresh();
   }
 
@@ -43,6 +58,7 @@ export function AdminProfilesPanel({
       token,
       body: JSON.stringify({ verifyStatus }),
     });
+    await artisansList.reload();
     await refresh();
   }
 
@@ -55,10 +71,12 @@ export function AdminProfilesPanel({
               <p className="eyebrow">Accounts</p>
               <h3>All users</h3>
             </div>
+            <span className="admin-surface-count">{usersList.total}</span>
           </div>
           <div className="admin-inline-table" role="list">
-            {users.length === 0 && (
-              <EmptyState title="No users loaded" body="Refresh admin data or widen the user list limit." />
+            {usersList.loading && <p className="muted">Loading users…</p>}
+            {!usersList.loading && users.length === 0 && (
+              <EmptyState title="No users found" body="Users will appear here as people sign up." />
             )}
             {users.map((user) => (
               <article className="admin-row admin-row--profile" key={user.firebaseUid} role="listitem">
@@ -111,6 +129,13 @@ export function AdminProfilesPanel({
               </article>
             ))}
           </div>
+          <Pagination
+            page={usersList.page}
+            limit={usersList.limit}
+            total={usersList.total}
+            busy={busy || usersList.loading}
+            onPageChange={usersList.setPage}
+          />
         </article>
 
         <article className="admin-surface">
@@ -119,9 +144,11 @@ export function AdminProfilesPanel({
               <p className="eyebrow">Supply</p>
               <h3>Artisan profiles</h3>
             </div>
+            <span className="admin-surface-count">{artisansList.total}</span>
           </div>
           <div className="admin-inline-table" role="list">
-            {artisans.length === 0 && (
+            {artisansList.loading && <p className="muted">Loading artisans…</p>}
+            {!artisansList.loading && artisans.length === 0 && (
               <EmptyState title="No artisan profiles" body="Artisans will appear here once they register." />
             )}
             {artisans.map((artisan) => (
@@ -183,6 +210,13 @@ export function AdminProfilesPanel({
               </article>
             ))}
           </div>
+          <Pagination
+            page={artisansList.page}
+            limit={artisansList.limit}
+            total={artisansList.total}
+            busy={busy || artisansList.loading}
+            onPageChange={artisansList.setPage}
+          />
         </article>
       </div>
     </section>

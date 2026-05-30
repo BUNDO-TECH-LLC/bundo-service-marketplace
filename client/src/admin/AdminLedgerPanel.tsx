@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import { api } from '../lib/api';
 import { bookingDate } from '../lib/bookingDisplay';
 import { money } from '../lib/formatting';
 import { EmptyState } from '../components/EmptyState';
+import { Pagination } from '../components/Pagination';
+import { useAdminList } from '../hooks/useAdminList';
 
 type LedgerEntryRow = {
   id: string;
@@ -16,25 +16,19 @@ type LedgerEntryRow = {
 };
 
 export function AdminLedgerPanel({ token }: { token: string }) {
-  const [entries, setEntries] = useState<LedgerEntryRow[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let mounted = true;
-    api<{ entries: LedgerEntryRow[] }>('/admin/ledger-entries?limit=50', { token })
-      .then((response) => {
-        if (mounted) setEntries(response.entries);
-      })
-      .catch(() => {
-        if (mounted) setEntries([]);
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [token]);
+  const {
+    items: entries,
+    total,
+    page,
+    limit,
+    loading,
+    setPage,
+  } = useAdminList<LedgerEntryRow>({
+    token,
+    path: '/admin/ledger-entries',
+    limit: 25,
+    select: (response) => (response.entries as LedgerEntryRow[]) ?? [],
+  });
 
   return (
     <section className="admin-panel admin-ledger-panel">
@@ -68,11 +62,13 @@ export function AdminLedgerPanel({ token }: { token: string }) {
                   <dt>Reference</dt>
                   <dd>{entry.payment?.paystackReference || '—'}</dd>
                 </div>
-              </dl>
-            </div>
-          </li>
+            </dl>
+          </div>
+        </li>
         ))}
       </ul>
+
+      <Pagination page={page} limit={limit} total={total} busy={loading} onPageChange={setPage} />
     </section>
   );
 }

@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import { bookingDate } from '../lib/bookingDisplay';
 import type { ActionRunner } from '../appTypes';
 import type { Review } from '../types';
 import { EmptyState } from '../components/EmptyState';
+import { Pagination } from '../components/Pagination';
+import { useAdminList } from '../hooks/useAdminList';
 
 type AdminReview = Review & {
   customer?: { email?: string | null; phone?: string | null };
@@ -20,35 +21,27 @@ export function AdminReviewsPanel({
   busy: boolean;
   runAction: ActionRunner;
 }) {
-  const [reviews, setReviews] = useState<AdminReview[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  async function loadReviews() {
-    const response = await api<{ reviews: AdminReview[] }>('/admin/reviews?limit=100', { token });
-    setReviews(response.reviews);
-  }
-
-  useEffect(() => {
-    let mounted = true;
-    setLoading(true);
-    loadReviews()
-      .catch(() => {
-        if (mounted) setReviews([]);
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [token]);
+  const {
+    items: reviews,
+    total,
+    page,
+    limit,
+    loading,
+    setPage,
+    reload,
+  } = useAdminList<AdminReview>({
+    token,
+    path: '/admin/reviews',
+    limit: 20,
+    select: (response) => (response.reviews as AdminReview[]) ?? [],
+  });
 
   async function removeReview(reviewId: string) {
     await api(`/admin/reviews/${reviewId}`, {
       method: 'DELETE',
       token,
     });
-    await loadReviews();
+    await reload();
   }
 
   return (
@@ -89,6 +82,8 @@ export function AdminReviewsPanel({
           </article>
         ))}
       </div>
+
+      <Pagination page={page} limit={limit} total={total} busy={busy || loading} onPageChange={setPage} />
     </section>
   );
 }

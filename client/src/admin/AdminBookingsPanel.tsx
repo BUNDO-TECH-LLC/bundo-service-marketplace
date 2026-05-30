@@ -35,7 +35,6 @@ export function AdminBookingsPanel({
   token,
   bookings,
   bookingsTotal,
-  adminUsers,
   busy,
   runAction,
   refresh,
@@ -45,7 +44,6 @@ export function AdminBookingsPanel({
   token: string;
   bookings: Booking[];
   bookingsTotal?: number;
-  adminUsers: AdminUserRecord[];
   busy: boolean;
   runAction: ActionRunner;
   refresh: () => Promise<void>;
@@ -54,6 +52,7 @@ export function AdminBookingsPanel({
 }) {
   const [filter, setFilter] = useState<AdminJobFilter>('all');
   const [moderatorFilter, setModeratorFilter] = useState<'all' | 'unassigned' | string>('all');
+  const [moderatorUsers, setModeratorUsers] = useState<AdminUserRecord[]>([]);
   const [expandedChatId, setExpandedChatId] = useState<string | null>(null);
   const [expandedActionsId, setExpandedActionsId] = useState<string | null>(null);
   const [jobs, setJobs] = useState(bookings);
@@ -80,6 +79,22 @@ export function AdminBookingsPanel({
     setTotal(bookingsTotal ?? bookings.length);
   }, [bookings, bookingsTotal]);
 
+  // Load the moderator (admin) list directly so assignment always works,
+  // regardless of which admin section was visited first.
+  useEffect(() => {
+    let mounted = true;
+    api<{ users: AdminUserRecord[] }>('/admin/users?page=1&limit=100', { token })
+      .then((response) => {
+        if (mounted) setModeratorUsers(response.users ?? []);
+      })
+      .catch(() => {
+        if (mounted) setModeratorUsers([]);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [token]);
+
   useEffect(() => {
     if (moderatorFilter === 'all') {
       return;
@@ -105,8 +120,8 @@ export function AdminBookingsPanel({
 
   const jobBookings = jobs as AdminBooking[];
   const adminModerators = useMemo(
-    () => adminUsers.filter((user) => user.role === 'ADMIN' && user.status === 'ACTIVE'),
-    [adminUsers]
+    () => moderatorUsers.filter((user) => user.role === 'ADMIN' && user.status === 'ACTIVE'),
+    [moderatorUsers]
   );
   const counts = useMemo(() => adminJobFilterCounts(jobBookings), [jobBookings]);
   const visibleJobs = useMemo(

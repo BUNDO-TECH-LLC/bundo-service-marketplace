@@ -2,22 +2,20 @@ import { useState } from 'react';
 import { api } from '../lib/api';
 import { bookingDate } from '../lib/bookingDisplay';
 import { PromptDialog } from '../components/PromptDialog';
-import type { ActionRunner, AdminArtisanRecord } from '../appTypes';
+import type { ActionRunner } from '../appTypes';
 import type { ArtisanKycSubmission } from '../types';
 import { AdminPortfolioGallery } from '../components/AdminPortfolioGallery';
 import { EmptyState } from '../components/EmptyState';
+import { Pagination } from '../components/Pagination';
+import { useAdminList } from '../hooks/useAdminList';
 
 export function AdminKycPanel({
   token,
-  submissions,
-  artisans: _artisans,
   busy,
   runAction,
   refresh,
 }: {
   token: string;
-  submissions: ArtisanKycSubmission[];
-  artisans?: AdminArtisanRecord[];
   busy: boolean;
   runAction: ActionRunner;
   refresh: () => Promise<void>;
@@ -26,6 +24,20 @@ export function AdminKycPanel({
     submissionId: string;
     status: 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED';
   }>(null);
+  const {
+    items: submissions,
+    total,
+    page,
+    limit,
+    loading,
+    setPage,
+    reload,
+  } = useAdminList<ArtisanKycSubmission>({
+    token,
+    path: '/admin/kyc-submissions',
+    limit: 12,
+    select: (response) => (response.submissions as ArtisanKycSubmission[]) ?? [],
+  });
 
   async function submitReview(note: string) {
     if (!reviewPrompt) return;
@@ -38,6 +50,7 @@ export function AdminKycPanel({
       }),
     });
     setReviewPrompt(null);
+    await reload();
     await refresh();
   }
 
@@ -74,7 +87,8 @@ export function AdminKycPanel({
         }
       />
 
-      {submissions.length === 0 && (
+      {loading && <p className="muted">Loading submissions…</p>}
+      {!loading && submissions.length === 0 && (
         <EmptyState
           title="No KYC submissions yet"
           body="Artisan KYC submissions will appear here once providers start sending their identity details."
@@ -168,6 +182,8 @@ export function AdminKycPanel({
           </article>
         ))}
       </div>
+
+      <Pagination page={page} limit={limit} total={total} busy={busy || loading} onPageChange={setPage} />
     </section>
   );
 }
