@@ -76,6 +76,21 @@ jobs:
           cache-dependency-path: server/package-lock.json
       - run: npm ci
       - run: npx prisma generate
+      # Supabase RLS migration revokes grants from anon/authenticated; plain CI Postgres lacks those roles.
+      - name: Create Supabase-compatible roles for RLS migration
+        run: |
+          npx prisma db execute --stdin <<'SQL'
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+              CREATE ROLE anon NOLOGIN;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+              CREATE ROLE authenticated NOLOGIN;
+            END IF;
+          END
+          $$;
+          SQL
       - run: npx prisma migrate deploy
       - run: npm run test:e2e -- src/smoke.lifecycle.e2e.test.ts
         timeout-minutes: 15
