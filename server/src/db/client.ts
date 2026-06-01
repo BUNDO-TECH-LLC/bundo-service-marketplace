@@ -14,6 +14,7 @@ const globalForPrisma = globalThis as unknown as {
 
 function buildPoolConfig(connectionString: string): PoolConfig {
   const parsed = new URL(connectionString);
+  const sslDisabled = parsed.searchParams.get('sslmode') === 'disable';
 
   // Let node-postgres use the explicit ssl object below instead of inheriting
   // stricter SSL semantics from sslmode in the URL during local development.
@@ -24,17 +25,22 @@ function buildPoolConfig(connectionString: string): PoolConfig {
     return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : fallback;
   };
 
-  return {
+  const config: PoolConfig = {
     connectionString: parsed.toString(),
-    ssl: {
-      rejectUnauthorized: false,
-    },
     // Bound the pool so we don't exhaust the database connection limit (Render
     // managed Postgres caps connections aggressively). Tunable via env.
     max: toInt(process.env.PG_POOL_MAX, 10),
     idleTimeoutMillis: toInt(process.env.PG_POOL_IDLE_TIMEOUT_MS, 30_000),
     connectionTimeoutMillis: toInt(process.env.PG_POOL_CONNECTION_TIMEOUT_MS, 10_000),
   };
+
+  if (!sslDisabled) {
+    config.ssl = {
+      rejectUnauthorized: false,
+    };
+  }
+
+  return config;
 }
 
 // Create or reuse pool
