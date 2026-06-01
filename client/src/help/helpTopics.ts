@@ -1,3 +1,5 @@
+import { BUNDO_SUPPORT_EMAIL } from '../constants/support';
+
 export type HelpQuestion = [string, string];
 export type HelpSection = { heading: string; questions: HelpQuestion[] };
 export type HelpTopic = { id: string; icon: string; title: string; sections: HelpSection[] };
@@ -201,8 +203,9 @@ export const helpTopics: HelpTopic[] = [
       {
         heading: 'Getting help',
         questions: [
+          ['How do I contact Bundo support?', `Email ${BUNDO_SUPPORT_EMAIL} with your account email and a short description of the issue.`],
           ['What if something goes wrong?', 'Use the conversation thread first so there is a clear record. Admin support can review chats and booking context when needed.'],
-          ['What if my account is restricted?', 'An admin may restrict accounts that violate marketplace rules. Contact support with your account email and a short explanation.'],
+          ['What if my account is restricted?', `An admin may restrict accounts that violate marketplace rules. Contact ${BUNDO_SUPPORT_EMAIL} with your account email and a short explanation.`],
         ],
       },
     ],
