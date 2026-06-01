@@ -4,3 +4,8 @@ dist/
 *.json.key
 .DS_Store
 .vercel/
+
+# Never commit MCP configs or API keys (global config lives in ~/.cursor/mcp.json)
+.cursor/mcp.json
+mcp.json
+**/mcp.json

@@ -13,11 +13,26 @@ function withRequiredSsl(url: string) {
   return parsed.toString();
 }
 
-function migrationUrl() {
-  const directUrl = process.env.DIRECT_URL;
-  const databaseUrl = new URL(directUrl || env("DATABASE_URL"));
+function poolerSessionUrl(databaseUrl: string): string {
+  let sessionUrl = databaseUrl.replace(':6543/', ':5432/').replace(':6543?', ':5432?');
+  if (sessionUrl === databaseUrl) {
+    sessionUrl = databaseUrl.replace(/@([^:]+):6543/, '@$1:5432');
+  }
+  return sessionUrl;
+}
 
-  return withRequiredSsl(databaseUrl.toString());
+function migrationUrl() {
+  const databaseUrl = env('DATABASE_URL');
+  const directUrl = process.env.DIRECT_URL;
+
+  // Supabase session pooler works from Render build VMs; legacy db.*.supabase.co direct
+  // hosts often do not. Prefer an explicit pooler DIRECT_URL, otherwise derive :5432 from
+  // DATABASE_URL (same logic as scripts/migrate-deploy-pooler.mjs).
+  if (directUrl?.includes('pooler.supabase.com')) {
+    return withRequiredSsl(directUrl);
+  }
+
+  return withRequiredSsl(poolerSessionUrl(databaseUrl));
 }
 
 export default defineConfig({
