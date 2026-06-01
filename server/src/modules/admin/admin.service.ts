@@ -22,6 +22,11 @@ import { Pagination, paginationArgs } from '../../utils/pagination';
 import { workspaceBookingLink, workspaceLink } from '../../lib/appLinks';
 import { createNotification } from '../notifications/notifications.service';
 import { invalidateCachedAuthUser } from '../../middlewares/authSessionCache';
+import { ConflictError, NotFoundError } from '../../utils/errors';
+import {
+  blocksLastActiveAdminRemoval,
+  LAST_ADMIN_GUARD_MESSAGE,
+} from './adminUserGuard';
 
 type AdminStatsRow = {
   users: bigint;
@@ -148,10 +153,36 @@ export const getUserById = async (firebaseUid: string) => {
   });
 };
 
+const countActiveAdmins = () =>
+  db.user.count({
+    where: { role: Role.ADMIN, status: UserStatus.ACTIVE },
+  });
+
 export const updateUserStatus = async (
   firebaseUid: string,
   status: UserStatus
 ) => {
+  const existing = await db.user.findUnique({ where: { firebaseUid } });
+
+  if (!existing) {
+    throw new NotFoundError('User');
+  }
+
+  if (existing.status === status) {
+    return existing;
+  }
+
+  if (
+    blocksLastActiveAdminRemoval({
+      currentRole: existing.role ?? Role.CUSTOMER,
+      currentStatus: existing.status,
+      nextStatus: status,
+      activeAdminCount: await countActiveAdmins(),
+    })
+  ) {
+    throw new ConflictError(LAST_ADMIN_GUARD_MESSAGE, 'LAST_ADMIN');
+  }
+
   const user = await db.user.update({
     where: { firebaseUid },
     data: { status },
@@ -162,6 +193,27 @@ export const updateUserStatus = async (
 };
 
 export const updateUserRole = async (firebaseUid: string, role: Role) => {
+  const existing = await db.user.findUnique({ where: { firebaseUid } });
+
+  if (!existing) {
+    throw new NotFoundError('User');
+  }
+
+  if (existing.role === role) {
+    return existing;
+  }
+
+  if (
+    blocksLastActiveAdminRemoval({
+      currentRole: existing.role ?? Role.CUSTOMER,
+      currentStatus: existing.status,
+      nextRole: role,
+      activeAdminCount: await countActiveAdmins(),
+    })
+  ) {
+    throw new ConflictError(LAST_ADMIN_GUARD_MESSAGE, 'LAST_ADMIN');
+  }
+
   const user = await db.user.update({
     where: { firebaseUid },
     data: { role },
