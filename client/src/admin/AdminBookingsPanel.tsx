@@ -61,7 +61,7 @@ export function AdminBookingsPanel({
   const [loadingMore, setLoadingMore] = useState(false);
   const [disputePrompt, setDisputePrompt] = useState<null | {
     disputeId: string;
-    action: 'RELEASE' | 'REFUND_FULL' | 'REFUND_PARTIAL';
+    action: 'RELEASE' | 'REFUND_FULL' | 'REFUND_PARTIAL' | 'CLOSE';
     step: 'note' | 'amount';
     note?: string;
   }>(null);
@@ -203,7 +203,7 @@ export function AdminBookingsPanel({
 
   function startDisputeResolution(
     disputeId: string,
-    action: 'RELEASE' | 'REFUND_FULL' | 'REFUND_PARTIAL'
+    action: 'RELEASE' | 'REFUND_FULL' | 'REFUND_PARTIAL' | 'CLOSE'
   ) {
     setDisputePrompt({ disputeId, action, step: 'note' });
   }
@@ -349,6 +349,15 @@ export function AdminBookingsPanel({
             paymentStatus === 'PAID_HELD' ||
             paymentStatus === 'PARTIALLY_RELEASED' ||
             paymentStatus === 'PARTIALLY_REFUNDED';
+          const canReleaseOnDispute =
+            Boolean(openDispute) &&
+            (paymentStatus === 'PAID_HELD' ||
+              paymentStatus === 'PARTIALLY_RELEASED' ||
+              paymentStatus === 'PARTIALLY_REFUNDED');
+          const canRefundOnDispute =
+            Boolean(openDispute) &&
+            paymentStatus === 'PAID_HELD' &&
+            (booking.payment?.releasedAmount ?? 0) === 0;
           const canRelease =
             releasableNow &&
             !['CANCELLED', 'DECLINED'].includes(booking.status) &&
@@ -555,28 +564,42 @@ export function AdminBookingsPanel({
                     <div className="admin-dispute-actions">
                       <button
                         type="button"
-                        className="primary-action"
-                        disabled={busy}
-                        onClick={() => startDisputeResolution(openDispute.id, 'RELEASE')}
-                      >
-                        Resolve & release
-                      </button>
-                      <button
-                        type="button"
                         className="secondary-button"
                         disabled={busy}
-                        onClick={() => startDisputeResolution(openDispute.id, 'REFUND_FULL')}
+                        onClick={() => startDisputeResolution(openDispute.id, 'CLOSE')}
                       >
-                        Full refund
+                        Close dispute
                       </button>
-                      <button
-                        type="button"
-                        className="secondary-button"
-                        disabled={busy}
-                        onClick={() => startDisputeResolution(openDispute.id, 'REFUND_PARTIAL')}
-                      >
-                        Partial refund
-                      </button>
+                      {canReleaseOnDispute && (
+                        <button
+                          type="button"
+                          className="primary-action"
+                          disabled={busy}
+                          onClick={() => startDisputeResolution(openDispute.id, 'RELEASE')}
+                        >
+                          Resolve & release
+                        </button>
+                      )}
+                      {canRefundOnDispute && (
+                        <>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            disabled={busy}
+                            onClick={() => startDisputeResolution(openDispute.id, 'REFUND_FULL')}
+                          >
+                            Full refund
+                          </button>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            disabled={busy}
+                            onClick={() => startDisputeResolution(openDispute.id, 'REFUND_PARTIAL')}
+                          >
+                            Partial refund
+                          </button>
+                        </>
+                      )}
                     </div>
                   )}
                   {!openDispute &&
@@ -642,21 +665,36 @@ export function AdminBookingsPanel({
         title={
           disputePrompt?.step === 'amount'
             ? 'Partial refund amount'
-            : disputePrompt?.action === 'RELEASE'
-              ? 'Resolve dispute — release payout'
-              : 'Resolve dispute — refund'
+            : disputePrompt?.action === 'CLOSE'
+              ? 'Close dispute'
+              : disputePrompt?.action === 'RELEASE'
+                ? 'Resolve dispute — release payout'
+                : 'Resolve dispute — refund'
         }
         message={
           disputePrompt?.step === 'note'
-            ? 'Add a short admin note for the audit trail.'
+            ? disputePrompt?.action === 'CLOSE'
+              ? 'Record why this dispute is closed. No refund or payout will be processed.'
+              : 'Add a short admin note for the audit trail.'
             : 'Enter the refund amount in NGN.'
         }
         label={disputePrompt?.step === 'amount' ? 'Amount (NGN)' : 'Admin note'}
         inputType={disputePrompt?.step === 'amount' ? 'number' : 'text'}
-        confirmLabel={disputePrompt?.step === 'amount' ? 'Issue refund' : 'Continue'}
+        confirmLabel={
+          disputePrompt?.step === 'amount'
+            ? 'Issue refund'
+            : disputePrompt?.action === 'CLOSE'
+              ? 'Close dispute'
+              : 'Continue'
+        }
         busy={busy}
         onCancel={() => setDisputePrompt(null)}
-        onConfirm={(value) => runAction(() => submitDisputeResolution(value), 'Dispute resolved')}
+        onConfirm={(value) =>
+          runAction(
+            () => submitDisputeResolution(value),
+            disputePrompt?.action === 'CLOSE' ? 'Dispute closed' : 'Dispute resolved'
+          )
+        }
       />
       <AdminPayoutDialog
         open={payoutDialogBooking !== null}

@@ -1174,15 +1174,11 @@ export const createBookingDispute = async (input: {
 
 export const resolveBookingDispute = async (input: {
   disputeId: string;
-  action: 'RELEASE' | 'REFUND_FULL' | 'REFUND_PARTIAL';
+  action: 'RELEASE' | 'REFUND_FULL' | 'REFUND_PARTIAL' | 'CLOSE';
   adminId: string;
   resolution?: string;
   refundAmount?: number;
 }) => {
-  if (!isPaystackConfigured()) {
-    return { status: 'paystack_not_configured' as const };
-  }
-
   const dispute = await db.dispute.findUnique({
     where: { id: input.disputeId },
     include: {
@@ -1209,6 +1205,48 @@ export const resolveBookingDispute = async (input: {
 
   if (!unresolvedStatuses.includes(dispute.status)) {
     return { status: 'already_resolved' as const, dispute };
+  }
+
+  if (input.action === 'CLOSE') {
+    const resolution = input.resolution?.trim();
+    if (!resolution) {
+      return { status: 'missing_resolution' as const };
+    }
+
+    const updatedDispute = await db.dispute.update({
+      where: { id: dispute.id },
+      data: {
+        status: DisputeStatus.CLOSED,
+        resolution: `Closed by admin ${input.adminId}: ${resolution}`,
+      },
+    });
+
+    await createNotifications([
+      {
+        userId: dispute.booking.customerId,
+        type: NotificationType.DISPUTE,
+        title: 'Dispute closed',
+        body: 'Your dispute was reviewed and closed. No further payment changes were made.',
+        link: workspaceBookingLink(dispute.booking.id),
+      },
+      {
+        userId: dispute.booking.artisan.userId,
+        type: NotificationType.DISPUTE,
+        title: 'Dispute closed',
+        body: 'A dispute on your booking was reviewed and closed. No further payment changes were made.',
+        link: workspaceBookingLink(dispute.booking.id),
+      },
+    ]);
+
+    return {
+      status: 'resolved_close' as const,
+      dispute: updatedDispute,
+      payment: dispute.booking.payment,
+    };
+  }
+
+  if (!isPaystackConfigured()) {
+    return { status: 'paystack_not_configured' as const };
   }
 
   const payment = dispute.booking.payment;

@@ -697,13 +697,13 @@ router.post('/payouts/:id/finalize-otp', asyncHandler(async (req, res) => {
 router.post('/disputes/:id/resolve', asyncHandler(async (req, res) => {
   const { action, resolution, refundAmount } = req.body;
 
-  if (!['RELEASE', 'REFUND_FULL', 'REFUND_PARTIAL'].includes(action)) {
-    throw httpError(400, 'action must be RELEASE, REFUND_FULL, or REFUND_PARTIAL');
+  if (!['RELEASE', 'REFUND_FULL', 'REFUND_PARTIAL', 'CLOSE'].includes(action)) {
+    throw httpError(400, 'action must be RELEASE, REFUND_FULL, REFUND_PARTIAL, or CLOSE');
   }
 
   const parsedRefundAmount =
     refundAmount === undefined ? undefined : Number(refundAmount);
-  const disputeAction = action as 'RELEASE' | 'REFUND_FULL' | 'REFUND_PARTIAL';
+  const disputeAction = action as 'RELEASE' | 'REFUND_FULL' | 'REFUND_PARTIAL' | 'CLOSE';
 
   const result = await resolveBookingDispute({
     disputeId: String(req.params.id),
@@ -723,6 +723,10 @@ router.post('/disputes/:id/resolve', asyncHandler(async (req, res) => {
 
   if (result.status === 'already_resolved') {
     throw httpError(409, 'Dispute is already resolved');
+  }
+
+  if (result.status === 'missing_resolution') {
+    throw httpError(400, 'resolution is required when closing a dispute');
   }
 
   if (result.status === 'missing_payment') {
@@ -801,6 +805,15 @@ router.post('/disputes/:id/resolve', asyncHandler(async (req, res) => {
       dispute: result.dispute,
       payment: result.payment,
       refundReference: result.refundReference,
+    });
+    return;
+  }
+
+  if (result.status === 'resolved_close') {
+    res.json({
+      message: 'Dispute closed without payment changes',
+      dispute: result.dispute,
+      payment: result.payment ?? null,
     });
     return;
   }
