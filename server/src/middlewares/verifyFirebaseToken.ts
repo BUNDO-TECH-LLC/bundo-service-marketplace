@@ -32,7 +32,7 @@ export const verifyFirebaseToken = async (
   let decoded;
 
   try {
-    decoded = await admin.auth().verifyIdToken(token);
+    decoded = await admin.auth().verifyIdToken(token, true);
   } catch (error: unknown) {
     logger.warn({ error }, 'Firebase token verification failed');
     return next(new UnauthorizedError('Invalid token'));

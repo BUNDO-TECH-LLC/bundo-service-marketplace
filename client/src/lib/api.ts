@@ -1,3 +1,5 @@
+import { getFirebaseAppCheckToken } from './appCheck';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:3000';
 const API_TIMEOUT_MS = 25_000;
 export const AUTH_API_TIMEOUT_MS = 60_000;
@@ -159,6 +161,11 @@ async function executeRequest<T>(
 
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const appCheckToken = await getFirebaseAppCheckToken();
+  if (appCheckToken) {
+    headers.set('X-Firebase-AppCheck', appCheckToken);
   }
 
   let response: Response;

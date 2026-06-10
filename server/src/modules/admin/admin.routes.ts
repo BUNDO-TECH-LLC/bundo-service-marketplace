@@ -7,6 +7,10 @@ import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
 import { requireRole } from '../../middlewares/requireRole';
 import { getPagination, paginationMeta } from '../../utils/pagination';
 import {
+  assertOwnedCloudinaryImageUrl,
+  assertOwnedCloudinaryPublicId,
+} from '../../utils/cloudinaryAsset';
+import {
   finalizePayoutTransferOtp,
   getSupportedPayoutBanks,
   previewPayoutAccount,
@@ -935,14 +939,35 @@ router.post('/conversations/:id/messages', asyncHandler(async (req, res) => {
     throw httpError(400, 'body or imageUrl is required');
   }
 
+  let validatedImageUrl: string | undefined;
+  let validatedCloudinaryId: string | undefined;
+  if (hasImageUrl) {
+    try {
+      const publicId = assertOwnedCloudinaryImageUrl(imageUrl, 'bundo/chat-images');
+      assertOwnedCloudinaryPublicId(
+        typeof imageCloudinaryId === 'string' ? imageCloudinaryId : undefined,
+        'bundo/chat-images',
+        publicId
+      );
+      validatedImageUrl = imageUrl.trim();
+      validatedCloudinaryId =
+        typeof imageCloudinaryId === 'string' && imageCloudinaryId.trim()
+          ? imageCloudinaryId.trim()
+          : publicId;
+    } catch (error) {
+      throw httpError(
+        400,
+        error instanceof Error ? error.message : 'Invalid chat image URL'
+      );
+    }
+  }
+
   const result = await createAdminConversationMessage({
     conversationId: String(req.params.id),
     adminId: (req as any).user.firebaseUid,
     body: hasBody ? body : '',
-    ...(hasImageUrl ? { imageUrl } : {}),
-    ...(typeof imageCloudinaryId === 'string' && imageCloudinaryId
-      ? { imageCloudinaryId }
-      : {}),
+    ...(validatedImageUrl ? { imageUrl: validatedImageUrl } : {}),
+    ...(validatedCloudinaryId ? { imageCloudinaryId: validatedCloudinaryId } : {}),
   });
 
   if (result.status === 'missing_conversation') {

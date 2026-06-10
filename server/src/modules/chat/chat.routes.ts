@@ -6,6 +6,10 @@ import { respondIfChatSchemaError } from '../../utils/handleChatSchemaError';
 import { throwOnServiceStatus } from '../../utils/resultErrors';
 import { createCloudinarySignedUpload } from '../../utils/cloudinaryUploadConfig';
 import {
+  assertOwnedCloudinaryImageUrl,
+  assertOwnedCloudinaryPublicId,
+} from '../../utils/cloudinaryAsset';
+import {
   createMessage,
   getConversationMessages,
   getConversationsForUser,
@@ -36,6 +40,32 @@ function validateMessagePayload(body: unknown, imageUrl: unknown, imageCloudinar
   }
 
   return null;
+}
+
+function parseChatImageFields(imageUrl: unknown, imageCloudinaryId: unknown) {
+  if (typeof imageUrl !== 'string' || !imageUrl.trim()) {
+    return { imageUrl: undefined, imageCloudinaryId: undefined };
+  }
+
+  try {
+    const publicId = assertOwnedCloudinaryImageUrl(imageUrl, 'bundo/chat-images');
+    assertOwnedCloudinaryPublicId(
+      typeof imageCloudinaryId === 'string' ? imageCloudinaryId : undefined,
+      'bundo/chat-images',
+      publicId
+    );
+    return {
+      imageUrl: imageUrl.trim(),
+      imageCloudinaryId:
+        typeof imageCloudinaryId === 'string' && imageCloudinaryId.trim()
+          ? imageCloudinaryId.trim()
+          : publicId,
+    };
+  } catch (error) {
+    throw new ValidationError(
+      error instanceof Error ? error.message : 'Invalid chat image URL'
+    );
+  }
 }
 
 router.post(
@@ -76,14 +106,16 @@ router.post(
         throw new ValidationError(validationError);
       }
 
+      const chatImage = parseChatImageFields(imageUrl, imageCloudinaryId);
+
       const result = await createMessage({
         senderId: (req as any).user.firebaseUid,
         senderRole: (req as any).user.role,
         artisanId,
         conversationId,
         body: typeof body === 'string' ? body : '',
-        imageUrl,
-        imageCloudinaryId,
+        imageUrl: chatImage.imageUrl,
+        imageCloudinaryId: chatImage.imageCloudinaryId,
       });
 
       throwOnServiceStatus(result.status, {
@@ -209,13 +241,15 @@ router.post(
         throw new ValidationError(validationError);
       }
 
+      const chatImage = parseChatImageFields(imageUrl, imageCloudinaryId);
+
       const result = await createMessage({
         senderId: (req as any).user.firebaseUid,
         senderRole: (req as any).user.role,
         conversationId: String(req.params.id),
         body: typeof body === 'string' ? body : '',
-        imageUrl,
-        imageCloudinaryId,
+        imageUrl: chatImage.imageUrl,
+        imageCloudinaryId: chatImage.imageCloudinaryId,
       });
 
       throwOnServiceStatus(result.status, {

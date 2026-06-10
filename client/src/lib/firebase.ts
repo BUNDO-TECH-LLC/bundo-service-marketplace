@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
+import { initFirebaseAppCheck } from './appCheck';
 
 const configuredAuthDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
 
@@ -40,4 +41,7 @@ export const missingFirebaseConfig = [
 export const firebaseReady = missingFirebaseConfig.length === 0;
 
 export const firebaseApp = firebaseReady ? initializeApp(firebaseConfig) : null;
+if (firebaseApp) {
+  initFirebaseAppCheck(firebaseApp);
+}
 export const auth = firebaseApp ? getAuth(firebaseApp) : null;

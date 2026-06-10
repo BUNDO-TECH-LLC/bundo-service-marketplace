@@ -19,23 +19,22 @@ import { serializeUser } from './modules/users/users.service';
 import logger from './utils/logger';
 import db from './db/client';
 import { appErrorHandler } from './middlewares/errorHandler';
+import { verifyAppCheck } from './middlewares/verifyAppCheck';
 import { getCloudinaryHealth } from './utils/cloudinaryUploadConfig';
 
 export function createApp() {
   const app = express();
   const isProduction = env.NODE_ENV === 'production';
-  const allowedOrigins = env.CORS_ORIGIN.split(',')
+  const allowedOrigins = [
+    ...env.CORS_ORIGIN.split(','),
+    ...(env.CORS_EXTRA_ORIGINS?.split(',') ?? []),
+  ]
     .map((origin) => origin.trim())
     .filter(Boolean);
 
   if (env.PAYSTACK_SECRET_KEY) {
     const paystackMode = env.PAYSTACK_SECRET_KEY.startsWith('sk_test') ? 'test' : 'live';
     logger.info({ paystackMode }, 'Paystack payments enabled');
-    if (isProduction && env.PAYSTACK_SECRET_KEY.startsWith('sk_test')) {
-      logger.warn(
-        'PAYSTACK_SECRET_KEY is a test key while NODE_ENV is production. Use sk_live when Paystack live is approved.'
-      );
-    }
     if (!isProduction && env.PAYSTACK_SECRET_KEY.startsWith('sk_live')) {
       logger.warn(
         'PAYSTACK_SECRET_KEY is a live key but NODE_ENV is not production. Avoid using live keys on dev machines.'
@@ -53,7 +52,12 @@ export function createApp() {
     try {
       const url = new URL(origin);
 
-      if (isProduction && url.protocol === 'https:' && url.hostname.endsWith('.vercel.app')) {
+      if (
+        isProduction &&
+        env.CORS_ALLOW_VERCEL_PREVIEWS === 'true' &&
+        url.protocol === 'https:' &&
+        url.hostname.endsWith('.vercel.app')
+      ) {
         return true;
       }
 
@@ -109,9 +113,17 @@ export function createApp() {
       limit: isProduction ? 120 : 1200,
       standardHeaders: 'draft-8',
       legacyHeaders: false,
-      skip: (req) => ['GET', 'HEAD', 'OPTIONS'].includes(req.method),
+      skip: (req) => {
+        if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
+          return true;
+        }
+        const requestPath = req.url.split('?')[0] ?? req.url;
+        return requestPath.includes('/webhooks/paystack');
+      },
     })
   );
+
+  app.use(verifyAppCheck);
 
   app.use(
     express.json({

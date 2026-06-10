@@ -5,6 +5,7 @@ import {
   parseNotificationPreferences,
   type NotificationPreferences,
 } from '../../lib/notificationPreferences';
+import { invalidateCachedAuthUser } from '../../middlewares/authSessionCache';
 import { ConflictError, ValidationError } from '../../utils/errors';
 
 function normalizeEmail(email?: string | null) {
@@ -265,6 +266,8 @@ export const deleteUserAccount = async (firebaseUid: string) => {
       notificationPreferences: Prisma.JsonNull,
     },
   });
+
+  invalidateCachedAuthUser(firebaseUid);
 
   return { status: 'deleted' as const };
 };

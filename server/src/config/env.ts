@@ -60,6 +60,13 @@ const envSchema = z
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     PORT: z.preprocess(trim, z.string().default('3000')),
     CORS_ORIGIN: z.preprocess(trim, z.string().min(1)),
+    /** Comma-separated extra browser origins (e.g. Vercel preview URLs). */
+    CORS_EXTRA_ORIGINS: z.preprocess(emptyToUndefined, z.string().optional()),
+    /** When true, allow any https://*.vercel.app origin in production (legacy behavior). */
+    CORS_ALLOW_VERCEL_PREVIEWS: z.preprocess(emptyToUndefined, z.enum(['true', 'false']).optional()),
+    /** Require valid Firebase App Check token on API requests (enable after client is configured). */
+    FIREBASE_APP_CHECK_ENFORCE: z.preprocess(emptyToUndefined, z.enum(['true', 'false']).optional()),
+    SENTRY_DSN: z.preprocess(emptyToUndefined, z.string().url().optional()),
 
     DATABASE_URL: z.preprocess(trim, z.string().min(1)),
     DIRECT_URL: z.preprocess(trim, z.string().min(1)),
@@ -181,6 +188,15 @@ const envSchema = z
           path: ['PAYSTACK_CALLBACK_URL'],
         });
       }
+    }
+
+    if (data.PAYSTACK_SECRET_KEY?.startsWith('sk_test')) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'PAYSTACK_SECRET_KEY must be a live key (sk_live_...) in production. Test keys are not allowed.',
+        path: ['PAYSTACK_SECRET_KEY'],
+      });
     }
   });
 
