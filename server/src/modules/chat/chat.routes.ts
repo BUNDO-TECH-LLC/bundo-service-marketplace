@@ -114,8 +114,12 @@ router.post(
         artisanId,
         conversationId,
         body: typeof body === 'string' ? body : '',
-        imageUrl: chatImage.imageUrl,
-        imageCloudinaryId: chatImage.imageCloudinaryId,
+        ...(chatImage.imageUrl
+          ? {
+              imageUrl: chatImage.imageUrl,
+              imageCloudinaryId: chatImage.imageCloudinaryId,
+            }
+          : {}),
       });
 
       throwOnServiceStatus(result.status, {
@@ -248,8 +252,12 @@ router.post(
         senderRole: (req as any).user.role,
         conversationId: String(req.params.id),
         body: typeof body === 'string' ? body : '',
-        imageUrl: chatImage.imageUrl,
-        imageCloudinaryId: chatImage.imageCloudinaryId,
+        ...(chatImage.imageUrl
+          ? {
+              imageUrl: chatImage.imageUrl,
+              imageCloudinaryId: chatImage.imageCloudinaryId,
+            }
+          : {}),
       });
 
       throwOnServiceStatus(result.status, {
