@@ -1,4 +1,4 @@
-import type { Booking, PaymentStatus } from '../types';
+import type { Booking, Conversation, PaymentStatus, Role } from '../types';
 
 /** Must match server MIN_AGREED_PAYMENT_NGN */
 export const MIN_PAYMENT_AMOUNT_NGN = 500;
@@ -50,6 +50,39 @@ export function parseBookingInput(value: string) {
 
 export function bookingContactName(booking: Booking) {
   return booking.customerUser?.email?.split('@')[0] || 'Customer';
+}
+
+function customerDisplayName(customer: Conversation['customer']) {
+  if (customer?.email) {
+    return customer.email.split('@')[0] || customer.email;
+  }
+  if (customer?.phone) {
+    return customer.phone;
+  }
+  return 'Customer';
+}
+
+/** Name shown for the other party in chat (customer sees artisan; artisan sees customer). */
+export function conversationContactName(
+  conversation: Conversation,
+  viewerRole: Role | null | undefined
+) {
+  if (viewerRole === 'ARTISAN') {
+    return customerDisplayName(conversation.customer);
+  }
+
+  return conversation.artisan?.displayName || customerDisplayName(conversation.customer) || 'Conversation';
+}
+
+export function conversationContactSubtitle(
+  conversation: Conversation,
+  viewerRole: Role | null | undefined
+) {
+  if (viewerRole === 'ARTISAN') {
+    return conversation.customer?.email || conversation.customer?.phone || 'Bundo customer';
+  }
+
+  return conversation.artisan?.city || conversation.customer?.email || 'Bundo conversation';
 }
 
 export function bookingLocation(booking: Booking) {

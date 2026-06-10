@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
+import { conversationContactName, conversationContactSubtitle } from '../lib/bookingDisplay';
 import { formatMessageTime } from '../lib/formatting';
 import { ChatComposer, type ChatComposerPayload } from '../components/ChatComposer';
 import { uploadChatImage } from '../lib/chatUpload';
@@ -116,8 +117,10 @@ export function ChatPanel({
     await refreshConversations();
   }
 
+  const viewerRole = me?.role;
+
   function conversationTitle(conversation: Conversation) {
-    return conversation.artisan?.displayName || conversation.customer?.email || 'Conversation';
+    return conversationContactName(conversation, viewerRole);
   }
 
   function conversationInitial(conversation: Conversation) {
@@ -129,7 +132,6 @@ export function ChatPanel({
     return latest?.body || (latest?.imageUrl ? 'Photo attachment' : 'Booking conversation ready');
   }
 
-  const viewerRole = me?.role;
   const canUseChatActions = viewerRole === 'CUSTOMER' || viewerRole === 'ARTISAN';
   const otherPartyFirebaseUid =
     activeConversation && canUseChatActions
@@ -219,11 +221,7 @@ export function ChatPanel({
                   <span className="conversation-avatar">{conversationInitial(activeConversation)}</span>
                   <div>
                     <h3>{conversationTitle(activeConversation)}</h3>
-                    <p>
-                      {activeConversation.artisan?.city ||
-                        activeConversation.customer?.email ||
-                        'Bundo conversation'}
-                    </p>
+                    <p>{conversationContactSubtitle(activeConversation, viewerRole)}</p>
                   </div>
                 </div>
                 {canUseChatActions && otherPartyFirebaseUid && (
