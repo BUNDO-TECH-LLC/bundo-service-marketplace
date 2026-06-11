@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { readBrowserLocation } from '../lib/geolocation';
+import { useCallback, useState } from 'react';
+import { readBrowserLocation, type UseMyLocationResult } from '../lib/geolocation';
 import { inferNigeriaState } from '../lib/inferNigeriaState';
 import {
   clearLocationPreference,
@@ -15,16 +15,14 @@ export type UserLocationState = {
   searchLng: number | null;
   locationSource: LocationSource;
   isDetectingLocation: boolean;
-  locationReady: boolean;
   setSelectedState: (state: string) => void;
   setSearchCoordinates: (lat: number | null, lng: number | null) => void;
-  useMyLocation: () => Promise<boolean>;
-  detectLocation: () => Promise<boolean>;
+  useMyLocation: () => Promise<UseMyLocationResult>;
   clearLocation: () => void;
 };
 
 type UseUserLocationOptions = {
-  onLocationApplied?: (state: string, source: LocationSource) => void;
+  onLocationApplied?: (state: string, source: LocationSource, lat: number | null, lng: number | null) => void;
 };
 
 function applyManualState(
@@ -60,101 +58,77 @@ export function useUserLocation(options?: UseUserLocationOptions): UserLocationS
   const [searchLng, setSearchLng] = useState<number | null>(stored?.lng ?? null);
   const [locationSource, setLocationSource] = useState<LocationSource>(stored?.source ?? 'none');
   const [isDetectingLocation, setIsDetectingLocation] = useState(false);
-  const [locationReady, setLocationReady] = useState(Boolean(stored));
-  const autoDetectAttemptedRef = useRef(false);
-  const onLocationAppliedRef = useRef(options?.onLocationApplied);
-  onLocationAppliedRef.current = options?.onLocationApplied;
+  const onLocationApplied = options?.onLocationApplied;
 
   const setSearchCoordinates = useCallback((lat: number | null, lng: number | null) => {
     setSearchLat(lat);
     setSearchLng(lng);
   }, []);
 
-  const applyAutoLocation = useCallback((lat: number, lng: number) => {
-    const state = inferNigeriaState(lat, lng);
-    setSelectedStateInternal(state);
-    setSearchLat(lat);
-    setSearchLng(lng);
-    setLocationSource('auto');
-    setLocationReady(true);
-    saveLocationPreference({
-      source: 'auto',
-      state,
-      lat,
-      lng,
-      promptStatus: 'granted',
-    });
-    onLocationAppliedRef.current?.(state, 'auto');
-    return state;
-  }, []);
+  const applyAutoLocation = useCallback(
+    (lat: number, lng: number) => {
+      const state = inferNigeriaState(lat, lng);
+      setSelectedStateInternal(state);
+      setSearchLat(lat);
+      setSearchLng(lng);
+      setLocationSource('auto');
+      saveLocationPreference({
+        source: 'auto',
+        state,
+        lat,
+        lng,
+        promptStatus: 'granted',
+      });
+      onLocationApplied?.(state, 'auto', lat, lng);
+      return state;
+    },
+    [onLocationApplied]
+  );
 
-  const detectLocation = useCallback(async () => {
+  const useMyLocation = useCallback(async (): Promise<UseMyLocationResult> => {
     setIsDetectingLocation(true);
     try {
       const result = await readBrowserLocation();
       if (!result.ok) {
-        saveLocationPreference({
-          source: locationSource,
-          state: selectedState,
-          lat: searchLat,
-          lng: searchLng,
-          promptStatus: result.reason === 'denied' ? 'denied' : readLocationPreference()?.promptStatus ?? null,
-        });
-        return false;
+        if (result.reason === 'denied') {
+          saveLocationPreference({
+            source: locationSource,
+            state: selectedState,
+            lat: searchLat,
+            lng: searchLng,
+            promptStatus: 'denied',
+          });
+        }
+        return { ok: false, reason: result.reason };
       }
 
-      applyAutoLocation(result.lat, result.lng);
-      return true;
+      const state = applyAutoLocation(result.lat, result.lng);
+      return { ok: true, state, lat: result.lat, lng: result.lng };
     } finally {
       setIsDetectingLocation(false);
     }
   }, [applyAutoLocation, locationSource, searchLat, searchLng, selectedState]);
 
-  const useMyLocation = useCallback(async () => {
-    const success = await detectLocation();
-    return success;
-  }, [detectLocation]);
-
   const setSelectedState = useCallback(
     (state: string) => {
       applyManualState(state, setSelectedStateInternal, setSearchCoordinates, setLocationSource);
-      setLocationReady(true);
       if (state) {
-        onLocationAppliedRef.current?.(state, 'manual');
+        const coords = coordinatesForState(state);
+        onLocationApplied?.(state, 'manual', coords.lat, coords.lng);
+      } else {
+        onLocationApplied?.('', 'none', null, null);
       }
     },
-    [setSearchCoordinates]
+    [onLocationApplied, setSearchCoordinates]
   );
 
   const clearLocation = useCallback(() => {
     setSelectedStateInternal('');
     setSearchCoordinates(null, null);
     setLocationSource('none');
-    setLocationReady(true);
     clearLocationPreference();
-  }, [setSearchCoordinates]);
-
-  useEffect(() => {
-    if (autoDetectAttemptedRef.current) {
-      return;
-    }
-    autoDetectAttemptedRef.current = true;
-
-    const preference = readLocationPreference();
-    if (preference?.state) {
-      setLocationReady(true);
-      return;
-    }
-
-    if (preference?.promptStatus === 'denied') {
-      setLocationReady(true);
-      return;
-    }
-
-    void detectLocation().finally(() => {
-      setLocationReady(true);
-    });
-  }, [detectLocation]);
+    onLocationApplied?.('', 'none', null, null);
+  }, [onLocationApplied, setSearchCoordinates]);
 
   return {
     selectedState,
@@ -162,11 +136,9 @@ export function useUserLocation(options?: UseUserLocationOptions): UserLocationS
     searchLng,
     locationSource,
     isDetectingLocation,
-    locationReady,
     setSelectedState,
     setSearchCoordinates,
     useMyLocation,
-    detectLocation,
     clearLocation,
   };
 }

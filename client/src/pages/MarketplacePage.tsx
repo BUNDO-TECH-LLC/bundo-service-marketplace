@@ -1,7 +1,7 @@
 import { EmptyState } from '../components/EmptyState';
-import { LocationBanner } from '../components/LocationBanner';
 import { MarketplaceFilters, OfferingGrid } from '../features/marketplace';
 import { coordinatesForState } from '../lib/nigeriaStateCoordinates';
+import { locationErrorMessage } from '../lib/geolocation';
 import { nigeriaStates } from '../lib/geo';
 import { useAppRoot } from '../app/appRootContext';
 
@@ -38,6 +38,19 @@ export default function MarketplacePage() {
     );
   }
 
+  function handleUseMyLocation() {
+    void ctx.useMyLocation().then((result) => {
+      if (result.ok) {
+        ctx.setMarketplaceSort('distance');
+        ctx.setSearchCoordinates(result.lat, result.lng);
+        ctx.setNotice(`Using your current location near ${result.state}.`);
+        void ctx.loadPublicData(result.state, ctx.searchTerm, { sort: 'distance' });
+        return;
+      }
+      ctx.setNotice(locationErrorMessage(result.reason));
+    });
+  }
+
   return (
     <main className="page">
       <section className="section-head">
@@ -49,22 +62,6 @@ export default function MarketplacePage() {
             : 'Browse approved artisans, compare services, and place a booking request.'}
         </p>
       </section>
-
-      <LocationBanner
-        selectedState={ctx.selectedState}
-        locationSource={ctx.locationSource}
-        isDetectingLocation={ctx.isDetectingLocation}
-        onChangeLocation={ctx.setSelectedState}
-        onUseMyLocation={() => {
-          void ctx.useMyLocation().then((success) => {
-            if (success) {
-              ctx.setNotice('Using your current location for nearby services.');
-            } else {
-              ctx.setNotice('Could not read your location. Pick a state or allow location access.');
-            }
-          });
-        }}
-      />
 
       <MarketplaceFilters
         categories={ctx.categories}
@@ -81,16 +78,7 @@ export default function MarketplacePage() {
         onPriceMinChange={ctx.setPriceMin}
         onPriceMaxChange={ctx.setPriceMax}
         onSortChange={ctx.setMarketplaceSort}
-        onUseMyLocation={() => {
-          void ctx.useMyLocation().then((success) => {
-            if (success) {
-              ctx.setMarketplaceSort('distance');
-              ctx.setNotice('Using your current location for nearest results.');
-            } else {
-              ctx.setNotice('Could not read your location. Pick a state or allow location access.');
-            }
-          });
-        }}
+        onUseMyLocation={handleUseMyLocation}
         onApply={applyFilters}
         onClear={async () => {
           ctx.clearLocation();

@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
-import { LocationBanner } from '../components/LocationBanner';
 import { AppPromo, Footer, Hero, ServicesSection, WhySection } from '../features/marketing';
 import { MarketplacePreview } from '../features/marketplace';
 import { buildAppPath } from '../lib/appPaths';
@@ -9,6 +8,7 @@ import {
   clearArtisanApplicant,
   isArtisanApplicantSession,
 } from '../lib/artisanApplication';
+import { locationErrorMessage } from '../lib/geolocation';
 import { nigeriaStates } from '../lib/geo';
 import { LoggedInHome } from '../views/LoggedInHome';
 import { useAppRoot } from '../app/appRootContext';
@@ -44,14 +44,11 @@ export default function HomePage() {
         offerings={ctx.publicOfferings}
         artisans={ctx.artisans}
         selectedState={ctx.selectedState}
-        locationSource={ctx.locationSource}
-        isDetectingLocation={ctx.isDetectingLocation}
         searchTerm={ctx.searchTerm}
         token={ctx.token}
         busy={ctx.busy}
         onSearchTermChange={ctx.setSearchTerm}
         onSelectedStateChange={ctx.setSelectedState}
-        onUseMyLocation={ctx.useMyLocation}
         onBrowse={async (categoryId) => {
           ctx.setSelectedCategoryId(categoryId || '');
           await ctx.withNotice(async () => {
@@ -75,22 +72,10 @@ export default function HomePage() {
 
   return (
     <main>
-      <LocationBanner
-        selectedState={ctx.selectedState}
-        locationSource={ctx.locationSource}
-        isDetectingLocation={ctx.isDetectingLocation}
-        onChangeLocation={ctx.setSelectedState}
-        onUseMyLocation={() => {
-          void ctx.useMyLocation().then((success) => {
-            if (!success) {
-              ctx.setNotice('Could not read your location. Pick a state or allow location access.');
-            }
-          });
-        }}
-      />
       <Hero
         selectedState={ctx.selectedState}
         states={nigeriaStates}
+        isDetectingLocation={ctx.isDetectingLocation}
         onStateChange={async (state) => {
           ctx.setSelectedState(state);
           await ctx.withNotice(async () => {
@@ -109,6 +94,16 @@ export default function HomePage() {
           }, queryText.trim() ? `Searching for ${queryText.trim()}` : 'Showing available services');
         }}
         onBrowse={() => ctx.navigate('/marketplace')}
+        onUseMyLocation={() => {
+          void ctx.useMyLocation().then((result) => {
+            if (result.ok) {
+              ctx.setNotice(`Showing services near ${result.state}.`);
+              void ctx.loadPublicData(result.state, ctx.searchTerm);
+              return;
+            }
+            ctx.setNotice(locationErrorMessage(result.reason));
+          });
+        }}
       />
       <WhySection />
       <ServicesSection

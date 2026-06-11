@@ -1,6 +1,7 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import type { NavigateFunction, Location } from 'react-router-dom';
 import type { User } from 'firebase/auth';
+import type { UseMyLocationResult } from '../lib/geolocation';
 import type {
   ActionRunner,
   AdminArtisanRecord,
@@ -59,7 +60,6 @@ export type AppRootValue = {
   setSelectedState: (value: string) => void;
   locationSource: LocationSource;
   isDetectingLocation: boolean;
-  locationReady: boolean;
   searchTerm: string;
   setSearchTerm: (value: string) => void;
   selectedCategoryId: string;
@@ -73,7 +73,7 @@ export type AppRootValue = {
   searchLat: number | null;
   searchLng: number | null;
   setSearchCoordinates: (lat: number | null, lng: number | null) => void;
-  useMyLocation: () => Promise<boolean>;
+  useMyLocation: () => Promise<UseMyLocationResult>;
   clearLocation: () => void;
   notice: string;
   setNotice: (value: string) => void;

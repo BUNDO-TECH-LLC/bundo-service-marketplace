@@ -9,6 +9,8 @@ export function Hero({
   onSearchTermChange,
   onSearch,
   onBrowse,
+  onUseMyLocation,
+  isDetectingLocation = false,
 }: {
   selectedState: string;
   states: string[];
@@ -17,6 +19,8 @@ export function Hero({
   onSearchTermChange: (value: string) => void;
   onSearch: (state: string, queryText: string) => Promise<void>;
   onBrowse: () => void;
+  onUseMyLocation?: () => void;
+  isDetectingLocation?: boolean;
 }) {
   async function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -50,9 +54,10 @@ export function Hero({
               <select
                 id="service-state"
                 value={selectedState}
+                disabled={isDetectingLocation}
                 onChange={(event) => onStateChange(event.target.value)}
               >
-                <option value="">Select your state</option>
+                <option value="">{isDetectingLocation ? 'Detecting…' : 'Select your state'}</option>
                 {states.map((state) => (
                   <option key={state} value={state}>{state}</option>
                 ))}
@@ -71,6 +76,16 @@ export function Hero({
               Search
             </button>
           </div>
+          {onUseMyLocation ? (
+            <button
+              className="location-link hero-location-link"
+              type="button"
+              disabled={isDetectingLocation}
+              onClick={onUseMyLocation}
+            >
+              {isDetectingLocation ? 'Finding your location…' : '⌖ Use my current location'}
+            </button>
+          ) : null}
           <button className="browse-link" type="button" onClick={onBrowse}>
             Browse all services
           </button>
@@ -79,4 +94,3 @@ export function Hero({
     </section>
   );
 }
-

@@ -110,7 +110,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps -- reload when entering marketplace routes
 
   useEffect(() => {
-    if (!userLocation.locationReady || !needsPublicMarketplaceData(location.pathname)) {
+    if (!needsPublicMarketplaceData(location.pathname)) {
       return;
     }
 
@@ -124,8 +124,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setNotice(message);
       });
   }, [
-    userLocation.locationReady,
     userLocation.selectedState,
+    userLocation.searchLat,
+    userLocation.searchLng,
     location.pathname,
     appData.loadPublicData,
     setNotice,
@@ -245,7 +246,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSelectedState: userLocation.setSelectedState,
     locationSource: userLocation.locationSource,
     isDetectingLocation: userLocation.isDetectingLocation,
-    locationReady: userLocation.locationReady,
     searchTerm: marketplaceFilters.searchTerm,
     setSearchTerm: marketplaceFilters.setSearchTerm,
     selectedCategoryId: marketplaceFilters.selectedCategoryId,
@@ -331,7 +331,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     userLocation.setSelectedState,
     userLocation.locationSource,
     userLocation.isDetectingLocation,
-    userLocation.locationReady,
     userLocation.searchLat,
     userLocation.searchLng,
     userLocation.setSearchCoordinates,

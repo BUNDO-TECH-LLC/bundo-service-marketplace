@@ -6,6 +6,8 @@ import { parseAuthDrawerPrompt, stripAuthDrawerParams } from '../lib/authDrawerP
 import { AuthBox } from '../auth/AuthBox';
 import { BundoLoadingScreen } from '../components/BundoLoadingScreen';
 import { buildAppPath } from '../lib/appPaths';
+import { needsPublicMarketplaceData } from '../lib/appRouting';
+import { locationErrorMessage } from '../lib/geolocation';
 import { nextHelpOpenState } from '../lib/helpNavigation';
 import { nigeriaStates } from '../lib/geo';
 import { userDisplayName } from '../lib/userDisplayName';
@@ -144,21 +146,46 @@ export function MainLayout() {
                     placeholder="Search for artisan"
                   />
                 </label>
-                <label>
+                <label className="topbar-location-field">
                   <span aria-hidden="true">⌖</span>
                   <select
                     value={ctx.selectedState}
+                    disabled={ctx.isDetectingLocation}
+                    aria-label="Location"
                     onChange={(event) => {
                       ctx.setSelectedState(event.target.value);
                     }}
                   >
-                    <option value="">Nigeria</option>
+                    <option value="">
+                      {ctx.isDetectingLocation ? 'Detecting…' : 'Nigeria'}
+                    </option>
                     {nigeriaStates.map((state) => (
                       <option key={state} value={state}>
                         {state}, Nigeria
                       </option>
                     ))}
                   </select>
+                  <button
+                    type="button"
+                    className="topbar-location-detect"
+                    disabled={ctx.isDetectingLocation}
+                    aria-label="Use my current location"
+                    title="Use my current location"
+                    onClick={() => {
+                      void ctx.useMyLocation().then((result) => {
+                        if (result.ok) {
+                          ctx.setNotice(`Showing services near ${result.state}.`);
+                          if (needsPublicMarketplaceData(ctx.location.pathname)) {
+                            void ctx.loadPublicData(result.state, ctx.searchTerm);
+                          }
+                          return;
+                        }
+                        ctx.setNotice(locationErrorMessage(result.reason));
+                      });
+                    }}
+                  >
+                    {ctx.isDetectingLocation ? '…' : 'Locate'}
+                  </button>
                 </label>
               </form>
             )}
