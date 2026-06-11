@@ -265,7 +265,6 @@ export default function WorkspacePage() {
               runAction={ctx.withNotice}
               reloadPrivate={() => ctx.loadPrivateData()}
               onBookingSuccess={ctx.setBookingSuccess}
-              openBookings={() => ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'bookings' }))}
             />
           )}
         </>
