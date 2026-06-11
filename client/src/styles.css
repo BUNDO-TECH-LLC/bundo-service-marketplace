@@ -5514,6 +5514,27 @@ footer h4 {
   gap: 10px;
 }
 
+.admin-sidebar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-sidebar-logo {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.admin-sidebar-wordmark {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+
 .admin-sidebar-head h1,
 .admin-sidebar-head p {
   margin: 0;

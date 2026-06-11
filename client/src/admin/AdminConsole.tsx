@@ -10,6 +10,7 @@ import { AdminLedgerPanel } from './AdminLedgerPanel';
 import { AdminProfilesPanel } from './AdminProfilesPanel';
 import { AdminReviewsPanel } from './AdminReviewsPanel';
 import { adminNavBadge } from './adminNavBadges';
+import bundoLogo from '../assets/BundoLogo.png';
 
 export function AdminConsole({
   section,
@@ -128,7 +129,10 @@ export function AdminConsole({
 
       <aside className="admin-sidebar" aria-label="Admin navigation">
         <div className="admin-sidebar-head">
-          <p className="eyebrow">Bundo</p>
+          <div className="admin-sidebar-brand">
+            <img className="admin-sidebar-logo" src={bundoLogo} alt="" />
+            <span className="admin-sidebar-wordmark">Bundo</span>
+          </div>
           <h1>Operations</h1>
           <p>Trust, jobs, support, and marketplace activity.</p>
         </div>
