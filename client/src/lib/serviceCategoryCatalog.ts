@@ -14,6 +14,23 @@ const catalogBySlug = new Map(SERVICE_CATEGORY_CATALOG.map((entry) => [entry.slu
 
 export const SERVICE_CATEGORY_SLUGS = new Set(SERVICE_CATEGORY_CATALOG.map((entry) => entry.slug));
 
+/** High-demand categories surfaced on the homepage and customer dashboard. */
+export const POPULAR_CATEGORY_SLUGS = [
+  'cleaning-laundry-fumigation',
+  'plumbing',
+  'electrical-inverter-odu',
+  'ac-refrigeration',
+  'barbing',
+  'carpentry-interior',
+] as const;
+
+export const HOMEPAGE_POPULAR_CATEGORY_LIMIT = 5;
+export const DASHBOARD_POPULAR_CATEGORY_LIMIT = 6;
+
+export type CatalogCategoryRow = ServiceCategoryDefinition & {
+  category: Category;
+};
+
 export function getServiceCategoryDefinition(slug: string) {
   return catalogBySlug.get(slug);
 }
@@ -40,5 +57,17 @@ export function listCatalogCategories(categories: Category[]) {
   return SERVICE_CATEGORY_CATALOG.flatMap((entry) => {
     const category = bySlug.get(entry.slug);
     return category ? [{ category, ...entry }] : [];
+  });
+}
+
+export function listPopularCatalogCategories(
+  categories: Category[],
+  limit: number = HOMEPAGE_POPULAR_CATEGORY_LIMIT
+) {
+  const bySlug = new Map(listCatalogCategories(categories).map((row) => [row.slug, row]));
+
+  return POPULAR_CATEGORY_SLUGS.slice(0, limit).flatMap((slug) => {
+    const row = bySlug.get(slug);
+    return row ? [row] : [];
   });
 }

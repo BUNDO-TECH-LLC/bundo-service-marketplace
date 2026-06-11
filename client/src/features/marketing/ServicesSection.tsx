@@ -1,5 +1,8 @@
 import type { Category } from '../../types';
-import { listCatalogCategories } from '../../lib/serviceCategoryCatalog';
+import {
+  HOMEPAGE_POPULAR_CATEGORY_LIMIT,
+  listPopularCatalogCategories,
+} from '../../lib/serviceCategoryCatalog';
 import { ServiceCategoryIcon } from '../../lib/serviceCategoryIcons';
 
 export function ServicesSection({
@@ -9,20 +12,20 @@ export function ServicesSection({
   categories: Category[];
   onBrowse: (categoryId?: string) => void | Promise<void>;
 }) {
-  const cards = listCatalogCategories(categories);
+  const cards = listPopularCatalogCategories(categories, HOMEPAGE_POPULAR_CATEGORY_LIMIT);
 
   return (
     <section className="services services-curated">
       <div className="section-title-row services-curated-title-row">
         <div className="services-curated-head">
-          <h2>Service categories</h2>
-          <p className="services-curated-sub">Book trusted professionals across every home and trade service.</p>
+          <h2>Popular service categories</h2>
+          <p className="services-curated-sub">Top booked trades on Bundo — explore more from the marketplace.</p>
         </div>
         <button type="button" className="services-explore-all" onClick={() => void onBrowse()}>
           Explore All <span aria-hidden>→</span>
         </button>
       </div>
-      <div className="services-curated-grid">
+      <div className="services-curated-grid services-curated-grid--popular">
         {cards.map((row) => (
           <button
             key={row.slug}

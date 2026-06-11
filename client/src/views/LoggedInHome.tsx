@@ -1,7 +1,10 @@
 import { FormEvent, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { api } from '../lib/api';
-import { sortCategoriesByCatalog } from '../lib/serviceCategoryCatalog';
+import {
+  DASHBOARD_POPULAR_CATEGORY_LIMIT,
+  listPopularCatalogCategories,
+} from '../lib/serviceCategoryCatalog';
 import { ServiceCategoryIcon } from '../lib/serviceCategoryIcons';
 import { heroImage } from '../lib/marketingAssets';
 import { money } from '../lib/formatting';
@@ -53,7 +56,7 @@ export function LoggedInHome({
   const displayName = userDisplayName(firebaseUser, me);
   const recommendedOfferings = offerings.slice(0, 3);
   const featuredArtisan = artisans[0];
-  const sortedCategories = sortCategoriesByCatalog(categories);
+  const popularCategories = listPopularCatalogCategories(categories, DASHBOARD_POPULAR_CATEGORY_LIMIT);
   const [activeOfferingAction, setActiveOfferingAction] = useState<string | null>(null);
 
   async function submitSearch(event: FormEvent<HTMLFormElement>) {
@@ -119,12 +122,12 @@ export function LoggedInHome({
             <button type="submit">Search</button>
           </form>
           <div className="quick-service-grid" aria-label="Quick service picks">
-            {sortedCategories.slice(0, 6).map((category) => (
-              <button key={category.id} type="button" onClick={() => void onBrowse(category.id)}>
+            {popularCategories.slice(0, 5).map((row) => (
+              <button key={row.category.id} type="button" onClick={() => void onBrowse(row.category.id)}>
                 <span className="quick-service-icon">
-                  <ServiceCategoryIcon iconKey={category.iconKey} />
+                  <ServiceCategoryIcon iconKey={row.iconKey} />
                 </span>
-                {category.name}
+                {row.name}
               </button>
             ))}
             <button className="wide" type="button" onClick={() => void onBrowse()}>
@@ -151,17 +154,19 @@ export function LoggedInHome({
 
       <section className="logged-section">
         <div className="logged-section-head">
-          <h2>Categories</h2>
+          <h2>Popular categories</h2>
           <button type="button" onClick={() => void onBrowse()}>View all categories</button>
         </div>
-        <div className="logged-category-row">
-          {categories.length === 0 && <span className="muted">Categories will appear here after seeding.</span>}
-          {sortedCategories.map((category) => (
-            <button key={category.id} type="button" onClick={() => void onBrowse(category.id)}>
+        <div className="logged-category-row logged-category-row--popular">
+          {popularCategories.length === 0 && (
+            <span className="muted">Popular categories will appear here after seeding.</span>
+          )}
+          {popularCategories.map((row) => (
+            <button key={row.category.id} type="button" onClick={() => void onBrowse(row.category.id)}>
               <span className="logged-category-icon">
-                <ServiceCategoryIcon iconKey={category.iconKey} />
+                <ServiceCategoryIcon iconKey={row.iconKey} />
               </span>
-              {category.name}
+              <span className="logged-category-label">{row.name}</span>
             </button>
           ))}
         </div>
