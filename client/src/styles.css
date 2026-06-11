@@ -2216,17 +2216,37 @@ canvas {
   margin-inline: auto;
 }
 
+/* Landing: 6 popular services — 3 per row. */
 .services-curated-grid--popular {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 20px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+  max-width: 1240px;
 }
 
 .services-curated-grid--popular .services-category-card {
-  flex: 1 1 calc(33.333% - 14px);
-  min-width: min(100%, 240px);
-  max-width: 360px;
+  min-height: 210px;
+  padding: 28px 26px 30px;
+}
+
+.services-curated-grid--popular .services-category-icon-tile {
+  width: 52px;
+  height: 52px;
+  margin-bottom: 18px;
+}
+
+.services-curated-grid--popular .services-category-icon-tile svg {
+  width: 24px;
+  height: 24px;
+}
+
+.services-curated-grid--popular .services-category-card-title {
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.services-curated-grid--popular .services-category-card-desc {
+  font-size: 14px;
+  -webkit-line-clamp: 2;
 }
 
 .services-category-card {
@@ -2306,9 +2326,8 @@ canvas {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .services-curated-grid--popular .services-category-card {
-    flex-basis: calc(50% - 10px);
-    min-width: min(100%, 220px);
+  .services-curated-grid--popular {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .logged-category-row--popular {
@@ -2321,11 +2340,6 @@ canvas {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .services-curated-grid--popular .services-category-card {
-    flex-basis: calc(50% - 10px);
-    max-width: none;
-  }
-
   .logged-category-row--popular {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2336,9 +2350,38 @@ canvas {
     grid-template-columns: 1fr;
   }
 
+  /* Landing popular grid stays 2 columns on mobile. */
+  .services-curated-grid--popular {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
   .services-curated-grid--popular .services-category-card {
-    flex-basis: 100%;
-    max-width: none;
+    min-height: 0;
+    padding: 18px 14px 20px;
+  }
+
+  .services-curated-grid--popular .services-category-icon-tile {
+    width: 44px;
+    height: 44px;
+    margin-bottom: 12px;
+  }
+
+  .services-curated-grid--popular .services-category-icon-tile svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .services-curated-grid--popular .services-category-card-title {
+    font-size: 13px;
+    line-height: 1.35;
+    margin-bottom: 6px;
+  }
+
+  .services-curated-grid--popular .services-category-card-desc {
+    font-size: 12px;
+    line-height: 1.4;
+    -webkit-line-clamp: 2;
   }
 
   .logged-category-row--popular {

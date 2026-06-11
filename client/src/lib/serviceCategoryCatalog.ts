@@ -24,7 +24,7 @@ export const POPULAR_CATEGORY_SLUGS = [
   'carpentry-interior',
 ] as const;
 
-export const HOMEPAGE_POPULAR_CATEGORY_LIMIT = 5;
+export const HOMEPAGE_POPULAR_CATEGORY_LIMIT = 6;
 export const DASHBOARD_POPULAR_CATEGORY_LIMIT = 6;
 
 export type CatalogCategoryRow = ServiceCategoryDefinition & {
