@@ -53,7 +53,7 @@ export function LoggedInHome({
 }) {
   const displayName = userDisplayName(firebaseUser, me);
   const recommendedOfferings = offerings.slice(0, 3);
-  const featuredArtisan = artisans[0];
+  const featuredArtisan = offerings.find((offering) => offering.artisan)?.artisan ?? artisans[0];
   const popularCategories = listPopularCatalogCategories(categories, DASHBOARD_POPULAR_CATEGORY_LIMIT);
   const [activeOfferingAction, setActiveOfferingAction] = useState<string | null>(null);
 

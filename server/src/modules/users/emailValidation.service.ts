@@ -28,5 +28,5 @@ export function validateEmailFormat(raw: string) {
 
 export async function validateSignupEmail(raw: string) {
   const { email } = validateEmailFormat(raw);
-  return { email, domainReachable: true as const };
+  return { email };
 }

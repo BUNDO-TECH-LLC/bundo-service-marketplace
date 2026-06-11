@@ -40,7 +40,7 @@ Shipped on `main` (newest first):
 
 | Commit / area | Summary |
 |---------------|---------|
-| **Pre-launch polish (May 19)** | Account **Settings** hub at `/workspace/settings` (personal, business, phone, email, language, notifications, password, delete account); `DELETE /users/account`; mobile settings layout; icon topbar for signed-in users; **artisan workspace** icon nav (`ArtisanTopbarNav`) aligned with customer topbar; shared **Bundo loading** mark (`BundoLoadingMark`) for bootstrap, `/loading`, and artisan gate; **auth drawer** stability; **`/terms`** and **`/privacy`** legal pages; support email `support@bundo.market`. |
+| **Pre-launch polish (May 19)** | Account **Settings** hub at `/workspace/settings` (personal, business, phone, email, language, notifications, password, delete account); `DELETE /users/account`; mobile settings layout; icon topbar for signed-in users; **artisan workspace** icon nav (`ArtisanTopbarNav`) aligned with customer topbar; shared **Bundo loading** mark (`BundoLoadingMark`) for bootstrap, `/loading`, and artisan gate; **auth drawer** stability; **`/terms`** and **`/privacy`** legal pages; support email `support@bundo.ng`. |
 | **Forgot password** (`476eac9`) | Dedicated `/forgot-password` page (`ForgotPassword.tsx`, `AuthLayout`); Firebase reset via `sendBundoPasswordResetEmail` with continue URL → `/login`; login links here with optional `?email=`; removed inline reset from `AuthPage`. |
 | **CI Postgres SSL** (`fc0dbf9`) | GitHub Actions smoke job uses `sslmode=disable` for the local Postgres service so `prisma migrate deploy` succeeds (Prisma config defaults to `sslmode=require`). |
 | **Client architecture refactor** (`b9240a0`) | Thin `App.tsx` → `AppProvider` + hooks (`useAppAuth`, `useAppData`, `useAppRouteSync`, …); domain UI under `client/src/features/*`; artisan onboarding split into `features/artisan/landing/`; dedicated auth routes `/login`, `/signup`, `/verify-email`; [client/ARCHITECTURE.md](/Users/macbook/bundo/client/ARCHITECTURE.md). |
@@ -1237,7 +1237,7 @@ Use this before calling the product **publicly launched**. Items marked **Blocke
 - [ ] **Stabilize CI smoke** — Green `smoke` job on every `main` push (investigate GitHub-only e2e failures if migrate passes)
 - [x] **Google sign-in on `/login`** — `lib/authSessionFlow.ts` + `AuthPage` (May 2026)
 - [x] **Legal / trust pages** — `/terms`, `/privacy` (`LegalPage.tsx`, `legalContent.ts`); footer + signup + drawer links
-- [ ] **Support contact** — Monitored `support@bundo.market` (constant in `client/src/constants/support.ts`); wire in Help footer if not already
+- [ ] **Support contact** — Monitored `support@bundo.ng` (constant in `client/src/constants/support.ts`); wire in Help footer if not already
 - [ ] **Firebase email domain** — Custom domain + templates for verification and reset (reduce spam folder)
 - [ ] **Error monitoring** — Sentry or similar on client + server
 - [ ] **Uptime alerting** — Ping `/health` and `/ready` (e.g. Better Uptime, Render/Vercel notifications)

@@ -102,9 +102,8 @@ export function useAppData(filters: MarketplaceFilterState, options?: UseAppData
 
       const query = `?${params.toString()}`;
       const requestOptions = { timeoutMs: PUBLIC_API_TIMEOUT_MS };
-      const [categoriesResult, artisansResult, offeringsResult] = await Promise.allSettled([
+      const [categoriesResult, offeringsResult] = await Promise.allSettled([
         api<{ categories: Category[] }>('/categories', requestOptions),
-        api<{ artisans: Artisan[] }>(`/artisans${query}`, requestOptions),
         api<{ offerings: Offering[] }>(`/offerings${query}`, requestOptions),
       ]);
 
@@ -115,18 +114,19 @@ export function useAppData(filters: MarketplaceFilterState, options?: UseAppData
         loadedAny = true;
       }
 
-      if (artisansResult.status === 'fulfilled') {
-        setArtisans(artisansResult.value.artisans);
-        loadedAny = true;
-      }
-
       if (offeringsResult.status === 'fulfilled') {
         setPublicOfferings(offeringsResult.value.offerings);
+        setArtisans(
+          offeringsResult.value.offerings
+            .map((offering) => offering.artisan)
+            .filter((artisan): artisan is Artisan => Boolean(artisan))
+            .filter((artisan, index, list) => list.findIndex((row) => row.id === artisan.id) === index)
+        );
         loadedAny = true;
       }
 
       if (!loadedAny) {
-        const firstError = [categoriesResult, artisansResult, offeringsResult].find(
+        const firstError = [categoriesResult, offeringsResult].find(
           (result): result is PromiseRejectedResult => result.status === 'rejected'
         )?.reason;
 
@@ -273,6 +273,13 @@ export function useAppData(filters: MarketplaceFilterState, options?: UseAppData
     [loadPrivateData]
   );
 
+  const loadNotifications = useCallback(async (authToken: string) => {
+    const notificationRes = await api<{ notifications: Notification[] }>('/notifications', {
+      token: authToken,
+    }).catch(() => ({ notifications: [] }));
+    setNotifications(notificationRes.notifications);
+  }, []);
+
   return {
     categories,
     artisans,
@@ -298,6 +305,7 @@ export function useAppData(filters: MarketplaceFilterState, options?: UseAppData
     loadConversations,
     loadAdminEssentials,
     loadAdminSection,
+    loadNotifications,
     clearPrivateData,
     completePaymentReturn,
   };

@@ -20,7 +20,6 @@ import logger from './utils/logger';
 import db from './db/client';
 import { appErrorHandler } from './middlewares/errorHandler';
 import { verifyAppCheck } from './middlewares/verifyAppCheck';
-import { getCloudinaryHealth } from './utils/cloudinaryUploadConfig';
 
 export function createApp() {
   const app = express();
@@ -169,16 +168,6 @@ export function createApp() {
   app.get('/ready', async (_req, res) => {
     try {
       await db.$queryRaw`SELECT 1`;
-      const cloudinary = await getCloudinaryHealth();
-
-      if (!cloudinary.ok) {
-        res.status(503).json({
-          status: 'not_ready',
-          service: 'bundo-api',
-          cloudinary,
-        });
-        return;
-      }
 
       res.json({
         status: 'ready',
@@ -188,10 +177,6 @@ export function createApp() {
           paystackConfigured: Boolean(env.PAYSTACK_SECRET_KEY),
           paystackMode: env.PAYSTACK_SECRET_KEY?.startsWith('sk_live') ? 'live' : env.PAYSTACK_SECRET_KEY ? 'test' : 'off',
           callbackConfigured: Boolean(env.PAYSTACK_CALLBACK_URL),
-        },
-        cloudinary: {
-          ok: true,
-          cloudName: cloudinary.cloudName,
         },
       });
     } catch {

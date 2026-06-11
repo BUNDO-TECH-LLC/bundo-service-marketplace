@@ -9,7 +9,7 @@ import { buildAppPath } from '../lib/appPaths';
 import { nextHelpOpenState } from '../lib/helpNavigation';
 import { nigeriaStates } from '../lib/geo';
 import { userDisplayName } from '../lib/userDisplayName';
-import bundoLogo from '../assets/bundo-logo.png';
+import bundoLogo from '../assets/BundoLogo.png';
 import { auth } from '../lib/firebase';
 import { PaymentSuccessDialog } from '../components/PaymentSuccessDialog';
 import { ArtisanAppHeader } from '../features/artisan/ArtisanAppHeader';

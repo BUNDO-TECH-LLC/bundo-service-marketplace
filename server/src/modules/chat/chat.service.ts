@@ -5,10 +5,24 @@ import { workspaceLink } from '../../lib/appLinks';
 import { createNotification } from '../notifications/notifications.service';
 import logger from '../../utils/logger';
 
+const conversationSyncAt = new Map<string, number>();
+const CONVERSATION_SYNC_TTL_MS = 5 * 60_000;
+
 async function ensureBookingConversationsForUser(input: {
   firebaseUid: string;
   role: Role | null;
 }) {
+  const syncKey = `${input.firebaseUid}:${input.role ?? 'none'}`;
+  const lastSync = conversationSyncAt.get(syncKey) ?? 0;
+
+  if (Date.now() - lastSync < CONVERSATION_SYNC_TTL_MS) {
+    if (input.role === Role.ARTISAN) {
+      return getArtisanProfileByUserId(input.firebaseUid);
+    }
+
+    return null;
+  }
+
   if (input.role === Role.ARTISAN) {
     const artisan = await getArtisanProfileByUserId(input.firebaseUid);
 
@@ -37,6 +51,7 @@ async function ensureBookingConversationsForUser(input: {
       });
     }
 
+    conversationSyncAt.set(syncKey, Date.now());
     return artisan;
   }
 
@@ -59,6 +74,7 @@ async function ensureBookingConversationsForUser(input: {
     });
   }
 
+  conversationSyncAt.set(syncKey, Date.now());
   return null;
 }
 

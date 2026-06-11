@@ -8,6 +8,12 @@ export function isAuthPathname(pathname: string): boolean {
   return AUTH_PATHS.has(p);
 }
 
+/** Routes that need categories/offerings bootstrap data. */
+export function needsPublicMarketplaceData(pathname: string): boolean {
+  const p = pathname.replace(/\/+$/, '') || '/';
+  return p === '/' || p === '/marketplace' || p.startsWith('/artisans/');
+}
+
 /** Routes that should survive auth bootstrap (guest or post-login redirect). */
 export function isPublicBrowsePathname(pathname: string): boolean {
   const p = pathname.replace(/\/+$/, '') || '/';

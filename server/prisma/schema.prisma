@@ -178,6 +178,8 @@ model Offering {
 
   @@index([artisanId])
   @@index([categoryId])
+  @@index([priceFrom])
+  @@index([categoryId, priceFrom])
   @@map("offerings")
 }
 
@@ -261,6 +263,9 @@ model Payment {
   payouts             Payout[]
   ledgerEntries       LedgerEntry[]
 
+  @@index([customerId])
+  @@index([artisanId])
+  @@index([status])
   @@map("payments")
 }
 
@@ -411,6 +416,8 @@ model Conversation {
   chatReports  ChatUserReport[]
 
   @@unique([customerId, artisanId])
+  @@index([artisanId, artisanInbox])
+  @@index([customerId, customerInbox])
   @@map("conversations")
 }
 

@@ -1,4 +1,4 @@
-import { BookingStatus, NotificationType, Prisma, Role } from '@prisma/client';
+import { BookingStatus, NotificationType, Prisma, Role, UserStatus, VerifyStatus } from '@prisma/client';
 import db from '../../db/client';
 import { appendBookingLifecycleMessage } from '../../lib/bookingConversations';
 import { bookingPaymentRequiredForStatus } from '../../lib/bookingPayment';
@@ -70,9 +70,25 @@ export const createBooking = async (input: {
 }) => {
   const offering = await db.offering.findUnique({
     where: { id: input.offeringId },
+    include: {
+      artisan: {
+        include: {
+          user: {
+            select: { status: true },
+          },
+        },
+      },
+    },
   });
 
   if (!offering) {
+    return null;
+  }
+
+  if (
+    offering.artisan.verifyStatus !== VerifyStatus.APPROVED ||
+    offering.artisan.user.status !== UserStatus.ACTIVE
+  ) {
     return null;
   }
 

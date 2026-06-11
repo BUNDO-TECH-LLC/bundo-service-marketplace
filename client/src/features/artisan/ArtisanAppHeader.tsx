@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ArtisanHeaderActive } from '../../appTypes';
-import bundoLogo from '../../assets/bundo-logo.png';
+import bundoLogo from '../../assets/BundoLogo.png';
 import { IconHelp, IconProfile, IconReviews, IconSettings } from '../../components/TopbarNavIcons';
 import { ProfileAccountMenu } from '../../components/ProfileAccountMenu';
 import { useMediaQuery } from '../../hooks/useMediaQuery';

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { signOut } from 'firebase/auth';
-import bundoLogo from '../assets/bundo-logo.png';
+import bundoLogo from '../assets/BundoLogo.png';
 import { IconHelp, TopbarNavButton } from '../components/TopbarNavIcons';
 import { auth } from '../lib/firebase';
 import { buildAppPath } from '../lib/appPaths';

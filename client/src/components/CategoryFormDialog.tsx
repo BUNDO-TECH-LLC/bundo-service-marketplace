@@ -26,13 +26,13 @@ export function CategoryFormDialog({
 }) {
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
-  const [iconKey, setIconKey] = useState('service');
+  const [iconKey, setIconKey] = useState('cleaning');
 
   useEffect(() => {
     if (!open) return;
     setName(initial?.name ?? '');
     setSlug(initial?.slug ?? '');
-    setIconKey(initial?.iconKey ?? 'service');
+    setIconKey(initial?.iconKey ?? 'cleaning');
   }, [open, initial]);
 
   if (!open) {

@@ -42,7 +42,7 @@ import { resolveApiSession } from '../lib/resolveApiSession';
 import { userDisplayName } from '../lib/userDisplayName';
 import type { ApiUser, Role } from '../types';
 import type { SignupRole, View, WorkspaceSection } from '../appTypes';
-import bundoLogo from '../assets/bundo-logo.png';
+import bundoLogo from '../assets/BundoLogo.png';
 import { sendBundoEmailVerification } from '../lib/authEmailVerification';
 import { LegalLinks } from '../components/LegalLinks';
 import { PasswordInput } from '../components/PasswordInput';

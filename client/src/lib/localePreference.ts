@@ -4,9 +4,6 @@ const storageKey = 'bundo:locale';
 
 export const LOCALE_OPTIONS: { value: BundoLocale; label: string }[] = [
   { value: 'en', label: 'English' },
-  { value: 'ha', label: 'Hausa' },
-  { value: 'yo', label: 'Yoruba' },
-  { value: 'ig', label: 'Igbo' },
 ];
 
 export function readLocalePreference(): BundoLocale {

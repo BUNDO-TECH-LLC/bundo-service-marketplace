@@ -17,6 +17,7 @@ export function useAppPush({
   setPushStatus,
   setNotice,
   loadPrivateData,
+  loadNotifications,
   currentTokenRef,
 }: {
   isAuthed: boolean;
@@ -27,6 +28,7 @@ export function useAppPush({
   setPushStatus: (value: PushStatus) => void;
   setNotice: (message: string) => void;
   loadPrivateData: (authToken: string, user?: ApiUser | null) => Promise<void>;
+  loadNotifications: (authToken: string) => Promise<void>;
   currentTokenRef: MutableRefObject<string>;
 }) {
   const syncPushToken = useCallback(
@@ -68,8 +70,8 @@ export function useAppPush({
 
     subscribeToForegroundMessages(async (payload) => {
       const latestToken = currentTokenRef.current;
-      if (latestToken && me?.role) {
-        await loadPrivateData(latestToken, me);
+      if (latestToken) {
+        await loadNotifications(latestToken);
       }
       const title = payload.notification?.title || 'New update from Bundo';
       setNotice(title);
@@ -78,7 +80,7 @@ export function useAppPush({
     return () => {
       cancelled = true;
     };
-  }, [isAuthed, loadPrivateData, me, pushToken, setPushStatus, setNotice, syncPushToken, token, currentTokenRef]);
+  }, [isAuthed, loadNotifications, me, pushToken, setPushStatus, setNotice, syncPushToken, token, currentTokenRef]);
 
   const enablePushAlerts = useCallback(async () => {
     if (!token) {

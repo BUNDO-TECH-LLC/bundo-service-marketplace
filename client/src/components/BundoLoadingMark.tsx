@@ -1,4 +1,4 @@
-import bundoLogo from '../assets/bundo-logo.png';
+import bundoLogo from '../assets/BundoLogo.png';
 
 type BundoLoadingMarkProps = {
   variant?: 'indeterminate' | 'progress';

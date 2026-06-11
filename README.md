@@ -33,8 +33,11 @@ Product architecture, API index, payment flows, deployment steps, **recent chang
 
 1. `npm run build` and `npm test` locally (or rely on CI on `main`).
 2. `cd server && npm run db:migrate:deploy:pooler` on the production database.
-3. Push to `main`; Vercel rebuilds the client when connected. On Render, trigger **Manual Deploy** (or confirm auto-deploy from `main`) for the API service.
-4. Confirm `VITE_API_BASE_URL`, `CORS_ORIGIN`, and `PAYSTACK_CALLBACK_URL` match your live URLs.
+3. **`cd server && npm run db:seed`** — syncs the 11 service categories (required on fresh DBs).
+4. **Promote the first admin** — set `role = 'ADMIN'` for your operator in the `users` table (Prisma Studio or SQL). See [docs/DEPLOY.md](docs/DEPLOY.md).
+5. Push to `main`; Vercel rebuilds the client when connected. On Render, trigger **Manual Deploy** (or confirm auto-deploy from `main`) for the API service.
+6. Confirm `VITE_API_BASE_URL`, `CORS_ORIGIN`, `PAYSTACK_SECRET_KEY`, `PAYSTACK_CALLBACK_URL`, and Paystack webhook URL match your live URLs.
+7. Optional hardening: enable Firebase App Check (`VITE_FIREBASE_APP_CHECK_SITE_KEY` + `FIREBASE_APP_CHECK_ENFORCE=true`) and Sentry DSNs.
 
 ## Scripts (root `package.json`)
 

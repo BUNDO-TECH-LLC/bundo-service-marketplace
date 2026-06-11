@@ -1,4 +1,5 @@
 import type { PortfolioImage } from '../types';
+import { optimizeCloudinaryUrl } from '../lib/cloudinaryUrl';
 
 export function AdminPortfolioGallery({
   images,
@@ -28,7 +29,10 @@ export function AdminPortfolioGallery({
           target="_blank"
           rel="noreferrer"
         >
-          <img src={image.url} alt={artisanName ? `${artisanName} photo ${index + 1}` : `Portfolio ${index + 1}`} />
+          <img
+            src={optimizeCloudinaryUrl(image.url, 480)}
+            alt={artisanName ? `${artisanName} photo ${index + 1}` : `Portfolio ${index + 1}`}
+          />
         </a>
       ))}
     </div>

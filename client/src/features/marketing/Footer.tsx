@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import bundoLogo from '../../assets/bundo-logo.png';
+import bundoLogo from '../../assets/BundoLogo.png';
 
 export function Footer({
   onOpenHelpTopic,

@@ -26,7 +26,14 @@ export function Hero({
   return (
     <section className="hero">
       <div className="hero-media">
-        <img src={heroImage} alt="Professional cleaning a bright home" />
+        <img
+          src={heroImage}
+          alt="Professional cleaning a bright home"
+          width={960}
+          height={640}
+          fetchPriority="high"
+          decoding="async"
+        />
       </div>
       <div className="hero-copy">
         <p className="eyebrow">BUNDO MARKETPLACE</p>

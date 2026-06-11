@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { ArtisanHeaderActive, AdminSection, BookingSuccessState, PaymentSuccessState } from '../appTypes';
-import { isAuthPathname } from '../lib/appRouting';
+import { isAuthPathname, needsPublicMarketplaceData } from '../lib/appRouting';
 import { ApiError } from '../lib/api';
 import { firebaseReady } from '../lib/firebase';
 import { useActionRunner } from '../hooks/useActionRunner';
@@ -67,10 +67,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setPushStatus: auth.setPushStatus,
     setNotice,
     loadPrivateData: appData.loadPrivateData,
+    loadNotifications: appData.loadNotifications,
     currentTokenRef: auth.currentTokenRef,
   });
 
   useEffect(() => {
+    if (!needsPublicMarketplaceData(location.pathname)) {
+      return;
+    }
+
     appData.loadPublicData().catch((error) => {
       const message =
         error instanceof ApiError
@@ -78,8 +83,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           : 'Could not load marketplace data. Check your connection and try again.';
       setNotice(message);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- initial marketplace load once
-  }, []);
+  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps -- reload when entering marketplace routes
 
   const isAuthed = Boolean(auth.firebaseUser && auth.token);
   const onAuthScreen = isAuthPathname(location.pathname);

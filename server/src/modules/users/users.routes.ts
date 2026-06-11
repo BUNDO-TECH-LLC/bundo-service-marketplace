@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { Role } from '@prisma/client';
 import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
 import { asyncHandler } from '../../middlewares/errorHandler';
@@ -20,8 +21,16 @@ import {
 
 const router = Router();
 
+const signupProbeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: process.env.NODE_ENV === 'production' ? 20 : 200,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+});
+
 router.post(
   '/validate-email',
+  signupProbeLimiter,
   asyncHandler(async (req, res) => {
     const { email, purpose } = req.body;
 
@@ -38,7 +47,6 @@ router.post(
     res.json({
       message: 'Email looks valid',
       email: result.email,
-      domainReachable: result.domainReachable,
       available: purpose === 'signup' ? true : undefined,
     });
   })
@@ -46,6 +54,7 @@ router.post(
 
 router.post(
   '/validate-signup-phone',
+  signupProbeLimiter,
   asyncHandler(async (req, res) => {
     const { phone } = req.body;
 
@@ -63,6 +72,7 @@ router.post(
 
 router.post(
   '/email-account-status',
+  signupProbeLimiter,
   asyncHandler(async (req, res) => {
     const { email } = req.body;
 

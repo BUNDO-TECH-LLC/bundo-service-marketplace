@@ -169,7 +169,6 @@ export const getArtisanById = async (id: string) => {
       user: {
         select: {
           firebaseUid: true,
-          phone: true,
           role: true,
           status: true,
         },
@@ -183,6 +182,13 @@ export const getArtisanById = async (id: string) => {
         orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
       },
     },
+  });
+};
+
+export const findApprovedArtisanId = async (id: string) => {
+  return db.artisanProfile.findFirst({
+    where: { id, verifyStatus: VerifyStatus.APPROVED },
+    select: { id: true },
   });
 };
 

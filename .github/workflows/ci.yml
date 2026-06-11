@@ -111,3 +111,4 @@ jobs:
       - run: npm run build
         env:
           VITE_API_BASE_URL: https://bundo-service-marketplace.onrender.com
+      - run: npm test

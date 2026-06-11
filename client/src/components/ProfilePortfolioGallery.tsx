@@ -1,4 +1,5 @@
 import type { PortfolioImage } from '../types';
+import { optimizeCloudinaryUrl } from '../lib/cloudinaryUrl';
 
 export function ProfilePortfolioGallery({
   images,
@@ -21,7 +22,7 @@ export function ProfilePortfolioGallery({
         {images.map((image, index) => (
           <figure className="profile-portfolio-slide" key={image.id}>
             <img
-              src={image.url}
+              src={optimizeCloudinaryUrl(image.url, 720)}
               alt={`${artisanName} work sample ${index + 1}`}
               loading={index < 5 ? 'eager' : 'lazy'}
               decoding="async"

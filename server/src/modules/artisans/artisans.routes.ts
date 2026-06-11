@@ -27,6 +27,7 @@ import {
   getArtisanProfileDetailsByUserId,
   getArtisanProfileByUserId,
   getArtisans,
+  findApprovedArtisanId,
   getCategoryById,
   getOfferingsForArtisanUser,
   getPortfolioImagesByArtisanId,
@@ -37,6 +38,37 @@ import {
 } from './artisans.service';
 import { env } from '../../config/env';
 import { createCloudinarySignedUpload } from '../../utils/cloudinaryUploadConfig';
+import {
+  assertOwnedCloudinaryImageUrl,
+  assertOwnedCloudinaryPublicId,
+} from '../../utils/cloudinaryAsset';
+
+const PORTFOLIO_FOLDER = 'bundo/artisan-portfolio';
+const KYC_FOLDER = 'bundo/artisan-kyc';
+
+function validateCloudinaryImageInput(
+  imageUrl: string,
+  folderPrefix: string,
+  cloudinaryId?: string
+) {
+  let publicId: string;
+
+  try {
+    publicId = assertOwnedCloudinaryImageUrl(imageUrl, folderPrefix);
+  } catch (error) {
+    throw httpError(400, error instanceof Error ? error.message : 'Invalid image URL');
+  }
+
+  if (cloudinaryId !== undefined) {
+    try {
+      assertOwnedCloudinaryPublicId(cloudinaryId, folderPrefix, publicId);
+    } catch (error) {
+      throw httpError(400, error instanceof Error ? error.message : 'Invalid cloudinaryId');
+    }
+  }
+
+  return publicId;
+}
 
 const router = Router();
 
@@ -76,6 +108,11 @@ router.post(
       (typeof selfieImageUrl !== 'string' || !selfieImageUrl.trim())
     ) {
       throw httpError(400, 'selfieImageUrl must be a string');
+    }
+
+    validateCloudinaryImageInput(documentImageUrl, KYC_FOLDER);
+    if (typeof selfieImageUrl === 'string' && selfieImageUrl.trim()) {
+      validateCloudinaryImageInput(selfieImageUrl, KYC_FOLDER);
     }
 
     const submission = await createOrUpdateKycSubmission(
@@ -304,6 +341,8 @@ router.post(
       throw httpError(400, 'displayOrder must be a non-negative integer');
     }
 
+    validateCloudinaryImageInput(url, PORTFOLIO_FOLDER, cloudinaryId);
+
     const image = await addPortfolioImage((req as any).user.firebaseUid, {
       cloudinaryId,
       url,
@@ -350,7 +389,10 @@ router.post(
       throw httpError(404, 'Create an artisan profile before adding availability slots');
     }
 
-    throw httpError(201, 'Availability slot added');
+    res.status(201).json({
+      message: 'Availability slot added',
+      slot,
+    });
   }
 );
 
@@ -493,6 +535,16 @@ router.patch(
         throw httpError(400, 'url must be a string');
       }
       data.url = url;
+    }
+
+    if (data.url !== undefined) {
+      validateCloudinaryImageInput(data.url, PORTFOLIO_FOLDER, data.cloudinaryId);
+    } else if (data.cloudinaryId !== undefined) {
+      try {
+        assertOwnedCloudinaryPublicId(data.cloudinaryId, PORTFOLIO_FOLDER);
+      } catch (error) {
+        throw httpError(400, error instanceof Error ? error.message : 'Invalid cloudinaryId');
+      }
     }
 
     if (displayOrder !== undefined) {
@@ -709,7 +761,7 @@ router.get('/', asyncHandler(async (req, res) => {
 
 router.get('/:id/portfolio-images', asyncHandler(async (req, res) => {
   const artisanId = String(req.params.id);
-  const artisan = await getArtisanById(artisanId);
+  const artisan = await findApprovedArtisanId(artisanId);
 
   if (!artisan) {
     throw httpError(404, 'Artisan not found');
@@ -726,7 +778,7 @@ router.get('/:id/portfolio-images', asyncHandler(async (req, res) => {
 
 router.get('/:id/availability-slots', asyncHandler(async (req, res) => {
   const artisanId = String(req.params.id);
-  const artisan = await getArtisanById(artisanId);
+  const artisan = await findApprovedArtisanId(artisanId);
 
   if (!artisan) {
     throw httpError(404, 'Artisan not found');

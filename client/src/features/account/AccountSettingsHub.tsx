@@ -586,7 +586,7 @@ export function AccountSettingsHub({
 
           <article id="account-settings-language" className={`panel-card form-card ${panelClass('language')}`}>
             <h2>Language</h2>
-            <p className="muted">Choose your preferred language. Full translations are rolling out across Bundo.</p>
+            <p className="muted">Bundo is currently available in English. More languages are coming soon.</p>
             {!editingLanguage ? (
               <div className="account-settings-readonly-card">
                 <dl className="account-settings-summary-grid">

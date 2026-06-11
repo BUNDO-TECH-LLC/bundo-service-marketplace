@@ -1,5 +1,6 @@
 import type { ActionRunner } from '../appTypes';
 import type { PortfolioImage } from '../types';
+import { optimizeCloudinaryUrl } from '../lib/cloudinaryUrl';
 
 type ArtisanPortfolioManagerProps = {
   variant: 'onboarding' | 'settings' | 'pending';
@@ -252,7 +253,7 @@ function PortfolioImageCard({
 }) {
   return (
     <div className="portfolio-image-card">
-      <img src={image.url} alt={`Work photo ${index + 1}`} />
+      <img src={optimizeCloudinaryUrl(image.url, 480)} alt={`Work photo ${index + 1}`} />
       {reorderPortfolioImage && imageCount > 1 && (
         <div className="portfolio-image-order">
           <button
