@@ -122,12 +122,12 @@ export function LoggedInHome({
             <button type="submit">Search</button>
           </form>
           <div className="quick-service-grid" aria-label="Quick service picks">
-            {popularCategories.slice(0, 5).map((row) => (
+            {popularCategories.slice(0, 3).map((row) => (
               <button key={row.category.id} type="button" onClick={() => void onBrowse(row.category.id)}>
                 <span className="quick-service-icon">
                   <ServiceCategoryIcon iconKey={row.iconKey} />
                 </span>
-                {row.name}
+                <span className="quick-service-label">{row.name}</span>
               </button>
             ))}
             <button className="wide" type="button" onClick={() => void onBrowse()}>
@@ -152,7 +152,7 @@ export function LoggedInHome({
         </div>
       </section>
 
-      <section className="logged-section">
+      <section className="logged-section logged-section--popular-categories">
         <div className="logged-section-head">
           <h2>Popular categories</h2>
           <button type="button" onClick={() => void onBrowse()}>View all categories</button>
