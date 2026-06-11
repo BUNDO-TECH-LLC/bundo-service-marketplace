@@ -6,7 +6,7 @@ import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
-import categories from '../../shared/service-categories.json';
+import { SERVICE_CATEGORIES } from '../src/config/serviceCategories';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -18,6 +18,7 @@ const db = new PrismaClient({ adapter });
 async function main() {
   console.log('🌱 Seeding database...');
 
+  const categories = SERVICE_CATEGORIES;
   const allowedSlugs = categories.map((cat) => cat.slug);
 
   for (const cat of categories) {
@@ -27,7 +28,11 @@ async function main() {
         name: cat.name,
         iconKey: cat.iconKey,
       },
-      create: cat,
+      create: {
+        name: cat.name,
+        slug: cat.slug,
+        iconKey: cat.iconKey,
+      },
     });
   }
 
