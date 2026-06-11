@@ -64,3 +64,15 @@ export function stripAuthDrawerParams(search: string): string {
   const serialized = params.toString();
   return serialized ? `?${serialized}` : '';
 }
+
+export function mergeAuthDrawerIntoSearch(search: string, prompt: AuthDrawerPrompt): string {
+  const params = new URLSearchParams(stripAuthDrawerParams(search).replace(/^\?/, ''));
+  const authParams = new URLSearchParams(buildAuthDrawerSearch(prompt).slice(1));
+
+  for (const [key, value] of authParams.entries()) {
+    params.set(key, value);
+  }
+
+  const serialized = params.toString();
+  return serialized ? `?${serialized}` : '';
+}

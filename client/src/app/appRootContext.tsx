@@ -99,6 +99,7 @@ export type AppRootValue = {
   loadAdminSection: (section: AdminSection, authToken?: string) => Promise<void>;
   refreshAdminSection: (section: AdminSection) => Promise<void>;
   openArtisanProfile: (artisanId: string) => Promise<void>;
+  promptCustomerLogin: () => void;
   enablePushAlerts: () => Promise<void>;
   firebaseReady: boolean;
   pushStatus: PushStatus;

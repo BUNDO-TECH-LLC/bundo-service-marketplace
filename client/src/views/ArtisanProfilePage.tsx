@@ -1,4 +1,5 @@
 import { FormEvent, useState } from 'react';
+import { useAppRoot } from '../app/appRootContext';
 import { api } from '../lib/api';
 import { money } from '../lib/formatting';
 import { userDisplayName } from '../lib/userDisplayName';
@@ -30,7 +31,9 @@ export function ArtisanProfilePage({
   reloadPrivate: () => Promise<void>;
   onBookingSuccess: (booking: BookingSuccessState) => void;
 }) {
+  const { promptCustomerLogin } = useAppRoot();
   const offerings = artisan.offerings || [];
+  const canBookAsCustomer = isAuthed && role === 'CUSTOMER';
   const firstOffering = offerings[0];
   const [offeringId, setOfferingId] = useState(firstOffering?.id || '');
   const [date, setDate] = useState('');
@@ -48,7 +51,11 @@ export function ArtisanProfilePage({
 
   async function createBooking(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedOffering || !date) return;
+    if (!isAuthed) {
+      promptCustomerLogin();
+      return;
+    }
+    if (!canBookAsCustomer || !selectedOffering || !date) return;
 
     const response = await api<{ booking: Booking }>('/bookings', {
       method: 'POST',
@@ -83,8 +90,14 @@ export function ArtisanProfilePage({
           </div>
         </div>
         <button
-          disabled={!isAuthed || role !== 'CUSTOMER' || busy || !selectedOffering}
-          onClick={() => document.getElementById('profile-booking-card')?.scrollIntoView({ behavior: 'smooth' })}
+          disabled={busy || (canBookAsCustomer && !selectedOffering)}
+          onClick={() => {
+            if (!isAuthed) {
+              promptCustomerLogin();
+              return;
+            }
+            document.getElementById('profile-booking-card')?.scrollIntoView({ behavior: 'smooth' });
+          }}
         >
           Book now
         </button>
@@ -205,7 +218,9 @@ export function ArtisanProfilePage({
               After you book, chat with {artisan.displayName.split(' ')[0]} from My bookings.
             </p>
 
-            <button disabled={!isAuthed || role !== 'CUSTOMER' || busy || !selectedOffering}>Book now</button>
+            <button disabled={busy || !selectedOffering || !date || (isAuthed && role !== 'CUSTOMER')}>
+              Book now
+            </button>
           </form>
 
           <div className="profile-stats">

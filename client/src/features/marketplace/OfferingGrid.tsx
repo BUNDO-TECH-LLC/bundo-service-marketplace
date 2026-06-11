@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ActionRunner, BookingSuccessState } from '../../appTypes';
+import { useAppRoot } from '../../app/appRootContext';
 import { EmptyState } from '../../components/EmptyState';
 import { api } from '../../lib/api';
 import { money } from '../../lib/formatting';
@@ -26,6 +27,7 @@ export function OfferingGrid({
   onViewProfile: (artisanId: string) => Promise<void>;
   onBookingSuccess: (booking: BookingSuccessState) => void;
 }) {
+  const { promptCustomerLogin } = useAppRoot();
   const [activeOfferingAction, setActiveOfferingAction] = useState<string | null>(null);
 
   async function runOfferingAction(actionKey: string, action: () => Promise<void>, done: string) {
@@ -76,8 +78,13 @@ export function OfferingGrid({
                 {isViewingThisArtisan ? 'Opening...' : 'View profile'}
               </button>
               <button
-                disabled={!isAuthed || role !== 'CUSTOMER' || isBookingThisOffering}
-                onClick={() =>
+                disabled={(isAuthed && role !== 'CUSTOMER') || isBookingThisOffering}
+                onClick={() => {
+                  if (!isAuthed) {
+                    promptCustomerLogin();
+                    return;
+                  }
+
                   void runOfferingAction(
                     bookActionKey,
                     async () => {
@@ -98,8 +105,8 @@ export function OfferingGrid({
                       });
                     },
                     'Booking requested'
-                  )
-                }
+                  );
+                }}
               >
                 {isBookingThisOffering ? 'Booking...' : 'Book'}
               </button>

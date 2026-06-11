@@ -9,6 +9,7 @@ import { useAppAuth } from '../hooks/useAppAuth';
 import { useAppData } from '../hooks/useAppData';
 import { useAppPush } from '../hooks/useAppPush';
 import { useAppRouteSync } from '../hooks/useAppRouteSync';
+import { mergeAuthDrawerIntoSearch } from '../lib/authDrawerPrompt';
 import { isArtisanApplicantSession } from '../lib/artisanApplication';
 import { useMarketplaceFilters } from '../hooks/useMarketplaceFilters';
 import type { ApiUser } from '../types';
@@ -130,6 +131,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [navigate]
   );
 
+  const promptCustomerLogin = useCallback(() => {
+    setNotice('Sign in as a customer to book this service.');
+    navigate({
+      pathname: location.pathname,
+      search: mergeAuthDrawerIntoSearch(location.search, { mode: 'login', role: 'CUSTOMER' }),
+    });
+  }, [location.pathname, location.search, navigate, setNotice]);
+
   const loadPrivateData = useCallback(
     (authToken?: string, user?: ApiUser | null) =>
       appData.loadPrivateData(authToken ?? auth.token, user ?? auth.me ?? undefined),
@@ -218,6 +227,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     loadAdminSection,
     refreshAdminSection,
     openArtisanProfile,
+    promptCustomerLogin,
     enablePushAlerts,
     firebaseReady,
     pushStatus: auth.pushStatus,
@@ -297,6 +307,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     loadAdminSection,
     refreshAdminSection,
     openArtisanProfile,
+    promptCustomerLogin,
     enablePushAlerts,
   ]);
 
