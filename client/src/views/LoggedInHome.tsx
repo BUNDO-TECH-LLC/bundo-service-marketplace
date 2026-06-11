@@ -10,9 +10,10 @@ import { heroImage } from '../lib/marketingAssets';
 import { money } from '../lib/formatting';
 import { nigeriaStates } from '../lib/geo';
 import { userDisplayName } from '../lib/userDisplayName';
-import type { ActionRunner, BookingSuccessState } from '../appTypes';
+import type { ActionRunner, BookingSuccessState, LocationSource } from '../appTypes';
 import type { ApiUser, Artisan, Booking, Category, Offering } from '../types';
 import { EmptyState } from '../components/EmptyState';
+import { LocationBanner } from '../components/LocationBanner';
 
 export function LoggedInHome({
   me,
@@ -21,11 +22,14 @@ export function LoggedInHome({
   offerings,
   artisans,
   selectedState,
+  locationSource,
+  isDetectingLocation,
   searchTerm,
   token,
   busy,
   onSearchTermChange,
   onSelectedStateChange,
+  onUseMyLocation,
   onBrowse,
   onSearch,
   onViewProfile,
@@ -39,11 +43,14 @@ export function LoggedInHome({
   offerings: Offering[];
   artisans: Artisan[];
   selectedState: string;
+  locationSource: LocationSource;
+  isDetectingLocation: boolean;
   searchTerm: string;
   token: string;
   busy: boolean;
   onSearchTermChange: (value: string) => void;
   onSelectedStateChange: (value: string) => void;
+  onUseMyLocation: () => Promise<boolean>;
   onBrowse: (categoryId?: string) => Promise<void>;
   onSearch: () => Promise<void>;
   onViewProfile: (artisanId: string) => Promise<void>;
@@ -90,6 +97,15 @@ export function LoggedInHome({
 
   return (
     <main className="logged-home">
+      <LocationBanner
+        selectedState={selectedState}
+        locationSource={locationSource}
+        isDetectingLocation={isDetectingLocation}
+        onChangeLocation={onSelectedStateChange}
+        onUseMyLocation={() => {
+          void onUseMyLocation();
+        }}
+      />
       <section className="logged-hero">
         <div className="logged-hero-copy">
           <p className="eyebrow">Welcome back, {displayName}</p>

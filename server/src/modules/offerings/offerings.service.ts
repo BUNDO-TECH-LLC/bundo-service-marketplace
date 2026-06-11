@@ -2,6 +2,7 @@ import { Prisma, VerifyStatus } from '@prisma/client';
 import db from '../../db/client';
 import { Pagination, paginationArgs } from '../../utils/pagination';
 import { distanceKm } from '../../lib/geoDistance';
+import { buildNigeriaStateWhere, buildCityOrStateWhere } from '../../lib/nigeriaStateFilter';
 import {
   getArtisanProfileByUserId,
   getCategoryById,
@@ -28,6 +29,7 @@ type OfferingFilters = {
   artisanId?: string;
   categoryId?: string;
   city?: string;
+  state?: string;
   q?: string;
   minPrice?: number;
   maxPrice?: number;
@@ -35,6 +37,17 @@ type OfferingFilters = {
   lat?: number;
   lng?: number;
 };
+
+function mergeArtisanWhere(
+  base: Prisma.ArtisanProfileWhereInput,
+  extra: Prisma.ArtisanProfileWhereInput
+): Prisma.ArtisanProfileWhereInput {
+  if (!extra || Object.keys(extra).length === 0) {
+    return base;
+  }
+
+  return { AND: [base, extra] };
+}
 
 function buildOfferingWhere(filters: OfferingFilters = {}): Prisma.OfferingWhereInput {
   const where: Prisma.OfferingWhereInput = {
@@ -49,11 +62,16 @@ function buildOfferingWhere(filters: OfferingFilters = {}): Prisma.OfferingWhere
     where.categoryId = filters.categoryId;
   }
 
-  if (filters.city) {
-    where.artisan = {
-      verifyStatus: VerifyStatus.APPROVED,
-      city: { equals: filters.city, mode: 'insensitive' },
-    };
+  if (filters.state) {
+    where.artisan = mergeArtisanWhere(
+      { verifyStatus: VerifyStatus.APPROVED },
+      buildNigeriaStateWhere(filters.state)
+    );
+  } else if (filters.city) {
+    where.artisan = mergeArtisanWhere(
+      { verifyStatus: VerifyStatus.APPROVED },
+      buildCityOrStateWhere(filters.city)
+    );
   }
 
   if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {

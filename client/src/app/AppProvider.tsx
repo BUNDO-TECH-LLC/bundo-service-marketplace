@@ -12,6 +12,7 @@ import { useAppRouteSync } from '../hooks/useAppRouteSync';
 import { mergeAuthDrawerIntoSearch } from '../lib/authDrawerPrompt';
 import { isArtisanApplicantSession } from '../lib/artisanApplication';
 import { useMarketplaceFilters } from '../hooks/useMarketplaceFilters';
+import { useUserLocation } from '../hooks/useUserLocation';
 import type { ApiUser } from '../types';
 import { AppRootContext, type AppRootValue } from './appRootContext';
 
@@ -20,7 +21,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const location = useLocation();
   const { busy, notice, setNotice, withNotice } = useActionRunner();
   const marketplaceFilters = useMarketplaceFilters();
-  const appData = useAppData(marketplaceFilters, { notifyConversationError: (msg) => setNotice(msg) });
+  const userLocation = useUserLocation();
+  const filterState = useMemo(
+    () => ({
+      selectedState: userLocation.selectedState,
+      searchTerm: marketplaceFilters.searchTerm,
+      selectedCategoryId: marketplaceFilters.selectedCategoryId,
+      priceMin: marketplaceFilters.priceMin,
+      priceMax: marketplaceFilters.priceMax,
+      marketplaceSort: marketplaceFilters.marketplaceSort,
+      searchLat: userLocation.searchLat,
+      searchLng: userLocation.searchLng,
+    }),
+    [
+      userLocation.selectedState,
+      userLocation.searchLat,
+      userLocation.searchLng,
+      marketplaceFilters.searchTerm,
+      marketplaceFilters.selectedCategoryId,
+      marketplaceFilters.priceMin,
+      marketplaceFilters.priceMax,
+      marketplaceFilters.marketplaceSort,
+    ]
+  );
+  const appData = useAppData(filterState, { notifyConversationError: (msg) => setNotice(msg) });
   const [bookingSuccess, setBookingSuccess] = useState<BookingSuccessState | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState<PaymentSuccessState | null>(null);
   const processedPaymentReferenceRef = useRef<string | null>(null);
@@ -84,6 +108,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setNotice(message);
     });
   }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps -- reload when entering marketplace routes
+
+  useEffect(() => {
+    if (!userLocation.locationReady || !needsPublicMarketplaceData(location.pathname)) {
+      return;
+    }
+
+    appData
+      .loadPublicData(userLocation.selectedState, marketplaceFilters.searchTerm)
+      .catch((error) => {
+        const message =
+          error instanceof ApiError
+            ? error.message
+            : 'Could not refresh services for your location.';
+        setNotice(message);
+      });
+  }, [
+    userLocation.locationReady,
+    userLocation.selectedState,
+    location.pathname,
+    appData.loadPublicData,
+    setNotice,
+  ]);
 
   const isAuthed = Boolean(auth.firebaseUser && auth.token);
   const onAuthScreen = isAuthPathname(location.pathname);
@@ -195,8 +241,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     adminUsers: appData.adminUsers,
     adminArtisans: appData.adminArtisans,
     adminCategories: appData.adminCategories,
-    selectedState: marketplaceFilters.selectedState,
-    setSelectedState: marketplaceFilters.setSelectedState,
+    selectedState: userLocation.selectedState,
+    setSelectedState: userLocation.setSelectedState,
+    locationSource: userLocation.locationSource,
+    isDetectingLocation: userLocation.isDetectingLocation,
+    locationReady: userLocation.locationReady,
     searchTerm: marketplaceFilters.searchTerm,
     setSearchTerm: marketplaceFilters.setSearchTerm,
     selectedCategoryId: marketplaceFilters.selectedCategoryId,
@@ -207,9 +256,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setPriceMax: marketplaceFilters.setPriceMax,
     marketplaceSort: marketplaceFilters.marketplaceSort,
     setMarketplaceSort: marketplaceFilters.setMarketplaceSort,
-    searchLat: marketplaceFilters.searchLat,
-    searchLng: marketplaceFilters.searchLng,
-    setSearchCoordinates: marketplaceFilters.setSearchCoordinates,
+    searchLat: userLocation.searchLat,
+    searchLng: userLocation.searchLng,
+    setSearchCoordinates: userLocation.setSearchCoordinates,
+    useMyLocation: userLocation.useMyLocation,
+    clearLocation: userLocation.clearLocation,
     notice,
     setNotice,
     bookingSuccess,
@@ -276,8 +327,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     appData.adminArtisans,
     appData.adminCategories,
     appData.loadPublicData,
-    marketplaceFilters.selectedState,
-    marketplaceFilters.setSelectedState,
+    userLocation.selectedState,
+    userLocation.setSelectedState,
+    userLocation.locationSource,
+    userLocation.isDetectingLocation,
+    userLocation.locationReady,
+    userLocation.searchLat,
+    userLocation.searchLng,
+    userLocation.setSearchCoordinates,
+    userLocation.useMyLocation,
+    userLocation.clearLocation,
     marketplaceFilters.searchTerm,
     marketplaceFilters.setSearchTerm,
     marketplaceFilters.selectedCategoryId,
@@ -288,9 +347,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     marketplaceFilters.setPriceMax,
     marketplaceFilters.marketplaceSort,
     marketplaceFilters.setMarketplaceSort,
-    marketplaceFilters.searchLat,
-    marketplaceFilters.searchLng,
-    marketplaceFilters.setSearchCoordinates,
     notice,
     setNotice,
     bookingSuccess,

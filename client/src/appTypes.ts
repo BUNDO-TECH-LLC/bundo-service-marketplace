@@ -48,6 +48,7 @@ export type AdminSection =
 export type ActionRunner = (action: () => Promise<void>, done?: string) => Promise<void>;
 export type PushStatus = 'idle' | 'unsupported' | 'missing-config' | 'unavailable' | 'enabled' | 'denied';
 export type MarketplaceSort = 'newest' | 'rating' | 'price_low' | 'price_high' | 'distance';
+export type LocationSource = 'auto' | 'manual' | 'none';
 
 export type NotificationPreferences = {
   bookings: boolean;

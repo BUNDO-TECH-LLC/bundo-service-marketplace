@@ -9,6 +9,7 @@ import type {
   AdminUserRecord,
   BookingSuccessState,
   PaymentSuccessState,
+  LocationSource,
   MarketplaceSort,
   PushStatus,
   ArtisanHeaderActive,
@@ -56,6 +57,9 @@ export type AppRootValue = {
   adminCategories: AdminCategoryRecord[];
   selectedState: string;
   setSelectedState: (value: string) => void;
+  locationSource: LocationSource;
+  isDetectingLocation: boolean;
+  locationReady: boolean;
   searchTerm: string;
   setSearchTerm: (value: string) => void;
   selectedCategoryId: string;
@@ -69,6 +73,8 @@ export type AppRootValue = {
   searchLat: number | null;
   searchLng: number | null;
   setSearchCoordinates: (lat: number | null, lng: number | null) => void;
+  useMyLocation: () => Promise<boolean>;
+  clearLocation: () => void;
   notice: string;
   setNotice: (value: string) => void;
   bookingSuccess: BookingSuccessState | null;

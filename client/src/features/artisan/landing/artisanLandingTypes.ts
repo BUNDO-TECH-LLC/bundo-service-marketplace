@@ -98,4 +98,5 @@ export type ArtisanLandingModel = {
   saveOffering: () => Promise<void>;
   submitForVerification: () => Promise<void>;
   openSetupEditor: () => void;
+  useCurrentLocation: () => Promise<void>;
 };

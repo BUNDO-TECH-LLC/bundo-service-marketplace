@@ -1,8 +1,9 @@
 import { LegalLinks } from '../../../components/LegalLinks';
+import { nigeriaStates } from '../../../lib/geo';
 import type { ArtisanLandingModel } from './artisanLandingTypes';
 
 export function ArtisanLandingStepBasic({ landing }: { landing: ArtisanLandingModel }) {
-  const { setup, updateSetup, agreed, setAgreed, categories } = landing;
+  const { setup, updateSetup, agreed, setAgreed, categories, useCurrentLocation, busy } = landing;
 
   return (
     <section className="artisan-setup-card">
@@ -44,15 +45,36 @@ export function ArtisanLandingStepBasic({ landing }: { landing: ArtisanLandingMo
       </label>
       <small>E.g Plumbing, Carpentry, Make-up Artist</small>
       <label>
-        Location<span>(Required)</span>
-        <input
+        State<span>(Required)</span>
+        <select
           value={setup.location}
           onChange={(event) => updateSetup('location', event.target.value)}
-          placeholder="Search for your city or area"
           required
+        >
+          <option value="">Select your state</option>
+          {nigeriaStates.map((state) => (
+            <option key={state} value={state}>
+              {state}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Area / neighbourhood<span>(Optional)</span>
+        <input
+          value={setup.area}
+          onChange={(event) => updateSetup('area', event.target.value)}
+          placeholder="e.g. Lekki, Ikeja, GRA"
         />
       </label>
-      <button className="location-link" type="button">
+      <button
+        className="location-link"
+        type="button"
+        disabled={busy}
+        onClick={() => {
+          void useCurrentLocation();
+        }}
+      >
         ⌖ Use your current location
       </button>
       <label className="terms-row">

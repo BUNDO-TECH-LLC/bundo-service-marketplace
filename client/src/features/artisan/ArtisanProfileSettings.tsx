@@ -4,6 +4,7 @@ import type { ActionRunner } from '../../appTypes';
 import { ArtisanAvailabilityEditor } from '../../components/ArtisanAvailabilityEditor';
 import { ArtisanPortfolioManager } from '../../components/ArtisanPortfolioManager';
 import { api } from '../../lib/api';
+import { nigeriaStates } from '../../lib/geo';
 import { useArtisanPortfolio } from '../../lib/useArtisanPortfolio';
 import type { Artisan, ArtisanKycSubmission } from '../../types';
 
@@ -172,8 +173,14 @@ export function ArtisanProfileSettings({
             <textarea name="bio" rows={4} defaultValue={profile?.bio || ''} placeholder="Tell customers about your work and experience." />
           </label>
           <label>
-            City
-            <input name="city" defaultValue={profile?.city || 'Lagos'} required />
+            State
+            <select name="city" defaultValue={profile?.city || 'Lagos'} required>
+              {nigeriaStates.map((state) => (
+                <option key={state} value={state}>
+                  {state}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             Area / neighbourhood

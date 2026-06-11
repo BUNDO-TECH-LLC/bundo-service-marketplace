@@ -728,14 +728,11 @@ router.delete(
 router.get('/', asyncHandler(async (req, res) => {
   const { city, state, area, categoryId, q, sort } = req.query;
   const pagination = getPagination(req);
-  const location =
-    typeof state === 'string'
-      ? state
-      : typeof city === 'string'
-        ? city
-        : undefined;
   const filters = {
-    ...(location !== undefined ? { city: location } : {}),
+    ...(typeof state === 'string' && state.trim() ? { state: state.trim() } : {}),
+    ...(typeof city === 'string' && city.trim() && !(typeof state === 'string' && state.trim())
+      ? { city: city.trim() }
+      : {}),
     ...(typeof area === 'string' ? { area } : {}),
     ...(typeof categoryId === 'string' ? { categoryId } : {}),
     ...(typeof q === 'string' ? { q } : {}),

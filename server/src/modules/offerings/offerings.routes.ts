@@ -135,12 +135,13 @@ router.get(
   asyncHandler(async (req, res) => {
     const { artisanId, categoryId, city, state, q, minPrice, maxPrice, sort, lat, lng } = req.query;
     const pagination = getPagination(req);
-    const location =
-      typeof state === 'string' ? state : typeof city === 'string' ? city : undefined;
     const filters = {
       ...(typeof artisanId === 'string' ? { artisanId } : {}),
       ...(typeof categoryId === 'string' ? { categoryId } : {}),
-      ...(location !== undefined ? { city: location } : {}),
+      ...(typeof state === 'string' && state.trim() ? { state: state.trim() } : {}),
+      ...(typeof city === 'string' && city.trim() && !(typeof state === 'string' && state.trim())
+        ? { city: city.trim() }
+        : {}),
       ...(typeof q === 'string' ? { q } : {}),
       ...(typeof minPrice === 'string' ? { minPrice: Number(minPrice) } : {}),
       ...(typeof maxPrice === 'string' ? { maxPrice: Number(maxPrice) } : {}),

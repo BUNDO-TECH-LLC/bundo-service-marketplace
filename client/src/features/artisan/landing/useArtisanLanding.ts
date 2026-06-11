@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../../lib/api';
 import { artisanVerificationPhase } from '../../../lib/artisanVerification';
+import { readBrowserLocation } from '../../../lib/geolocation';
+import { inferNigeriaState } from '../../../lib/inferNigeriaState';
 import { uploadKycImage } from '../../../lib/kycUpload';
 import { uploadPortfolioImage } from '../../../lib/portfolioUpload';
 import type {
@@ -32,7 +34,7 @@ export function useArtisanLanding({
     businessName: '',
     categoryId: '',
     location: 'Lagos',
-    area: 'Lekki',
+    area: '',
     lat: '6.5244',
     lng: '3.3792',
     title: 'Basic inspection',
@@ -334,6 +336,23 @@ export function useArtisanLanding({
     await refresh();
   }
 
+  async function useCurrentLocation() {
+    await runAction(async () => {
+      const result = await readBrowserLocation();
+      if (!result.ok) {
+        throw new Error('Could not read your location. Pick your state manually or allow location access.');
+      }
+
+      const state = inferNigeriaState(result.lat, result.lng);
+      setSetup((current) => ({
+        ...current,
+        location: state,
+        lat: String(result.lat),
+        lng: String(result.lng),
+      }));
+    }, 'Location updated');
+  }
+
   return {
     displayName,
     accountEmail,
@@ -372,5 +391,6 @@ export function useArtisanLanding({
     saveOffering,
     submitForVerification,
     openSetupEditor,
+    useCurrentLocation,
   };
 }

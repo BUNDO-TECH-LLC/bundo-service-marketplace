@@ -243,11 +243,14 @@ export default function WorkspacePage() {
               offerings={ctx.publicOfferings}
               artisans={ctx.artisans}
               selectedState={ctx.selectedState}
+              locationSource={ctx.locationSource}
+              isDetectingLocation={ctx.isDetectingLocation}
               searchTerm={ctx.searchTerm}
               token={ctx.token}
               busy={ctx.busy}
               onSearchTermChange={ctx.setSearchTerm}
               onSelectedStateChange={ctx.setSelectedState}
+              onUseMyLocation={ctx.useMyLocation}
               onBrowse={async (categoryId) => {
                 ctx.setSelectedCategoryId(categoryId || '');
                 await ctx.withNotice(async () => {

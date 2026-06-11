@@ -2,6 +2,7 @@ import { KycStatus, Prisma, VerifyStatus } from '@prisma/client';
 import db from '../../db/client';
 import { Pagination, paginationArgs } from '../../utils/pagination';
 import { ConflictError } from '../../utils/errors';
+import { buildNigeriaStateWhere, buildCityOrStateWhere, normalizeArtisanCity, normalizeArtisanLocation } from '../../lib/nigeriaStateFilter';
 import { workspaceLink } from '../../lib/appLinks';
 import { createNotification } from '../notifications/notifications.service';
 
@@ -35,12 +36,29 @@ type UpdateArtisanProfileInput = {
 
 type ArtisanFilters = {
   city?: string;
+  state?: string;
   area?: string;
   categoryId?: string;
   q?: string;
   includeUnapproved?: boolean;
   sort?: 'newest' | 'rating' | 'reviews';
 };
+
+function appendAndClause(
+  where: Prisma.ArtisanProfileWhereInput,
+  clause: Prisma.ArtisanProfileWhereInput
+) {
+  if (!clause || Object.keys(clause).length === 0) {
+    return;
+  }
+
+  const existing = where.AND
+    ? Array.isArray(where.AND)
+      ? where.AND
+      : [where.AND]
+    : [];
+  where.AND = [...existing, clause];
+}
 
 function buildArtisanWhere(
   filters: ArtisanFilters = {}
@@ -49,37 +67,46 @@ function buildArtisanWhere(
     ? {}
     : { verifyStatus: VerifyStatus.APPROVED };
 
-  if (filters.city) {
-    where.city = { equals: filters.city, mode: 'insensitive' };
+  if (filters.state) {
+    appendAndClause(where, buildNigeriaStateWhere(filters.state));
+  } else if (filters.city) {
+    appendAndClause(where, buildCityOrStateWhere(filters.city));
   }
 
   if (filters.area) {
-    where.area = { equals: filters.area, mode: 'insensitive' };
+    appendAndClause(where, {
+      OR: [
+        { area: { equals: filters.area, mode: 'insensitive' } },
+        { area: { contains: filters.area, mode: 'insensitive' } },
+      ],
+    });
   }
 
   if (filters.q) {
-    where.OR = [
-      { displayName: { contains: filters.q, mode: 'insensitive' } },
-      { bio: { contains: filters.q, mode: 'insensitive' } },
-      { city: { contains: filters.q, mode: 'insensitive' } },
-      { area: { contains: filters.q, mode: 'insensitive' } },
-      {
-        offerings: {
-          some: {
-            title: { contains: filters.q, mode: 'insensitive' },
-          },
-        },
-      },
-      {
-        offerings: {
-          some: {
-            category: {
-              name: { contains: filters.q, mode: 'insensitive' },
+    appendAndClause(where, {
+      OR: [
+        { displayName: { contains: filters.q, mode: 'insensitive' } },
+        { bio: { contains: filters.q, mode: 'insensitive' } },
+        { city: { contains: filters.q, mode: 'insensitive' } },
+        { area: { contains: filters.q, mode: 'insensitive' } },
+        {
+          offerings: {
+            some: {
+              title: { contains: filters.q, mode: 'insensitive' },
             },
           },
         },
-      },
-    ];
+        {
+          offerings: {
+            some: {
+              category: {
+                name: { contains: filters.q, mode: 'insensitive' },
+              },
+            },
+          },
+        },
+      ],
+    });
   }
 
   if (filters.categoryId) {
@@ -107,7 +134,10 @@ function artisanOrderBy(
 
 export const createArtisanProfile = async (input: CreateArtisanProfileInput) => {
   return db.artisanProfile.create({
-    data: input,
+    data: {
+      ...input,
+      city: normalizeArtisanLocation(input.city, input.lat, input.lng),
+    },
   });
 };
 
@@ -115,9 +145,17 @@ export const updateArtisanProfile = async (
   userId: string,
   input: UpdateArtisanProfileInput
 ) => {
+  const normalizedCity =
+    input.city !== undefined
+      ? normalizeArtisanLocation(input.city, input.lat, input.lng)
+      : undefined;
+
   return db.artisanProfile.update({
     where: { userId },
-    data: input,
+    data: {
+      ...input,
+      ...(normalizedCity !== undefined ? { city: normalizedCity } : {}),
+    },
   });
 };
 
@@ -342,6 +380,7 @@ export const createOrUpdateKycSubmission = async (
     where: { artisanId: artisan.id },
     update: {
       ...input,
+      city: normalizeArtisanCity(input.city),
       status: KycStatus.PENDING,
       reviewNote: null,
       reviewedAt: null,

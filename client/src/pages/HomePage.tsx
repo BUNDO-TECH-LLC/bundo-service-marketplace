@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
+import { LocationBanner } from '../components/LocationBanner';
 import { AppPromo, Footer, Hero, ServicesSection, WhySection } from '../features/marketing';
 import { MarketplacePreview } from '../features/marketplace';
 import { buildAppPath } from '../lib/appPaths';
@@ -43,11 +44,14 @@ export default function HomePage() {
         offerings={ctx.publicOfferings}
         artisans={ctx.artisans}
         selectedState={ctx.selectedState}
+        locationSource={ctx.locationSource}
+        isDetectingLocation={ctx.isDetectingLocation}
         searchTerm={ctx.searchTerm}
         token={ctx.token}
         busy={ctx.busy}
         onSearchTermChange={ctx.setSearchTerm}
         onSelectedStateChange={ctx.setSelectedState}
+        onUseMyLocation={ctx.useMyLocation}
         onBrowse={async (categoryId) => {
           ctx.setSelectedCategoryId(categoryId || '');
           await ctx.withNotice(async () => {
@@ -71,6 +75,19 @@ export default function HomePage() {
 
   return (
     <main>
+      <LocationBanner
+        selectedState={ctx.selectedState}
+        locationSource={ctx.locationSource}
+        isDetectingLocation={ctx.isDetectingLocation}
+        onChangeLocation={ctx.setSelectedState}
+        onUseMyLocation={() => {
+          void ctx.useMyLocation().then((success) => {
+            if (!success) {
+              ctx.setNotice('Could not read your location. Pick a state or allow location access.');
+            }
+          });
+        }}
+      />
       <Hero
         selectedState={ctx.selectedState}
         states={nigeriaStates}
