@@ -2453,19 +2453,33 @@ footer h4 {
 
 .marketplace-filters {
   display: grid;
-  gap: 18px;
+  gap: 20px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  margin-bottom: 26px;
-  padding: 22px;
+  border-radius: 12px;
+  margin-bottom: 28px;
+  padding: 24px;
   background: var(--color-white);
-  box-shadow: 0 8px 26px var(--shadow-light);
+  box-shadow: 0 10px 30px var(--shadow-light);
+}
+
+.marketplace-filter-head h2 {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.marketplace-filter-head p:last-child {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.5;
 }
 
 .marketplace-filter-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: 16px 18px;
 }
 
 .marketplace-filter-grid label,
@@ -2473,7 +2487,9 @@ footer h4 {
   display: grid;
   gap: 8px;
   color: var(--ink);
+  font-size: 13px;
   font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .marketplace-filter-grid input,
@@ -2485,13 +2501,99 @@ footer h4 {
   border: 1px solid var(--color-line-light);
   border-radius: 8px;
   padding: 12px 14px;
+  color: var(--ink);
   background: var(--color-white);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.marketplace-filter-grid input:hover,
+.marketplace-filter-grid select:hover {
+  border-color: var(--line);
+}
+
+.marketplace-filter-grid input:focus,
+.marketplace-filter-grid select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.marketplace-filter-location-hint {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+  background: var(--soft);
+}
+
+.marketplace-filter-link-button {
+  padding: 0;
+  color: var(--accent-dark);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  background: transparent;
+}
+
+.marketplace-filter-link-button:hover {
+  color: var(--ink);
 }
 
 .marketplace-filter-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  justify-content: flex-end;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  margin-top: 2px;
+  padding-top: 18px;
+}
+
+.marketplace-filter-button {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 12px 22px;
+  font-weight: 700;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.12s ease,
+    box-shadow 0.18s ease;
+}
+
+.marketplace-filter-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.marketplace-filter-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.marketplace-filter-button--primary {
+  color: var(--color-white);
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.marketplace-filter-button--primary:hover:not(:disabled) {
+  background: #1a1a1a;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+}
+
+.marketplace-filter-button--secondary {
+  color: var(--ink);
+  background: var(--color-white);
+  border-color: var(--line);
+}
+
+.marketplace-filter-button--secondary:hover:not(:disabled) {
+  color: var(--accent-dark);
+  background: var(--accent-soft);
+  border-color: var(--accent);
 }
 
 .grid {

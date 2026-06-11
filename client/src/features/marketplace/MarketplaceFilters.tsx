@@ -39,13 +39,13 @@ export function MarketplaceFilters({
   onClear: () => Promise<void>;
 }) {
   return (
-    <section className="marketplace-filters">
-      <div className="section-title-row">
-        <div>
-          <p className="eyebrow">Refine results</p>
-          <h2>Search with more control</h2>
-        </div>
-      </div>
+    <section className="marketplace-filters" aria-label="Search and filter services">
+      <header className="marketplace-filter-head">
+        <p className="eyebrow">Search</p>
+        <h2>Find the right service</h2>
+        <p>Filter by location, category, price, and sort order.</p>
+      </header>
+
       <div className="marketplace-filter-grid">
         <label>
           State
@@ -80,11 +80,23 @@ export function MarketplaceFilters({
         </label>
         <label>
           Min price
-          <input type="number" min="0" value={priceMin} onChange={(event) => onPriceMinChange(event.target.value)} placeholder="5000" />
+          <input
+            type="number"
+            min="0"
+            value={priceMin}
+            onChange={(event) => onPriceMinChange(event.target.value)}
+            placeholder="₦5,000"
+          />
         </label>
         <label>
           Max price
-          <input type="number" min="0" value={priceMax} onChange={(event) => onPriceMaxChange(event.target.value)} placeholder="50000" />
+          <input
+            type="number"
+            min="0"
+            value={priceMax}
+            onChange={(event) => onPriceMaxChange(event.target.value)}
+            placeholder="₦50,000"
+          />
         </label>
         <label>
           Sort by
@@ -97,21 +109,32 @@ export function MarketplaceFilters({
           </select>
         </label>
       </div>
+
       {sort === 'distance' && onUseMyLocation ? (
-        <p className="muted">
-          <button type="button" className="text-button" onClick={onUseMyLocation}>
+        <p className="marketplace-filter-location-hint">
+          <button type="button" className="marketplace-filter-link-button" onClick={onUseMyLocation}>
             Use my current location
           </button>{' '}
-          for distance ranking, or pick a state above to use that region as your reference point.
+          for distance ranking, or pick a state above as your reference point.
         </p>
       ) : null}
+
       <div className="marketplace-filter-actions">
-        <button onClick={() => void onApply()}>Apply filters</button>
-        <button className="secondary-button" onClick={() => void onClear()}>
-          Clear
+        <button
+          type="button"
+          className="marketplace-filter-button marketplace-filter-button--secondary"
+          onClick={() => void onClear()}
+        >
+          Clear filters
+        </button>
+        <button
+          type="button"
+          className="marketplace-filter-button marketplace-filter-button--primary"
+          onClick={() => void onApply()}
+        >
+          Apply filters
         </button>
       </div>
     </section>
   );
 }
-

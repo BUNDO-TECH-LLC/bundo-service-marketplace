@@ -68,22 +68,6 @@ export default function MarketplacePage() {
         </p>
       </section>
 
-      <section className="toolbar" aria-label="Marketplace summary">
-        {ctx.selectedState && <span>Location: {ctx.selectedState}</span>}
-        {ctx.searchTerm && <span>Search: {ctx.searchTerm}</span>}
-        {ctx.selectedCategoryId && (
-          <span>
-            Category: {ctx.categories.find((category) => category.id === ctx.selectedCategoryId)?.name || 'Selected'}
-          </span>
-        )}
-        {ctx.marketplaceSort === 'distance' && ctx.searchLat != null && (
-          <span>Sort: nearest</span>
-        )}
-        <span>{ctx.publicOfferings.length} services</span>
-        <span>{ctx.artisans.length} artisans</span>
-        <span>{ctx.categories.length} categories</span>
-      </section>
-
       <MarketplaceFilters
         categories={ctx.categories}
         selectedState={ctx.selectedState}
