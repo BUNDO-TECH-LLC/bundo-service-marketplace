@@ -32,7 +32,12 @@ export default function MarketplacePage() {
 
     await ctx.withNotice(
       async () => {
-        await ctx.loadPublicData(ctx.selectedState, ctx.searchTerm);
+        await ctx.loadPublicData(ctx.selectedState, ctx.searchTerm, {
+          categoryId: ctx.selectedCategoryId,
+          minPrice: '',
+          maxPrice: '',
+          sort: ctx.marketplaceSort,
+        });
       },
       'Marketplace filters updated'
     );
@@ -67,22 +72,15 @@ export default function MarketplacePage() {
         categories={ctx.categories}
         selectedState={ctx.selectedState}
         states={nigeriaStates}
-        searchTerm={ctx.searchTerm}
         selectedCategoryId={ctx.selectedCategoryId}
-        priceMin={ctx.priceMin}
-        priceMax={ctx.priceMax}
         sort={ctx.marketplaceSort}
         onSelectedStateChange={ctx.setSelectedState}
-        onSearchTermChange={ctx.setSearchTerm}
         onCategoryChange={ctx.setSelectedCategoryId}
-        onPriceMinChange={ctx.setPriceMin}
-        onPriceMaxChange={ctx.setPriceMax}
         onSortChange={ctx.setMarketplaceSort}
         onUseMyLocation={handleUseMyLocation}
         onApply={applyFilters}
         onClear={async () => {
           ctx.clearLocation();
-          ctx.setSearchTerm('');
           ctx.setSelectedCategoryId('');
           ctx.setPriceMin('');
           ctx.setPriceMax('');

@@ -6,16 +6,10 @@ export function MarketplaceFilters({
   categories,
   selectedState,
   states,
-  searchTerm,
   selectedCategoryId,
-  priceMin,
-  priceMax,
   sort,
   onSelectedStateChange,
-  onSearchTermChange,
   onCategoryChange,
-  onPriceMinChange,
-  onPriceMaxChange,
   onSortChange,
   onUseMyLocation,
   onApply,
@@ -24,16 +18,10 @@ export function MarketplaceFilters({
   categories: Category[];
   selectedState: string;
   states: string[];
-  searchTerm: string;
   selectedCategoryId: string;
-  priceMin: string;
-  priceMax: string;
   sort: MarketplaceSort;
   onSelectedStateChange: (value: string) => void;
-  onSearchTermChange: (value: string) => void;
   onCategoryChange: (value: string) => void;
-  onPriceMinChange: (value: string) => void;
-  onPriceMaxChange: (value: string) => void;
   onSortChange: (value: MarketplaceSort) => void;
   onUseMyLocation?: () => void;
   onApply: () => Promise<void>;
@@ -46,7 +34,7 @@ export function MarketplaceFilters({
       <header className="marketplace-filter-head">
         <p className="eyebrow">Search</p>
         <h2>Find the right service</h2>
-        <p>Filter by location, category, price, and sort order.</p>
+        <p>Filter by state, category, and sort order.</p>
       </header>
 
       <div className="marketplace-filter-grid">
@@ -71,35 +59,6 @@ export function MarketplaceFilters({
               </option>
             ))}
           </select>
-        </label>
-        <label>
-          Search
-          <input
-            type="search"
-            value={searchTerm}
-            onChange={(event) => onSearchTermChange(event.target.value)}
-            placeholder="Artisan, service, category"
-          />
-        </label>
-        <label>
-          Min price
-          <input
-            type="number"
-            min="0"
-            value={priceMin}
-            onChange={(event) => onPriceMinChange(event.target.value)}
-            placeholder="₦5,000"
-          />
-        </label>
-        <label>
-          Max price
-          <input
-            type="number"
-            min="0"
-            value={priceMax}
-            onChange={(event) => onPriceMaxChange(event.target.value)}
-            placeholder="₦50,000"
-          />
         </label>
         <label>
           Sort by
