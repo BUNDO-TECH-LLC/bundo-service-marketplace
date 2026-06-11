@@ -1,6 +1,4 @@
-import fs from 'node:fs';
-import path from 'node:path';
-
+// Keep in sync with shared/service-categories.json (used by the client).
 export type ServiceCategorySeed = {
   name: string;
   slug: string;
@@ -8,9 +6,71 @@ export type ServiceCategorySeed = {
   description: string;
 };
 
-function loadServiceCategories(): ServiceCategorySeed[] {
-  const catalogPath = path.resolve(__dirname, '../../../shared/service-categories.json');
-  return JSON.parse(fs.readFileSync(catalogPath, 'utf8')) as ServiceCategorySeed[];
-}
-
-export const SERVICE_CATEGORIES = loadServiceCategories();
+export const SERVICE_CATEGORIES: ServiceCategorySeed[] = [
+  {
+    name: 'A.C/Refrigeration Services',
+    slug: 'ac-refrigeration',
+    iconKey: 'ac',
+    description: 'Installation, servicing, and repairs for AC and refrigeration units.',
+  },
+  {
+    name: 'Carpentry/Interior Services',
+    slug: 'carpentry-interior',
+    iconKey: 'carpentry',
+    description: 'Custom furniture, fittings, and interior woodwork.',
+  },
+  {
+    name: 'Plumbing Services',
+    slug: 'plumbing',
+    iconKey: 'plumbing',
+    description: 'Pipework, fixtures, leaks, and plumbing installations.',
+  },
+  {
+    name: 'Cleaning/Laundry/Fumigation',
+    slug: 'cleaning-laundry-fumigation',
+    iconKey: 'cleaning',
+    description: 'Home cleaning, laundry, and fumigation services.',
+  },
+  {
+    name: 'Appliance Electronics Repairs',
+    slug: 'appliance-electronics-repairs',
+    iconKey: 'appliance',
+    description: 'Repairs for home appliances, electronics, and gadgets.',
+  },
+  {
+    name: 'Beautician',
+    slug: 'beautician',
+    iconKey: 'beautician',
+    description: 'Makeup, skincare, lashes, and beauty treatments.',
+  },
+  {
+    name: 'Brick Layer/Tiler/POP',
+    slug: 'bricklayer-tiler-pop',
+    iconKey: 'masonry',
+    description: 'Bricklaying, tiling, and POP ceiling finishing.',
+  },
+  {
+    name: 'Electrical/Inverter/ODU',
+    slug: 'electrical-inverter-odu',
+    iconKey: 'electrical',
+    description: 'Wiring, inverters, solar, and outdoor unit setup.',
+  },
+  {
+    name: 'Generator Services',
+    slug: 'generator',
+    iconKey: 'generator',
+    description: 'Generator servicing, repairs, and installation.',
+  },
+  {
+    name: 'Haulage/Movers',
+    slug: 'haulage-movers',
+    iconKey: 'haulage',
+    description: 'Moving, delivery, and haulage for homes and businesses.',
+  },
+  {
+    name: 'Barbing Service',
+    slug: 'barbing',
+    iconKey: 'barbing',
+    description: 'Haircuts, grooming, and professional barber services.',
+  },
+];

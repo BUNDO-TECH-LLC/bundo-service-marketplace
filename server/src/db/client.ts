@@ -1,9 +1,10 @@
 // src/db/client.ts
 
 import { PrismaClient } from '@prisma/client';
-import { Pool, type PoolConfig } from 'pg';
+import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { env } from '../config/env';
+import { buildPoolConfig } from './poolConfig';
 import logger from '../utils/logger';
 
 // Extend globalThis safely
@@ -11,37 +12,6 @@ const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
   pgPool?: Pool;
 };
-
-function buildPoolConfig(connectionString: string): PoolConfig {
-  const parsed = new URL(connectionString);
-  const sslDisabled = parsed.searchParams.get('sslmode') === 'disable';
-
-  // Let node-postgres use the explicit ssl object below instead of inheriting
-  // stricter SSL semantics from sslmode in the URL during local development.
-  parsed.searchParams.delete('sslmode');
-
-  const toInt = (value: string | undefined, fallback: number) => {
-    const parsedValue = value ? Number.parseInt(value, 10) : NaN;
-    return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : fallback;
-  };
-
-  const config: PoolConfig = {
-    connectionString: parsed.toString(),
-    // Bound the pool so we don't exhaust the database connection limit (Render
-    // managed Postgres caps connections aggressively). Tunable via env.
-    max: toInt(process.env.PG_POOL_MAX, 10),
-    idleTimeoutMillis: toInt(process.env.PG_POOL_IDLE_TIMEOUT_MS, 30_000),
-    connectionTimeoutMillis: toInt(process.env.PG_POOL_CONNECTION_TIMEOUT_MS, 10_000),
-  };
-
-  if (!sslDisabled) {
-    config.ssl = {
-      rejectUnauthorized: false,
-    };
-  }
-
-  return config;
-}
 
 // Create or reuse pool
 const pool =
