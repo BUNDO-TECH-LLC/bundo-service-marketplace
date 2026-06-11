@@ -168,13 +168,7 @@ export function MainLayout() {
                 <label className="topbar-location-field">
                   <button
                     type="button"
-                    className={`topbar-location-trigger${
-                      ctx.isDetectingLocation
-                        ? ' topbar-location-trigger--active'
-                        : ctx.locationSource === 'auto'
-                          ? ' topbar-location-trigger--active'
-                          : ''
-                    }`}
+                    className="topbar-location-trigger"
                     disabled={ctx.isDetectingLocation}
                     aria-label="Use my current location"
                     title="Use my current location"

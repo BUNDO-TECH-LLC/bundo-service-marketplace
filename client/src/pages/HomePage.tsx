@@ -76,7 +76,6 @@ export default function HomePage() {
         selectedState={ctx.selectedState}
         states={nigeriaStates}
         isDetectingLocation={ctx.isDetectingLocation}
-        locationSource={ctx.locationSource}
         onStateChange={async (state) => {
           ctx.setSelectedState(state);
           await ctx.withNotice(async () => {

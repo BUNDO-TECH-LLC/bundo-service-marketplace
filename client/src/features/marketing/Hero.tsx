@@ -1,5 +1,4 @@
 import { FormEvent } from 'react';
-import type { LocationSource } from '../../appTypes';
 import { heroImage } from '../../lib/marketingAssets';
 
 export function Hero({
@@ -12,7 +11,6 @@ export function Hero({
   onBrowse,
   onUseMyLocation,
   isDetectingLocation = false,
-  locationSource = 'none',
 }: {
   selectedState: string;
   states: string[];
@@ -23,14 +21,11 @@ export function Hero({
   onBrowse: () => void;
   onUseMyLocation: () => void;
   isDetectingLocation?: boolean;
-  locationSource?: LocationSource;
 }) {
   async function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await onSearch(selectedState, searchTerm);
   }
-
-  const locationActive = isDetectingLocation || locationSource === 'auto';
 
   return (
     <section className="hero">
@@ -59,7 +54,7 @@ export function Hero({
               <div className="hero-location-row">
                 <button
                   type="button"
-                  className={`hero-location-trigger${locationActive ? ' hero-location-trigger--active' : ''}`}
+                  className="hero-location-trigger"
                   disabled={isDetectingLocation}
                   aria-label="Use my current location"
                   title="Use my current location"
