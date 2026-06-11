@@ -76,6 +76,7 @@ export default function HomePage() {
         selectedState={ctx.selectedState}
         states={nigeriaStates}
         isDetectingLocation={ctx.isDetectingLocation}
+        locationSource={ctx.locationSource}
         onStateChange={async (state) => {
           ctx.setSelectedState(state);
           await ctx.withNotice(async () => {
@@ -97,8 +98,12 @@ export default function HomePage() {
         onUseMyLocation={() => {
           void ctx.useMyLocation().then((result) => {
             if (result.ok) {
+              ctx.setSearchCoordinates(result.lat, result.lng);
               ctx.setNotice(`Showing services near ${result.state}.`);
-              void ctx.loadPublicData(result.state, ctx.searchTerm);
+              void ctx.loadPublicData(result.state, ctx.searchTerm, {
+                lat: result.lat,
+                lng: result.lng,
+              });
               return;
             }
             ctx.setNotice(locationErrorMessage(result.reason));

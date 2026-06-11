@@ -1,4 +1,5 @@
 import { FormEvent } from 'react';
+import type { LocationSource } from '../../appTypes';
 import { heroImage } from '../../lib/marketingAssets';
 
 export function Hero({
@@ -11,6 +12,7 @@ export function Hero({
   onBrowse,
   onUseMyLocation,
   isDetectingLocation = false,
+  locationSource = 'none',
 }: {
   selectedState: string;
   states: string[];
@@ -19,13 +21,16 @@ export function Hero({
   onSearchTermChange: (value: string) => void;
   onSearch: (state: string, queryText: string) => Promise<void>;
   onBrowse: () => void;
-  onUseMyLocation?: () => void;
+  onUseMyLocation: () => void;
   isDetectingLocation?: boolean;
+  locationSource?: LocationSource;
 }) {
   async function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await onSearch(selectedState, searchTerm);
   }
+
+  const locationActive = isDetectingLocation || locationSource === 'auto';
 
   return (
     <section className="hero">
@@ -49,19 +54,32 @@ export function Hero({
             <span>Find trusted help near you</span>
           </div>
           <div className="location-control">
-            <div className="field-shell">
+            <div className="field-shell field-shell--location">
               <span>Location</span>
-              <select
-                id="service-state"
-                value={selectedState}
-                disabled={isDetectingLocation}
-                onChange={(event) => onStateChange(event.target.value)}
-              >
-                <option value="">{isDetectingLocation ? 'Detecting…' : 'Select your state'}</option>
-                {states.map((state) => (
-                  <option key={state} value={state}>{state}</option>
-                ))}
-              </select>
+              <div className="hero-location-row">
+                <button
+                  type="button"
+                  className={`hero-location-trigger${locationActive ? ' hero-location-trigger--active' : ''}`}
+                  disabled={isDetectingLocation}
+                  aria-label="Use my current location"
+                  title="Use my current location"
+                  onClick={onUseMyLocation}
+                >
+                  <span aria-hidden="true">⌖</span>
+                </button>
+                <select
+                  id="service-state"
+                  value={selectedState}
+                  disabled={isDetectingLocation}
+                  aria-label="State"
+                  onChange={(event) => onStateChange(event.target.value)}
+                >
+                  <option value="">{isDetectingLocation ? 'Detecting…' : 'Select your state'}</option>
+                  {states.map((state) => (
+                    <option key={state} value={state}>{state}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="field-shell">
               <span>Service</span>
@@ -76,16 +94,6 @@ export function Hero({
               Search
             </button>
           </div>
-          {onUseMyLocation ? (
-            <button
-              className="location-link hero-location-link"
-              type="button"
-              disabled={isDetectingLocation}
-              onClick={onUseMyLocation}
-            >
-              {isDetectingLocation ? 'Finding your location…' : '⌖ Use my current location'}
-            </button>
-          ) : null}
           <button className="browse-link" type="button" onClick={onBrowse}>
             Browse all services
           </button>

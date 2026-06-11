@@ -727,9 +727,6 @@ canvas {
   cursor: wait;
 }
 
-.hero-location-link {
-  margin-top: 8px;
-}
 
 .auth-entry,
 .auth-summary {
@@ -1864,6 +1861,47 @@ canvas {
   background: var(--color-white);
   font-weight: 700;
   outline: none;
+}
+
+.field-shell--location .hero-location-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.hero-location-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1;
+  background: transparent;
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.hero-location-trigger:hover:not(:disabled) {
+  color: var(--accent-dark);
+  background: var(--accent-soft);
+}
+
+.hero-location-trigger--active,
+.hero-location-trigger:active:not(:disabled) {
+  color: var(--accent-dark);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.hero-location-trigger:disabled {
+  opacity: 0.65;
+  cursor: wait;
 }
 
 .field-shell input {
