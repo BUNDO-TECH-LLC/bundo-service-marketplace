@@ -1,4 +1,5 @@
 import type { MarketplaceSort } from '../../appTypes';
+import { sortCategoriesByCatalog } from '../../lib/serviceCategoryCatalog';
 import type { Category } from '../../types';
 
 export function MarketplaceFilters({
@@ -38,6 +39,8 @@ export function MarketplaceFilters({
   onApply: () => Promise<void>;
   onClear: () => Promise<void>;
 }) {
+  const sortedCategories = sortCategoriesByCatalog(categories);
+
   return (
     <section className="marketplace-filters" aria-label="Search and filter services">
       <header className="marketplace-filter-head">
@@ -62,7 +65,7 @@ export function MarketplaceFilters({
           Category
           <select value={selectedCategoryId} onChange={(event) => onCategoryChange(event.target.value)}>
             <option value="">All categories</option>
-            {categories.map((category) => (
+            {sortedCategories.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.name}
               </option>

@@ -1,7 +1,8 @@
 import { FormEvent, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { api } from '../lib/api';
-import { categoryIcon } from '../lib/categoryIcon';
+import { sortCategoriesByCatalog } from '../lib/serviceCategoryCatalog';
+import { ServiceCategoryIcon } from '../lib/serviceCategoryIcons';
 import { heroImage } from '../lib/marketingAssets';
 import { money } from '../lib/formatting';
 import { nigeriaStates } from '../lib/geo';
@@ -52,6 +53,7 @@ export function LoggedInHome({
   const displayName = userDisplayName(firebaseUser, me);
   const recommendedOfferings = offerings.slice(0, 3);
   const featuredArtisan = artisans[0];
+  const sortedCategories = sortCategoriesByCatalog(categories);
   const [activeOfferingAction, setActiveOfferingAction] = useState<string | null>(null);
 
   async function submitSearch(event: FormEvent<HTMLFormElement>) {
@@ -117,9 +119,11 @@ export function LoggedInHome({
             <button type="submit">Search</button>
           </form>
           <div className="quick-service-grid" aria-label="Quick service picks">
-            {categories.slice(0, 6).map((category) => (
+            {sortedCategories.slice(0, 6).map((category) => (
               <button key={category.id} type="button" onClick={() => void onBrowse(category.id)}>
-                <span>{categoryIcon(category.iconKey)}</span>
+                <span className="quick-service-icon">
+                  <ServiceCategoryIcon iconKey={category.iconKey} />
+                </span>
                 {category.name}
               </button>
             ))}
@@ -152,9 +156,11 @@ export function LoggedInHome({
         </div>
         <div className="logged-category-row">
           {categories.length === 0 && <span className="muted">Categories will appear here after seeding.</span>}
-          {categories.slice(0, 7).map((category) => (
+          {sortedCategories.map((category) => (
             <button key={category.id} type="button" onClick={() => void onBrowse(category.id)}>
-              <span>{categoryIcon(category.iconKey)}</span>
+              <span className="logged-category-icon">
+                <ServiceCategoryIcon iconKey={category.iconKey} />
+              </span>
               {category.name}
             </button>
           ))}

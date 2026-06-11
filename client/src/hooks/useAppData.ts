@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { api, ApiError, PUBLIC_API_TIMEOUT_MS } from '../lib/api';
 import { isArtisanApplicantSession } from '../lib/artisanApplication';
 import { paymentSuccessFromVerify, type VerifyPaymentResponse } from '../lib/paymentReturn';
+import { sortCategoriesByCatalog } from '../lib/serviceCategoryCatalog';
 import type {
   AdminArtisanRecord,
   AdminCategoryRecord,
@@ -110,7 +111,7 @@ export function useAppData(filters: MarketplaceFilterState, options?: UseAppData
       let loadedAny = false;
 
       if (categoriesResult.status === 'fulfilled') {
-        setCategories(categoriesResult.value.categories);
+        setCategories(sortCategoriesByCatalog(categoriesResult.value.categories));
         loadedAny = true;
       }
 

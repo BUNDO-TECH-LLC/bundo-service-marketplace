@@ -1,4 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
+import { SERVICE_CATEGORY_CATALOG } from '../lib/serviceCategoryCatalog';
+
+const ICON_KEY_OPTIONS = [...new Set(SERVICE_CATEGORY_CATALOG.map((entry) => entry.iconKey))];
 
 export type CategoryFormValues = {
   name: string;
@@ -66,7 +69,17 @@ export function CategoryFormDialog({
         </label>
         <label>
           Icon key
-          <input value={iconKey} onChange={(event) => setIconKey(event.target.value)} required />
+          <input
+            value={iconKey}
+            onChange={(event) => setIconKey(event.target.value)}
+            list="category-icon-keys"
+            required
+          />
+          <datalist id="category-icon-keys">
+            {ICON_KEY_OPTIONS.map((key) => (
+              <option key={key} value={key} />
+            ))}
+          </datalist>
         </label>
         <div className="prompt-dialog-actions">
           <button type="button" className="secondary-button" disabled={busy} onClick={onCancel}>
