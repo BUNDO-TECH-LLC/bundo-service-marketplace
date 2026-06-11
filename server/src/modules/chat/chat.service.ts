@@ -62,6 +62,15 @@ async function ensureBookingConversationsForUser(input: {
   return null;
 }
 
+async function hasBookingBetween(customerId: string, artisanId: string) {
+  const booking = await db.booking.findFirst({
+    where: { customerId, artisanId },
+    select: { id: true },
+  });
+
+  return Boolean(booking);
+}
+
 export const createMessage = async (input: {
   senderId: string;
   senderRole: Role | null;
@@ -98,6 +107,10 @@ export const createMessage = async (input: {
 
     if (isArtisan && conversation.artisanInbox !== ConversationInboxState.ACTIVE) {
       return { status: 'forbidden' as const };
+    }
+
+    if (!(await hasBookingBetween(conversation.customerId, conversation.artisanId))) {
+      return { status: 'booking_required' as const };
     }
 
     const message = await db.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -165,6 +178,10 @@ export const createMessage = async (input: {
 
   if (artisan.userId === input.senderId) {
     return { status: 'self_message' as const };
+  }
+
+  if (!(await hasBookingBetween(input.senderId, input.artisanId))) {
+    return { status: 'booking_required' as const };
   }
 
   const conversation = await db.conversation.upsert({

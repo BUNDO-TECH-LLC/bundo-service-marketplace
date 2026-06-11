@@ -35,14 +35,14 @@ export const helpTopics: HelpTopic[] = [
         heading: 'Finding professionals',
         questions: [
           ['How do I find a service?', 'Select your state from the homepage dropdown, open the marketplace, then compare available offerings and approved artisan profiles.'],
-          ['What should I check before booking?', 'Check the service price, artisan location, rating count, profile details, and send a message if you need more information.'],
+          ['What should I check before booking?', 'Check the service price, artisan location, rating count, and profile details before you request a booking.'],
         ],
       },
       {
         heading: 'Bookings',
         questions: [
           ['How do I place a booking?', 'Sign in as a customer, open a service card, and select Book. Your booking request appears in your customer dashboard.'],
-          ['Can I chat before booking?', 'Yes. Use Message on a service card to start a conversation with the artisan before requesting the service.'],
+          ['Can I chat before booking?', 'No. Messaging unlocks after you place a booking request. Use Open chat from My bookings or the Messages tab once your request is sent.'],
         ],
       },
     ],

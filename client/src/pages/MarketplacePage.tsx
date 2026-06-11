@@ -64,7 +64,7 @@ export default function MarketplacePage() {
         <p>
           {ctx.selectedState || ctx.searchTerm
             ? `Browse approved artisans and offerings${ctx.selectedState ? ` in ${ctx.selectedState}` : ''}${ctx.searchTerm ? ` matching "${ctx.searchTerm}"` : ''}.`
-            : 'Browse approved artisans, compare services, send a message, or place a booking request.'}
+            : 'Browse approved artisans, compare services, and place a booking request.'}
         </p>
       </section>
 

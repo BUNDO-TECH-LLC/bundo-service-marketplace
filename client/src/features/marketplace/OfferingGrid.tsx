@@ -43,10 +43,8 @@ export function OfferingGrid({
       {offerings.length === 0 && <EmptyState title="No services yet" body="Approved artisan offerings will appear here." />}
       {offerings.map((offering) => {
         const bookActionKey = `book:${offering.id}`;
-        const messageActionKey = `message:${offering.id}`;
         const viewActionKey = `view:${offering.artisan?.id || offering.id}`;
         const isBookingThisOffering = activeOfferingAction === bookActionKey;
-        const isMessagingThisOffering = activeOfferingAction === messageActionKey;
         const isViewingThisArtisan = activeOfferingAction === viewActionKey;
 
         return (
@@ -105,29 +103,6 @@ export function OfferingGrid({
               >
                 {isBookingThisOffering ? 'Booking...' : 'Book'}
               </button>
-              <button
-                className="secondary-button"
-                disabled={!isAuthed || !offering.artisan?.id || isMessagingThisOffering}
-                onClick={() =>
-                  void runOfferingAction(
-                    messageActionKey,
-                    async () => {
-                      await api('/messages', {
-                        method: 'POST',
-                        token,
-                        body: JSON.stringify({
-                          artisanId: offering.artisan!.id,
-                          body: 'Hello, I am interested in this service.',
-                        }),
-                      });
-                      await reloadPrivate();
-                    },
-                    'Message sent'
-                  )
-                }
-              >
-                {isMessagingThisOffering ? 'Sending...' : 'Message'}
-              </button>
             </div>
           </article>
         );
@@ -135,6 +110,3 @@ export function OfferingGrid({
     </div>
   );
 }
-
-
-

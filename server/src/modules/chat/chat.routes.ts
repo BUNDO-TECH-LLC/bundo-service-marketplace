@@ -127,6 +127,9 @@ router.post(
         missing_artisan_id: new ValidationError('artisanId is required'),
         missing_artisan: new NotFoundError('Artisan'),
         self_message: new ForbiddenError('You cannot message yourself'),
+        booking_required: new ForbiddenError(
+          'Messaging is only available after you have booked this artisan'
+        ),
         forbidden: new ForbiddenError('You can only message inside your own conversations'),
       });
 
@@ -262,6 +265,9 @@ router.post(
 
       throwOnServiceStatus(result.status, {
         missing_conversation: new NotFoundError('Conversation'),
+        booking_required: new ForbiddenError(
+          'Messaging is only available after you have booked this artisan'
+        ),
         forbidden: new ForbiddenError('You can only message inside your own conversations'),
       });
 

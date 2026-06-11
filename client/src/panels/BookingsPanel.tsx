@@ -618,7 +618,9 @@ export function BookingsPage({
                     Reschedule
                   </button>
                 )}
-                {booking.status === 'ACCEPTED' && (
+                {(['REQUESTED', 'ACCEPTED', 'ONGOING', 'COMPLETED'] as Booking['status'][]).includes(
+                  booking.status
+                ) && (
                   <button className="secondary-button" onClick={openMessages}>
                     Open chat
                   </button>

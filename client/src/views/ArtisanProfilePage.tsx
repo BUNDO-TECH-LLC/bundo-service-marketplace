@@ -67,18 +67,6 @@ export function ArtisanProfilePage({
     });
   }
 
-  async function sendMessage() {
-    await api('/messages', {
-      method: 'POST',
-      token,
-      body: JSON.stringify({
-        artisanId: artisan.id,
-        body: `Hello ${artisan.displayName}, I am interested in your service.`,
-      }),
-    });
-    await reloadPrivate();
-  }
-
   return (
     <main className="artisan-profile-page">
       <button className="back-button profile-back" onClick={onBack}>Back to marketplace</button>
@@ -115,7 +103,7 @@ export function ArtisanProfilePage({
             <h2>About</h2>
             <p>
               {artisan.bio ||
-                `${artisan.displayName} is an approved Bundo professional serving customers around ${artisan.area || artisan.city}. Review their services, send a message, or request a booking when you are ready.`}
+                `${artisan.displayName} is an approved Bundo professional serving customers around ${artisan.area || artisan.city}. Review their services and request a booking when you are ready.`}
             </p>
           </section>
 
@@ -213,16 +201,12 @@ export function ArtisanProfilePage({
             <p className="booking-payment-notice">
               Final price is agreed with your artisan before you pay from My bookings.
             </p>
+            <p className="booking-payment-notice">
+              After you book, chat with {artisan.displayName.split(' ')[0]} from My bookings.
+            </p>
 
             <button disabled={!isAuthed || role !== 'CUSTOMER' || busy || !selectedOffering}>Book now</button>
           </form>
-          <button
-            className="outline-button"
-            disabled={!isAuthed || busy}
-            onClick={() => runAction(sendMessage, 'Message sent')}
-          >
-            Send a message
-          </button>
 
           <div className="profile-stats">
             <span>Jobs completed <strong>{artisan.ratingCount + offerings.length}</strong></span>
