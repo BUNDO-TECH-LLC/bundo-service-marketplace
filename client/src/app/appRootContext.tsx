@@ -98,6 +98,8 @@ export type AppRootValue = {
       minPrice?: string;
       maxPrice?: string;
       sort?: MarketplaceSort;
+      lat?: number;
+      lng?: number;
     }
   ) => Promise<void>;
   loadPrivateData: (authToken?: string, user?: ApiUser | null) => Promise<void>;

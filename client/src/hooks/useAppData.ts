@@ -77,6 +77,8 @@ export function useAppData(filters: MarketplaceFilterState, options?: UseAppData
         minPrice?: string;
         maxPrice?: string;
         sort?: MarketplaceSort;
+        lat?: number;
+        lng?: number;
       }
     ) => {
       const params = new URLSearchParams({ page: '1', limit: '12' });
@@ -84,6 +86,8 @@ export function useAppData(filters: MarketplaceFilterState, options?: UseAppData
       const nextMinPrice = options?.minPrice ?? filters.priceMin;
       const nextMaxPrice = options?.maxPrice ?? filters.priceMax;
       const nextSort = options?.sort ?? filters.marketplaceSort;
+      const nextLat = options?.lat ?? filters.searchLat;
+      const nextLng = options?.lng ?? filters.searchLng;
 
       if (state) params.set('state', state);
       if (queryText.trim()) params.set('q', queryText.trim());
@@ -91,13 +95,9 @@ export function useAppData(filters: MarketplaceFilterState, options?: UseAppData
       if (nextMinPrice.trim()) params.set('minPrice', nextMinPrice.trim());
       if (nextMaxPrice.trim()) params.set('maxPrice', nextMaxPrice.trim());
       if (nextSort) params.set('sort', nextSort);
-      if (
-        nextSort === 'distance' &&
-        filters.searchLat != null &&
-        filters.searchLng != null
-      ) {
-        params.set('lat', String(filters.searchLat));
-        params.set('lng', String(filters.searchLng));
+      if (nextSort === 'distance' && nextLat != null && nextLng != null) {
+        params.set('lat', String(nextLat));
+        params.set('lng', String(nextLng));
       }
 
       const query = `?${params.toString()}`;

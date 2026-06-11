@@ -46,10 +46,14 @@ export default function MarketplacePage() {
   function handleUseMyLocation() {
     void ctx.useMyLocation().then((result) => {
       if (result.ok) {
-        ctx.setMarketplaceSort('distance');
         ctx.setSearchCoordinates(result.lat, result.lng);
+        ctx.setMarketplaceSort('distance');
         ctx.setNotice(`Using your current location near ${result.state}.`);
-        void ctx.loadPublicData(result.state, ctx.searchTerm, { sort: 'distance' });
+        void ctx.loadPublicData(result.state, ctx.searchTerm, {
+          sort: 'distance',
+          lat: result.lat,
+          lng: result.lng,
+        });
         return;
       }
       ctx.setNotice(locationErrorMessage(result.reason));

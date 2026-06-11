@@ -82,6 +82,25 @@ export function MainLayout() {
     navigate();
   };
 
+  function handleUseMyLocation() {
+    void ctx.useMyLocation().then((result) => {
+      if (result.ok) {
+        ctx.setSearchCoordinates(result.lat, result.lng);
+        ctx.setMarketplaceSort('distance');
+        ctx.setNotice(`Showing services near ${result.state}.`);
+        if (needsPublicMarketplaceData(ctx.location.pathname)) {
+          void ctx.loadPublicData(result.state, ctx.searchTerm, {
+            sort: 'distance',
+            lat: result.lat,
+            lng: result.lng,
+          });
+        }
+        return;
+      }
+      ctx.setNotice(locationErrorMessage(result.reason));
+    });
+  }
+
   if (ctx.isAppBootstrapping) {
     return <BundoLoadingScreen />;
   }
@@ -147,7 +166,22 @@ export function MainLayout() {
                   />
                 </label>
                 <label className="topbar-location-field">
-                  <span aria-hidden="true">⌖</span>
+                  <button
+                    type="button"
+                    className={`topbar-location-trigger${
+                      ctx.isDetectingLocation
+                        ? ' topbar-location-trigger--active'
+                        : ctx.locationSource === 'auto'
+                          ? ' topbar-location-trigger--active'
+                          : ''
+                    }`}
+                    disabled={ctx.isDetectingLocation}
+                    aria-label="Use my current location"
+                    title="Use my current location"
+                    onClick={handleUseMyLocation}
+                  >
+                    <span aria-hidden="true">⌖</span>
+                  </button>
                   <select
                     value={ctx.selectedState}
                     disabled={ctx.isDetectingLocation}
@@ -165,27 +199,6 @@ export function MainLayout() {
                       </option>
                     ))}
                   </select>
-                  <button
-                    type="button"
-                    className="topbar-location-detect"
-                    disabled={ctx.isDetectingLocation}
-                    aria-label="Use my current location"
-                    title="Use my current location"
-                    onClick={() => {
-                      void ctx.useMyLocation().then((result) => {
-                        if (result.ok) {
-                          ctx.setNotice(`Showing services near ${result.state}.`);
-                          if (needsPublicMarketplaceData(ctx.location.pathname)) {
-                            void ctx.loadPublicData(result.state, ctx.searchTerm);
-                          }
-                          return;
-                        }
-                        ctx.setNotice(locationErrorMessage(result.reason));
-                      });
-                    }}
-                  >
-                    {ctx.isDetectingLocation ? '…' : 'Locate'}
-                  </button>
                 </label>
               </form>
             )}

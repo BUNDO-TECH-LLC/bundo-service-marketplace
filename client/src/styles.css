@@ -691,24 +691,40 @@ canvas {
 }
 
 .topbar-location-field {
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
 }
 
-.topbar-location-detect {
-  padding: 0 10px;
-  color: var(--accent-dark);
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-  background: transparent;
-}
-
-.topbar-location-detect:hover:not(:disabled) {
+.topbar-location-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
   color: var(--ink);
+  font-size: 20px;
+  line-height: 1;
+  background: transparent;
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.topbar-location-detect:disabled {
-  opacity: 0.6;
+.topbar-location-trigger:hover:not(:disabled) {
+  color: var(--accent-dark);
+  background: var(--accent-soft);
+}
+
+.topbar-location-trigger--active,
+.topbar-location-trigger:active:not(:disabled) {
+  color: var(--accent-dark);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.topbar-location-trigger:disabled {
+  opacity: 0.65;
+  cursor: wait;
 }
 
 .hero-location-link {
