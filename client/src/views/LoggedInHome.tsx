@@ -32,7 +32,6 @@ export function LoggedInHome({
   runAction,
   reloadPrivate,
   onBookingSuccess,
-  openBookings,
 }: {
   me: ApiUser;
   firebaseUser: User | null;
@@ -51,7 +50,6 @@ export function LoggedInHome({
   runAction: ActionRunner;
   reloadPrivate: () => Promise<void>;
   onBookingSuccess: (booking: BookingSuccessState) => void;
-  openBookings: () => void;
 }) {
   const displayName = userDisplayName(firebaseUser, me);
   const recommendedOfferings = offerings.slice(0, 3);
@@ -130,12 +128,6 @@ export function LoggedInHome({
                 <span className="quick-service-label">{row.name}</span>
               </button>
             ))}
-            <button className="wide" type="button" onClick={() => void onBrowse()}>
-              Browse marketplace
-            </button>
-            <button className="wide" type="button" onClick={openBookings}>
-              My bookings
-            </button>
           </div>
         </div>
 
