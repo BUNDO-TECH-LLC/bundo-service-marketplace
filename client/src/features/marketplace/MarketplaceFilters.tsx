@@ -6,9 +6,11 @@ export function MarketplaceFilters({
   categories,
   selectedState,
   states,
+  searchTerm,
   selectedCategoryId,
   sort,
   onSelectedStateChange,
+  onSearchTermChange,
   onCategoryChange,
   onSortChange,
   onUseMyLocation,
@@ -18,9 +20,11 @@ export function MarketplaceFilters({
   categories: Category[];
   selectedState: string;
   states: string[];
+  searchTerm: string;
   selectedCategoryId: string;
   sort: MarketplaceSort;
   onSelectedStateChange: (value: string) => void;
+  onSearchTermChange: (value: string) => void;
   onCategoryChange: (value: string) => void;
   onSortChange: (value: MarketplaceSort) => void;
   onUseMyLocation?: () => void;
@@ -34,7 +38,7 @@ export function MarketplaceFilters({
       <header className="marketplace-filter-head">
         <p className="eyebrow">Search</p>
         <h2>Find the right service</h2>
-        <p>Filter by state, category, and sort order.</p>
+        <p>Filter by state, category, search, and sort order.</p>
       </header>
 
       <div className="marketplace-filter-grid">
@@ -59,6 +63,15 @@ export function MarketplaceFilters({
               </option>
             ))}
           </select>
+        </label>
+        <label>
+          Search
+          <input
+            type="search"
+            value={searchTerm}
+            onChange={(event) => onSearchTermChange(event.target.value)}
+            placeholder="Lekki, artisan, service"
+          />
         </label>
         <label>
           Sort by

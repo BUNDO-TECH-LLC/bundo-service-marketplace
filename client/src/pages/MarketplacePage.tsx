@@ -76,15 +76,18 @@ export default function MarketplacePage() {
         categories={ctx.categories}
         selectedState={ctx.selectedState}
         states={nigeriaStates}
+        searchTerm={ctx.searchTerm}
         selectedCategoryId={ctx.selectedCategoryId}
         sort={ctx.marketplaceSort}
         onSelectedStateChange={ctx.setSelectedState}
+        onSearchTermChange={ctx.setSearchTerm}
         onCategoryChange={ctx.setSelectedCategoryId}
         onSortChange={ctx.setMarketplaceSort}
         onUseMyLocation={handleUseMyLocation}
         onApply={applyFilters}
         onClear={async () => {
           ctx.clearLocation();
+          ctx.setSearchTerm('');
           ctx.setSelectedCategoryId('');
           ctx.setPriceMin('');
           ctx.setPriceMax('');
