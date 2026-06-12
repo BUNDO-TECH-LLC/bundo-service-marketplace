@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../../lib/api';
 import { artisanVerificationPhase } from '../../../lib/artisanVerification';
-import { readBrowserLocation } from '../../../lib/geolocation';
+import { locationErrorMessage, readBrowserLocation } from '../../../lib/geolocation';
 import { inferNigeriaState } from '../../../lib/inferNigeriaState';
 import { uploadKycImage } from '../../../lib/kycUpload';
 import { uploadPortfolioImage } from '../../../lib/portfolioUpload';
@@ -340,7 +340,9 @@ export function useArtisanLanding({
     await runAction(async () => {
       const result = await readBrowserLocation();
       if (!result.ok) {
-        throw new Error('Could not read your location. Pick your state manually or allow location access.');
+        throw new Error(
+          locationErrorMessage(result.reason, { permissionGranted: result.permissionGranted })
+        );
       }
 
       const state = inferNigeriaState(result.lat, result.lng);

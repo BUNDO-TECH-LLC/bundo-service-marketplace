@@ -1,5 +1,13 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
-import { readBrowserLocation } from './geolocation';
+import { locationErrorMessage, readBrowserLocation } from './geolocation';
+
+describe('locationErrorMessage', () => {
+  it('explains macOS system settings when permission is granted but position is unavailable', () => {
+    const message = locationErrorMessage('unavailable', { permissionGranted: true });
+    expect(message).toContain('System Settings');
+    expect(message).toContain('Google Chrome');
+  });
+});
 
 describe('readBrowserLocation', () => {
   afterEach(() => {
@@ -13,6 +21,8 @@ describe('readBrowserLocation', () => {
         getCurrentPosition: (_success: unknown, error: (err: { code: number }) => void) => {
           error({ code: 1 });
         },
+        watchPosition: vi.fn(),
+        clearWatch: vi.fn(),
       },
       permissions: {
         query: vi.fn().mockResolvedValue({ state: 'prompt' }),
@@ -36,6 +46,8 @@ describe('readBrowserLocation', () => {
           }
           success({ coords: { latitude: 6.5244, longitude: 3.3792 } });
         },
+        watchPosition: vi.fn(),
+        clearWatch: vi.fn(),
       },
       permissions: {
         query: vi.fn().mockResolvedValue({ state: 'granted' }),
@@ -45,5 +57,49 @@ describe('readBrowserLocation', () => {
     const result = await readBrowserLocation();
     expect(result).toEqual({ ok: true, lat: 6.5244, lng: 3.3792 });
     expect(attempt).toBe(2);
+  });
+
+  it('falls back to watchPosition after repeated getCurrentPosition failures', async () => {
+    vi.stubGlobal('window', { isSecureContext: true, clearTimeout: vi.fn(), setTimeout: vi.fn(() => 1) });
+    vi.stubGlobal('navigator', {
+      geolocation: {
+        getCurrentPosition: (_success: unknown, error: (err: { code: number }) => void) => {
+          error({ code: 2 });
+        },
+        watchPosition: (success: (position: { coords: { latitude: number; longitude: number } }) => void) => {
+          success({ coords: { latitude: 9.0765, longitude: 7.3986 } });
+          return 7;
+        },
+        clearWatch: vi.fn(),
+      },
+      permissions: {
+        query: vi.fn().mockResolvedValue({ state: 'granted' }),
+      },
+    });
+
+    const result = await readBrowserLocation();
+    expect(result).toEqual({ ok: true, lat: 9.0765, lng: 7.3986 });
+  });
+
+  it('marks unavailable failures as permissionGranted when browser permission is granted', async () => {
+    vi.stubGlobal('window', { isSecureContext: true, clearTimeout: vi.fn(), setTimeout: vi.fn(() => 1) });
+    vi.stubGlobal('navigator', {
+      geolocation: {
+        getCurrentPosition: (_success: unknown, error: (err: { code: number }) => void) => {
+          error({ code: 2 });
+        },
+        watchPosition: (_success: unknown, error: (err: { code: number }) => void) => {
+          error({ code: 2 });
+          return 7;
+        },
+        clearWatch: vi.fn(),
+      },
+      permissions: {
+        query: vi.fn().mockResolvedValue({ state: 'granted' }),
+      },
+    });
+
+    const result = await readBrowserLocation();
+    expect(result).toEqual({ ok: false, reason: 'unavailable', permissionGranted: true });
   });
 });

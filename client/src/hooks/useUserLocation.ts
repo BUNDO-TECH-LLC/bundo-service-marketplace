@@ -99,7 +99,11 @@ export function useUserLocation(options?: UseUserLocationOptions): UserLocationS
             promptStatus: 'denied',
           });
         }
-        return { ok: false, reason: result.reason };
+        return {
+          ok: false,
+          reason: result.reason,
+          permissionGranted: result.permissionGranted,
+        };
       }
 
       const state = applyAutoLocation(result.lat, result.lng);

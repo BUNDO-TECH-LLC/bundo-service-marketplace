@@ -105,7 +105,9 @@ export default function HomePage() {
               });
               return;
             }
-            ctx.setNotice(locationErrorMessage(result.reason));
+            ctx.setNotice(
+              locationErrorMessage(result.reason, { permissionGranted: result.permissionGranted })
+            );
           });
         }}
       />

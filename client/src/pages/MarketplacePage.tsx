@@ -56,7 +56,9 @@ export default function MarketplacePage() {
         });
         return;
       }
-      ctx.setNotice(locationErrorMessage(result.reason));
+      ctx.setNotice(
+        locationErrorMessage(result.reason, { permissionGranted: result.permissionGranted })
+      );
     });
   }
 
