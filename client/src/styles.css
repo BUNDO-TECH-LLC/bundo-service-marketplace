@@ -1863,6 +1863,7 @@ canvas {
   min-width: 0;
 }
 
+.hero-search .hero-location-trigger,
 .hero-location-trigger {
   display: inline-flex;
   align-items: center;
@@ -1878,6 +1879,13 @@ canvas {
   background: transparent;
 }
 
+.hero-search .hero-location-trigger:hover,
+.hero-location-trigger:hover {
+  color: var(--ink);
+  background: transparent;
+}
+
+.hero-search .hero-location-trigger:active:not(:disabled),
 .hero-location-trigger:active:not(:disabled) {
   color: var(--accent-dark);
   background: var(--accent-soft);
@@ -1892,7 +1900,7 @@ canvas {
   font-weight: 600;
 }
 
-.hero-search button,
+.hero-search button:not(.browse-link):not(.hero-location-trigger),
 .actions button,
 .form-card button,
 .phone-input button,
@@ -1902,7 +1910,7 @@ canvas {
   background: var(--accent);
 }
 
-.hero-search button:hover,
+.hero-search button:not(.browse-link):not(.hero-location-trigger):hover,
 .actions button:hover,
 .form-card button:hover,
 .phone-input button:hover,
