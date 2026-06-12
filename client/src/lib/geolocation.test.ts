@@ -21,8 +21,6 @@ describe('readBrowserLocation', () => {
         getCurrentPosition: (_success: unknown, error: (err: { code: number }) => void) => {
           error({ code: 1 });
         },
-        watchPosition: vi.fn(),
-        clearWatch: vi.fn(),
       },
       permissions: {
         query: vi.fn().mockResolvedValue({ state: 'prompt' }),
@@ -33,7 +31,7 @@ describe('readBrowserLocation', () => {
     expect(result).toEqual({ ok: false, reason: 'denied' });
   });
 
-  it('retries with a second attempt after position unavailable', async () => {
+  it('retries once with a fresh read after position unavailable', async () => {
     vi.stubGlobal('window', { isSecureContext: true });
     let attempt = 0;
     vi.stubGlobal('navigator', {
@@ -46,8 +44,6 @@ describe('readBrowserLocation', () => {
           }
           success({ coords: { latitude: 6.5244, longitude: 3.3792 } });
         },
-        watchPosition: vi.fn(),
-        clearWatch: vi.fn(),
       },
       permissions: {
         query: vi.fn().mockResolvedValue({ state: 'granted' }),
@@ -59,18 +55,15 @@ describe('readBrowserLocation', () => {
     expect(attempt).toBe(2);
   });
 
-  it('falls back to watchPosition after repeated getCurrentPosition failures', async () => {
-    vi.stubGlobal('window', { isSecureContext: true, clearTimeout: vi.fn(), setTimeout: vi.fn(() => 1) });
+  it('does not retry after timeout', async () => {
+    vi.stubGlobal('window', { isSecureContext: true });
+    let attempt = 0;
     vi.stubGlobal('navigator', {
       geolocation: {
         getCurrentPosition: (_success: unknown, error: (err: { code: number }) => void) => {
-          error({ code: 2 });
+          attempt += 1;
+          error({ code: 3 });
         },
-        watchPosition: (success: (position: { coords: { latitude: number; longitude: number } }) => void) => {
-          success({ coords: { latitude: 9.0765, longitude: 7.3986 } });
-          return 7;
-        },
-        clearWatch: vi.fn(),
       },
       permissions: {
         query: vi.fn().mockResolvedValue({ state: 'granted' }),
@@ -78,21 +71,17 @@ describe('readBrowserLocation', () => {
     });
 
     const result = await readBrowserLocation();
-    expect(result).toEqual({ ok: true, lat: 9.0765, lng: 7.3986 });
+    expect(result).toEqual({ ok: false, reason: 'timeout', permissionGranted: true });
+    expect(attempt).toBe(1);
   });
 
   it('marks unavailable failures as permissionGranted when browser permission is granted', async () => {
-    vi.stubGlobal('window', { isSecureContext: true, clearTimeout: vi.fn(), setTimeout: vi.fn(() => 1) });
+    vi.stubGlobal('window', { isSecureContext: true });
     vi.stubGlobal('navigator', {
       geolocation: {
         getCurrentPosition: (_success: unknown, error: (err: { code: number }) => void) => {
           error({ code: 2 });
         },
-        watchPosition: (_success: unknown, error: (err: { code: number }) => void) => {
-          error({ code: 2 });
-          return 7;
-        },
-        clearWatch: vi.fn(),
       },
       permissions: {
         query: vi.fn().mockResolvedValue({ state: 'granted' }),

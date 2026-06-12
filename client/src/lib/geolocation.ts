@@ -18,6 +18,8 @@ const PERMISSION_DENIED = 1;
 const POSITION_UNAVAILABLE = 2;
 const TIMEOUT = 3;
 
+const FAST_TIMEOUT_MS = 8_000;
+
 type LocationFailureReason = Exclude<BrowserLocationResult, { ok: true }>['reason'];
 
 export function locationErrorMessage(
@@ -72,45 +74,6 @@ function readBrowserLocationOnce(options: PositionOptions): Promise<BrowserLocat
   });
 }
 
-function readBrowserLocationWatch(
-  options: PositionOptions,
-  watchTimeoutMs = 25_000
-): Promise<BrowserLocationResult> {
-  return new Promise((resolve) => {
-    let settled = false;
-    let timeoutId = 0;
-    let watchId = 0;
-
-    const finish = (result: BrowserLocationResult) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      window.clearTimeout(timeoutId);
-      navigator.geolocation.clearWatch(watchId);
-      resolve(result);
-    };
-
-    timeoutId = window.setTimeout(() => {
-      finish({ ok: false, reason: 'timeout' });
-    }, watchTimeoutMs);
-
-    watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        finish({
-          ok: true,
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        });
-      },
-      (error) => {
-        finish(mapGeolocationError(error));
-      },
-      options
-    );
-  });
-}
-
 async function readPermissionState(): Promise<PermissionState | null> {
   if (!navigator.permissions?.query) {
     return null;
@@ -153,34 +116,20 @@ export async function readBrowserLocation(): Promise<BrowserLocationResult> {
     return { ok: false, reason: 'denied' };
   }
 
-  // Network/Wi‑Fi positioning works better on laptops than GPS-first requests.
-  const attempts: PositionOptions[] = [
-    { enableHighAccuracy: false, timeout: 20_000, maximumAge: 900_000 },
-    { enableHighAccuracy: true, timeout: 20_000, maximumAge: 300_000 },
-    { enableHighAccuracy: false, timeout: 30_000, maximumAge: 0 },
-  ];
-
-  let lastResult: BrowserLocationResult = { ok: false, reason: 'unknown' };
-
-  for (const options of attempts) {
-    const result = await readBrowserLocationOnce(options);
-    if (result.ok) {
-      return result;
-    }
-
-    lastResult = result;
-    if (result.reason === 'denied') {
-      return withPermissionContext(result, permissionState);
-    }
+  const cachedResult = await readBrowserLocationOnce({
+    enableHighAccuracy: false,
+    timeout: FAST_TIMEOUT_MS,
+    maximumAge: 600_000,
+  });
+  if (cachedResult.ok || cachedResult.reason !== 'unavailable') {
+    return withPermissionContext(cachedResult, permissionState);
   }
 
-  const watchResult = await readBrowserLocationWatch(
-    { enableHighAccuracy: false, timeout: 30_000, maximumAge: 0 },
-    25_000
-  );
-  if (watchResult.ok) {
-    return watchResult;
-  }
+  const freshResult = await readBrowserLocationOnce({
+    enableHighAccuracy: false,
+    timeout: FAST_TIMEOUT_MS,
+    maximumAge: 0,
+  });
 
-  return withPermissionContext(watchResult.ok ? watchResult : lastResult, permissionState);
+  return withPermissionContext(freshResult, permissionState);
 }
