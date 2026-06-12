@@ -30,7 +30,7 @@ export function WhySection() {
               </span>
               <div>
                 <h3>Secure Payments</h3>
-                <p>Escrow-based payments that release only when the job is done.</p>
+                <p>Payments are secured end to end, from checkout through job completion.</p>
               </div>
             </li>
             <li className="why-feature">
