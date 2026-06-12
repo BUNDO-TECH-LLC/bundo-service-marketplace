@@ -2168,41 +2168,7 @@ canvas {
   border-top: 1px solid #2a2a2a;
 }
 
-.app-promo-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(20px, 4vw, 40px);
-  text-align: center;
-}
-
-.app-promo-stat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-}
-
-.app-promo-stat-value {
-  font-size: clamp(1.65rem, 3.5vw, 2.35rem);
-  font-weight: 800;
-  line-height: 1.1;
-  color: var(--accent);
-}
-
-.app-promo-stat-label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #8a7a6e;
-}
-
 @media (max-width: 640px) {
-  .app-promo-stats {
-    grid-template-columns: 1fr;
-    gap: 28px;
-  }
-
   .app-promo {
     padding-top: 72px;
     padding-bottom: 72px;

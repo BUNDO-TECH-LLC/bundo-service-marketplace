@@ -26,20 +26,6 @@ export function AppPromo() {
           </div>
         </div>
         <hr className="app-promo-divider" />
-        <div className="app-promo-stats">
-          <div className="app-promo-stat">
-            <span className="app-promo-stat-value">5,000+</span>
-            <span className="app-promo-stat-label">Vetted artisans</span>
-          </div>
-          <div className="app-promo-stat">
-            <span className="app-promo-stat-value">50,000+</span>
-            <span className="app-promo-stat-label">Homes transformed</span>
-          </div>
-          <div className="app-promo-stat">
-            <span className="app-promo-stat-value">4.9/5</span>
-            <span className="app-promo-stat-label">Trust score</span>
-          </div>
-        </div>
       </div>
     </section>
   );
