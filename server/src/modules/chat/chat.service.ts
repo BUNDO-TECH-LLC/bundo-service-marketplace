@@ -364,7 +364,24 @@ export const getConversationMessages = async (input: {
       },
     },
   });
-  const messages = recent.reverse();
+
+  const readAt = new Date();
+  await db.message.updateMany({
+    where: {
+      conversationId: input.conversationId,
+      senderId: { not: input.firebaseUid },
+      readAt: null,
+    },
+    data: { readAt },
+  });
+
+  const messages = recent
+    .reverse()
+    .map((message) =>
+      message.senderId !== input.firebaseUid && !message.readAt
+        ? { ...message, readAt }
+        : message
+    );
 
   return { status: 'found' as const, conversation, messages };
 };

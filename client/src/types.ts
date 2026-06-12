@@ -213,6 +213,7 @@ export type Message = {
   body: string;
   imageUrl?: string | null;
   imageCloudinaryId?: string | null;
+  readAt?: string | null;
   createdAt: string;
   sender?: Pick<ApiUser, 'firebaseUid' | 'email' | 'phone' | 'role'>;
 };

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { conversationContactName, conversationContactSubtitle } from '../lib/bookingDisplay';
+import { conversationIsUnread } from '../lib/conversationUnread';
 import { formatMessageTime } from '../lib/formatting';
 import { ChatComposer, type ChatComposerPayload } from '../components/ChatComposer';
 import { uploadChatImage } from '../lib/chatUpload';
@@ -31,20 +32,17 @@ export function ChatPanel({
   const { openArtisanProfile, me } = useAppRoot();
   const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [filter, setFilter] = useState<'all' | 'incoming'>('all');
+  const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const narrowMessenger = useMediaQuery(MESSENGER_MOBILE_BREAKPOINT);
   const mobileInboxMode = narrowMessenger && !activeConversation;
   const mobileThreadMode = narrowMessenger && activeConversation;
 
   const incomingConversations = useMemo(
-    () =>
-      conversations.filter((conversation) => {
-        const latest = conversation.messages?.[0];
-        return Boolean(latest && latest.senderId !== currentUserId);
-      }),
+    () => conversations.filter((conversation) => conversationIsUnread(conversation, currentUserId)),
     [conversations, currentUserId]
   );
-  const visibleConversations = filter === 'incoming' ? incomingConversations : conversations;
+  const incomingUnreadCount = incomingConversations.length;
+  const visibleConversations = filter === 'unread' ? incomingConversations : conversations;
 
   const CHAT_POLL_MS = 12_000;
 
@@ -59,6 +57,7 @@ export function ChatPanel({
 
   async function openConversation(conversationId: string) {
     await fetchMessages(conversationId);
+    await refreshConversations();
   }
 
   function backToInbox() {
@@ -161,8 +160,19 @@ export function ChatPanel({
           <button className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>
             All messages
           </button>
-          <button className={filter === 'incoming' ? 'active' : ''} onClick={() => setFilter('incoming')}>
-            Incoming
+          <button
+            className={filter === 'unread' ? 'active' : ''}
+            aria-label={
+              incomingUnreadCount > 0 ? `Unread, ${incomingUnreadCount} messages` : 'Unread'
+            }
+            onClick={() => setFilter('unread')}
+          >
+            Unread
+            {incomingUnreadCount > 0 ? (
+              <span className="message-tab-badge" aria-hidden="true">
+                {incomingUnreadCount > 99 ? '99+' : incomingUnreadCount}
+              </span>
+            ) : null}
           </button>
         </div>
       </div>
@@ -175,26 +185,25 @@ export function ChatPanel({
         <aside className="conversation-rail">
           {visibleConversations.length === 0 && (
             <div className="conversation-empty">
-              <strong>No {filter === 'incoming' ? 'incoming ' : ''}messages yet</strong>
+              <strong>No {filter === 'unread' ? 'unread ' : ''}messages yet</strong>
               <span>Booking conversations appear here automatically when a job is opened.</span>
             </div>
           )}
           {visibleConversations.map((conversation) => {
-            const latest = conversation.messages?.[0];
-            const isIncoming = Boolean(latest && latest.senderId !== currentUserId);
+            const isUnread = conversationIsUnread(conversation, currentUserId);
 
             return (
               <button
                 className={`conversation-row ${activeConversation?.id === conversation.id ? 'active' : ''}`}
                 key={conversation.id}
-                onClick={() => openConversation(conversation.id)}
+                onClick={() => void openConversation(conversation.id)}
               >
                 <span className="conversation-avatar">{conversationInitial(conversation)}</span>
                 <span className="conversation-copy">
                   <strong>{conversationTitle(conversation)}</strong>
                   <small>{latestMessage(conversation)}</small>
                 </span>
-                {isIncoming && <em>New</em>}
+                {isUnread && <em>New</em>}
               </button>
             );
           })}
