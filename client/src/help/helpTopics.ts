@@ -84,7 +84,7 @@ export const helpTopics: HelpTopic[] = [
         heading: 'Marketplace safety',
         questions: [
           ['How does Bundo protect users?', 'Bundo uses role-based access, verified artisan profiles, admin moderation, booking history, and conversation records.'],
-          ['Can admin review chats?', 'Admins can inspect conversations and add private operational notes when support or moderation is needed.'],
+          ['Can Bundo review my messages?', 'Our support team may review conversation history when handling a dispute, safety concern, or account issue. Notes added for internal review are never visible to the other party.'],
         ],
       },
     ],
@@ -98,7 +98,7 @@ export const helpTopics: HelpTopic[] = [
         heading: 'Customer payments',
         questions: [
           ['How does Bundo handle payment?', 'Customers pay through Paystack. Once the transaction is confirmed, Bundo marks the payment as held while the booking is still in progress.'],
-          ['When does the artisan get paid?', 'Bundo releases payout after the service is completed and the booking is reviewed on the operations side. This helps reduce fraud and incomplete-service risk.'],
+          ['When does the artisan get paid?', 'Bundo releases payout after the service is marked complete and the booking has been confirmed. This protects customers until the job is done and reduces fraud or incomplete-service risk.'],
           ['Does Bundo store card details?', 'No. Card and payment authorization are handled by Paystack. Bundo stores payment references and booking-linked status updates.'],
         ],
       },
@@ -106,7 +106,7 @@ export const helpTopics: HelpTopic[] = [
         heading: 'Payouts',
         questions: [
           ['How does an artisan receive payout?', 'An artisan adds a verified Nigerian payout account in their workspace. Once a held payment is approved for release, Bundo sends the payout to that account.'],
-          ['Why might payout be delayed?', 'Payout may be delayed if the booking is not completed, a dispute is open, the payout account is missing, or internal review is still ongoing.'],
+          ['Why might payout be delayed?', 'Payout may be delayed if the booking is not completed, a dispute is open, the payout account is missing, or our team is still reviewing the case.'],
         ],
       },
     ],
@@ -127,7 +127,7 @@ export const helpTopics: HelpTopic[] = [
         heading: 'Refund decisions',
         questions: [
           ['What outcomes are possible?', 'Bundo can release payout to the artisan, issue a full refund to the customer, or issue a partial refund depending on the review outcome.'],
-          ['How are decisions recorded?', 'Dispute outcomes are logged in the booking, payment history, and admin tooling so there is a clear internal audit trail.'],
+          ['How are decisions recorded?', 'Dispute outcomes are saved to your booking and payment history so there is a clear record of what was decided.'],
         ],
       },
     ],
@@ -162,7 +162,7 @@ export const helpTopics: HelpTopic[] = [
         heading: 'Verification and trust',
         questions: [
           ['Why does Bundo ask for KYC?', 'KYC helps Bundo confirm artisan identity before scaling profile visibility, payments, and payouts. It strengthens trust for customers and reduces fraud risk.'],
-          ['What does an artisan submit?', 'The current flow supports legal name, document type, document number, identity document image, optional selfie image, and address details for review.'],
+          ['What does an artisan submit?', 'You will submit your legal name, document type, document number, a photo of your identity document, an optional selfie, and your address for review.'],
         ],
       },
       {
@@ -204,7 +204,7 @@ export const helpTopics: HelpTopic[] = [
         heading: 'Getting help',
         questions: [
           ['How do I contact Bundo support?', `Email ${BUNDO_SUPPORT_EMAIL} with your account email and a short description of the issue.`],
-          ['What if something goes wrong?', 'Use the conversation thread first so there is a clear record. Admin support can review chats and booking context when needed.'],
+          ['What if something goes wrong?', 'Message the other party in your booking thread first so there is a clear record. If you still need help, contact Bundo support with your booking details.'],
           ['What if my account is restricted?', `An admin may restrict accounts that violate marketplace rules. Contact ${BUNDO_SUPPORT_EMAIL} with your account email and a short explanation.`],
         ],
       },

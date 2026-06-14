@@ -23,8 +23,11 @@ export function HelpCenter({
             <p className="eyebrow">Bundo help center</p>
             <h1>How can we help you?</h1>
             <div className="help-highlight">
-              <strong>Trust policies for payments, disputes, cancellations, and provider reviews live here.</strong>
-              <p>Use these topics to understand how Bundo protects customers, artisans, and marketplace funds during the MVP stage.</p>
+              <strong>Payments, disputes, cancellations, and reviews — how Bundo keeps the marketplace fair.</strong>
+              <p>
+                Browse these guides to understand how we protect customers, artisans, and every transaction on
+                Bundo.
+              </p>
             </div>
             <div className="help-topic-list">
               {helpTopics.map((topic) => (
