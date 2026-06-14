@@ -116,8 +116,12 @@ export const getAdminStats = async () => {
   return stats;
 };
 
-export const getUsers = async (pagination?: Pagination) => {
+export const getUsers = async (
+  pagination?: Pagination,
+  filters?: { role?: Role }
+) => {
   return db.user.findMany({
+    where: filters?.role ? { role: filters.role } : undefined,
     orderBy: { createdAt: 'desc' },
     ...paginationArgs(pagination),
     include: {
@@ -132,8 +136,10 @@ export const getUsers = async (pagination?: Pagination) => {
   });
 };
 
-export const countUsers = async () => {
-  return db.user.count();
+export const countUsers = async (filters?: { role?: Role }) => {
+  return db.user.count({
+    where: filters?.role ? { role: filters.role } : undefined,
+  });
 };
 
 export const getUserById = async (firebaseUid: string) => {
@@ -223,8 +229,12 @@ export const updateUserRole = async (firebaseUid: string, role: Role) => {
   return user;
 };
 
-export const getAdminArtisans = async (pagination?: Pagination) => {
+export const getAdminArtisans = async (
+  pagination?: Pagination,
+  filters?: { verifyStatus?: VerifyStatus }
+) => {
   return db.artisanProfile.findMany({
+    where: filters?.verifyStatus ? { verifyStatus: filters.verifyStatus } : undefined,
     orderBy: { createdAt: 'desc' },
     ...paginationArgs(pagination),
     include: {
@@ -253,8 +263,10 @@ export const getAdminArtisans = async (pagination?: Pagination) => {
   });
 };
 
-export const countAdminArtisans = async () => {
-  return db.artisanProfile.count();
+export const countAdminArtisans = async (filters?: { verifyStatus?: VerifyStatus }) => {
+  return db.artisanProfile.count({
+    where: filters?.verifyStatus ? { verifyStatus: filters.verifyStatus } : undefined,
+  });
 };
 
 export const getAdminArtisanById = async (id: string) => {

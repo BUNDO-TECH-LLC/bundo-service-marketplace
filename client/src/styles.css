@@ -6833,6 +6833,147 @@ footer h4 {
   background: #fff7f1;
 }
 
+.admin-profiles-panel .admin-panel-lead {
+  margin: 6px 0 0;
+  max-width: 42rem;
+  font-size: 14px;
+}
+
+.admin-profiles-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.admin-profiles-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-profiles-filters button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 10px 14px;
+  color: var(--muted);
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.admin-profiles-filters button strong {
+  min-width: 1.5rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--ink);
+  background: var(--soft);
+  font-size: 12px;
+  text-align: center;
+}
+
+.admin-profiles-filters button.active {
+  border-color: rgb(185 81 27 / 45%);
+  color: var(--ink);
+  background: #fff7f1;
+}
+
+.admin-profiles-select-wrap select,
+.admin-inline-select {
+  min-width: 132px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--ink);
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.admin-profiles-loading {
+  margin: 0 0 12px;
+}
+
+.admin-profiles-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.admin-profiles-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+.admin-profiles-table th,
+.admin-profiles-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.admin-profiles-table th {
+  color: var(--muted);
+  background: var(--soft);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-profiles-table tbody tr:last-child td,
+.admin-profiles-table tbody tr.admin-profiles-expand-row td {
+  border-bottom: 0;
+}
+
+.admin-profiles-table td strong {
+  display: block;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.admin-profiles-meta {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.admin-profiles-table td .booking-status {
+  display: inline-flex;
+  margin-top: 6px;
+}
+
+.admin-profiles-action {
+  padding: 0;
+  font-size: 13px;
+}
+
+.admin-profiles-expand-row td {
+  padding-top: 0;
+  background: #fafafa;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .admin-job-moderator-filters {
   display: flex;
   flex-wrap: wrap;
@@ -9305,6 +9446,72 @@ footer h4 {
 
   .admin-job-filters button {
     flex: 0 0 auto;
+  }
+
+  .admin-profiles-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .admin-profiles-filters::-webkit-scrollbar {
+    display: none;
+  }
+
+  .admin-profiles-filters button {
+    flex: 0 0 auto;
+  }
+
+  .admin-profiles-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-profiles-select-wrap select {
+    width: 100%;
+  }
+
+  .admin-profiles-table {
+    min-width: 0;
+  }
+
+  .admin-profiles-table thead {
+    display: none;
+  }
+
+  .admin-profiles-table tr {
+    display: grid;
+    gap: 10px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .admin-profiles-table td {
+    display: grid;
+    grid-template-columns: minmax(88px, 34%) 1fr;
+    gap: 8px 12px;
+    padding: 0 14px;
+    border-bottom: 0;
+  }
+
+  .admin-profiles-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .admin-profiles-expand-row td {
+    display: block;
+    padding: 0 14px 14px;
+  }
+
+  .admin-profiles-expand-row td::before {
+    content: none;
   }
 
   .admin-panel-head h2 {

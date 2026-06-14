@@ -1,3 +1,4 @@
+import { Fragment, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { EmptyState } from '../components/EmptyState';
 import type { ActionRunner, AdminArtisanRecord, AdminUserRecord } from '../appTypes';
@@ -6,31 +7,92 @@ import { Pagination } from '../components/Pagination';
 import { useAdminList } from '../hooks/useAdminList';
 import type { Artisan, Role } from '../types';
 
+type ProfileFilter = 'all' | 'customer' | 'artisan' | 'admin';
+type VerifyFilter = 'all' | Artisan['verifyStatus'];
+
+const profileFilters: Array<{ id: ProfileFilter; label: string; statKey?: keyof ProfileStats }> = [
+  { id: 'all', label: 'All accounts', statKey: 'users' },
+  { id: 'customer', label: 'Customers', statKey: 'customers' },
+  { id: 'artisan', label: 'Artisans', statKey: 'artisans' },
+  { id: 'admin', label: 'Admins', statKey: 'admins' },
+];
+
+const verifyFilters: Array<{ id: VerifyFilter; label: string }> = [
+  { id: 'all', label: 'All statuses' },
+  { id: 'PENDING', label: 'Pending' },
+  { id: 'APPROVED', label: 'Approved' },
+  { id: 'REJECTED', label: 'Rejected' },
+];
+
+type ProfileStats = {
+  users?: number;
+  customers?: number;
+  artisans?: number;
+  admins?: number;
+  pendingArtisans?: number;
+};
+
+function accountLabel(user: AdminUserRecord) {
+  return user.email || user.phone || user.firebaseUid.slice(0, 12);
+}
+
+function statusClass(status: string) {
+  const normalized = status.toLowerCase();
+  if (normalized === 'active' || normalized === 'approved') return 'accepted';
+  if (normalized === 'banned' || normalized === 'rejected') return 'cancelled';
+  if (normalized === 'pending') return 'requested';
+  return 'appointment';
+}
+
 export function AdminProfilesPanel({
   token,
   busy,
   runAction,
   refresh,
+  stats,
 }: {
   token: string;
   busy: boolean;
   runAction: ActionRunner;
   refresh: () => Promise<void>;
+  stats: ProfileStats | null;
 }) {
+  const [profileFilter, setProfileFilter] = useState<ProfileFilter>('all');
+  const [verifyFilter, setVerifyFilter] = useState<VerifyFilter>('all');
+  const [expandedArtisanId, setExpandedArtisanId] = useState<string | null>(null);
+
+  const isArtisanView = profileFilter === 'artisan';
+
+  const userRoleParam = useMemo(() => {
+    if (profileFilter === 'customer') return { role: 'CUSTOMER' };
+    if (profileFilter === 'admin') return { role: 'ADMIN' };
+    return undefined;
+  }, [profileFilter]);
+
+  const verifyParam = useMemo(() => {
+    if (!isArtisanView || verifyFilter === 'all') return undefined;
+    return { verifyStatus: verifyFilter };
+  }, [isArtisanView, verifyFilter]);
+
   const usersList = useAdminList<AdminUserRecord>({
     token,
     path: '/admin/users',
-    limit: 20,
+    limit: 25,
+    enabled: !isArtisanView,
+    extraParams: userRoleParam,
     select: (response) => (response.users as AdminUserRecord[]) ?? [],
   });
+
   const artisansList = useAdminList<AdminArtisanRecord>({
     token,
     path: '/admin/artisans',
-    limit: 12,
+    limit: 20,
+    enabled: isArtisanView,
+    extraParams: verifyParam,
     select: (response) => (response.artisans as AdminArtisanRecord[]) ?? [],
   });
-  const users = usersList.items;
-  const artisans = artisansList.items;
+
+  const activeList = isArtisanView ? artisansList : usersList;
 
   async function updateStatus(firebaseUid: string, status: 'ACTIVE' | 'BANNED') {
     await api(`/admin/users/${firebaseUid}/status`, {
@@ -62,163 +124,264 @@ export function AdminProfilesPanel({
     await refresh();
   }
 
+  function switchFilter(next: ProfileFilter) {
+    setProfileFilter(next);
+    setExpandedArtisanId(null);
+    if (next !== 'artisan') {
+      setVerifyFilter('all');
+    }
+  }
+
   return (
-    <section className="admin-panel">
-      <div className="admin-stack">
-        <article className="admin-surface">
-          <div className="admin-surface-head">
-            <div>
-              <p className="eyebrow">Accounts</p>
-              <h3>All users</h3>
-            </div>
-            <span className="admin-surface-count">{usersList.total}</span>
+    <section className="admin-panel admin-profiles-panel">
+      <article className="admin-surface">
+        <div className="admin-surface-head">
+          <div>
+            <p className="eyebrow">Directory</p>
+            <h3>Profiles</h3>
+            <p className="admin-panel-lead muted">
+              Review customer accounts and artisan listings. Use filters to narrow the list.
+            </p>
           </div>
-          <div className="admin-inline-table" role="list">
-            {usersList.loading && <p className="muted">Loading users…</p>}
-            {!usersList.loading && users.length === 0 && (
-              <EmptyState title="No users found" body="Users will appear here as people sign up." />
-            )}
-            {users.map((user) => (
-              <article className="admin-row admin-row--profile" key={user.firebaseUid} role="listitem">
-                <div className="admin-row-grid admin-row-grid--profile">
-                  <div className="admin-row-primary">
-                    <strong className="admin-row-title">{user.email || user.phone || user.firebaseUid}</strong>
-                    <p className="admin-row-sub">{user.firebaseUid}</p>
-                    <div className="admin-row-chips">
-                      <span className={`booking-status ${user.status.toLowerCase() === 'active' ? 'accepted' : 'cancelled'}`}>
+          <span className="admin-surface-count">{activeList.total}</span>
+        </div>
+
+        <div className="admin-profiles-toolbar">
+          <div className="admin-profiles-filters" role="tablist" aria-label="Profile filters">
+            {profileFilters.map((filter) => (
+              <button
+                key={filter.id}
+                type="button"
+                role="tab"
+                aria-selected={profileFilter === filter.id}
+                className={profileFilter === filter.id ? 'active' : ''}
+                onClick={() => switchFilter(filter.id)}
+              >
+                {filter.label}
+                {stats && filter.statKey && stats[filter.statKey] !== undefined ? (
+                  <strong>{stats[filter.statKey]}</strong>
+                ) : null}
+              </button>
+            ))}
+          </div>
+
+          {isArtisanView && (
+            <label className="admin-profiles-select-wrap">
+              <span className="sr-only">Verification status</span>
+              <select
+                value={verifyFilter}
+                disabled={busy || artisansList.loading}
+                onChange={(event) => setVerifyFilter(event.target.value as VerifyFilter)}
+              >
+                {verifyFilters.map((filter) => (
+                  <option key={filter.id} value={filter.id}>
+                    {filter.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+
+        {activeList.error && <p className="admin-list-hint">{activeList.error}</p>}
+        {activeList.loading && <p className="muted admin-profiles-loading">Loading profiles…</p>}
+
+        {!activeList.loading && !isArtisanView && usersList.items.length === 0 && (
+          <EmptyState title="No accounts found" body="Try another filter or check back after new sign-ups." />
+        )}
+
+        {!activeList.loading && isArtisanView && artisansList.items.length === 0 && (
+          <EmptyState title="No artisan profiles found" body="Try another verification filter or check back later." />
+        )}
+
+        {!activeList.loading && !isArtisanView && usersList.items.length > 0 && (
+          <div className="admin-profiles-table-wrap">
+            <table className="admin-profiles-table">
+              <thead>
+                <tr>
+                  <th scope="col">Account</th>
+                  <th scope="col">Role</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Phone</th>
+                  <th scope="col">Artisan profile</th>
+                  <th scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {usersList.items.map((user) => (
+                  <tr key={user.firebaseUid}>
+                    <td data-label="Account">
+                      <strong>{accountLabel(user)}</strong>
+                      <span className="admin-profiles-meta">{user.firebaseUid.slice(0, 10)}…</span>
+                    </td>
+                    <td data-label="Role">
+                      <select
+                        className="admin-inline-select"
+                        value={user.role || 'CUSTOMER'}
+                        disabled={busy}
+                        aria-label={`Role for ${accountLabel(user)}`}
+                        onChange={(event) =>
+                          void runAction(
+                            () => updateRole(user.firebaseUid, event.target.value as Role),
+                            `Role updated to ${event.target.value.toLowerCase()}`
+                          )
+                        }
+                      >
+                        <option value="CUSTOMER">Customer</option>
+                        <option value="ARTISAN">Artisan</option>
+                        <option value="ADMIN">Admin</option>
+                      </select>
+                    </td>
+                    <td data-label="Status">
+                      <span className={`booking-status ${statusClass(user.status)}`}>
                         {user.status.toLowerCase()}
                       </span>
-                      <span className="booking-status">{(user.role || 'UNASSIGNED').toLowerCase()}</span>
-                    </div>
-                  </div>
-                  <dl className="admin-row-fields admin-row-fields--compact">
-                    <div>
-                      <dt>Phone</dt>
-                      <dd>{user.phone || '—'}</dd>
-                    </div>
-                    <div>
-                      <dt>Artisan</dt>
-                      <dd>{user.artisanProfile?.displayName || '—'}</dd>
-                    </div>
-                  </dl>
-                </div>
-                <div className="admin-row-actions admin-row-actions--inline">
-                  <button
-                    className="secondary-button"
-                    disabled={busy}
-                    onClick={() =>
-                      runAction(
-                        () => updateStatus(user.firebaseUid, user.status === 'ACTIVE' ? 'BANNED' : 'ACTIVE'),
-                        user.status === 'ACTIVE' ? 'User banned' : 'User reactivated'
-                      )
-                    }
-                  >
-                    {user.status === 'ACTIVE' ? 'Ban' : 'Restore'}
-                  </button>
-                  {(['CUSTOMER', 'ARTISAN', 'ADMIN'] as Role[]).map((role) => (
-                    <button
-                      key={role}
-                      className={user.role === role ? 'primary-button' : 'secondary-button'}
-                      disabled={busy}
-                      onClick={() => runAction(() => updateRole(user.firebaseUid, role), `Role changed to ${role.toLowerCase()}`)}
-                    >
-                      {role.toLowerCase()}
-                    </button>
-                  ))}
-                </div>
-              </article>
-            ))}
+                    </td>
+                    <td data-label="Phone">{user.phone || '—'}</td>
+                    <td data-label="Artisan profile">
+                      {user.artisanProfile ? (
+                        <>
+                          <span>{user.artisanProfile.displayName}</span>
+                          <span className={`booking-status ${statusClass(user.artisanProfile.verifyStatus)}`}>
+                            {user.artisanProfile.verifyStatus.toLowerCase()}
+                          </span>
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td data-label="Actions">
+                      <button
+                        type="button"
+                        className="text-button admin-profiles-action"
+                        disabled={busy}
+                        onClick={() =>
+                          void runAction(
+                            () =>
+                              updateStatus(
+                                user.firebaseUid,
+                                user.status === 'ACTIVE' ? 'BANNED' : 'ACTIVE'
+                              ),
+                            user.status === 'ACTIVE' ? 'Account banned' : 'Account restored'
+                          )
+                        }
+                      >
+                        {user.status === 'ACTIVE' ? 'Ban' : 'Restore'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <Pagination
-            page={usersList.page}
-            limit={usersList.limit}
-            total={usersList.total}
-            busy={busy || usersList.loading}
-            onPageChange={usersList.setPage}
-          />
-        </article>
+        )}
 
-        <article className="admin-surface">
-          <div className="admin-surface-head">
-            <div>
-              <p className="eyebrow">Supply</p>
-              <h3>Artisan profiles</h3>
-            </div>
-            <span className="admin-surface-count">{artisansList.total}</span>
+        {!activeList.loading && isArtisanView && artisansList.items.length > 0 && (
+          <div className="admin-profiles-table-wrap">
+            <table className="admin-profiles-table">
+              <thead>
+                <tr>
+                  <th scope="col">Artisan</th>
+                  <th scope="col">Contact</th>
+                  <th scope="col">Location</th>
+                  <th scope="col">Verification</th>
+                  <th scope="col">Rating</th>
+                  <th scope="col">Activity</th>
+                  <th scope="col">Photos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {artisansList.items.map((artisan) => {
+                  const photoCount =
+                    artisan._count?.portfolioImages ?? artisan.portfolioImages?.length ?? 0;
+                  const expanded = expandedArtisanId === artisan.id;
+
+                  return (
+                    <Fragment key={artisan.id}>
+                      <tr>
+                        <td data-label="Artisan">
+                          <strong>{artisan.displayName}</strong>
+                          <span className="admin-profiles-meta">
+                            {artisan.user?.status?.toLowerCase() || 'unknown'} account
+                          </span>
+                        </td>
+                        <td data-label="Contact">
+                          {artisan.user?.email || artisan.user?.phone || '—'}
+                        </td>
+                        <td data-label="Location">
+                          {[artisan.area, artisan.city].filter(Boolean).join(', ') || '—'}
+                        </td>
+                        <td data-label="Verification">
+                          <select
+                            className="admin-inline-select"
+                            value={artisan.verifyStatus}
+                            disabled={busy}
+                            aria-label={`Verification for ${artisan.displayName}`}
+                            onChange={(event) =>
+                              void runAction(
+                                () =>
+                                  updateVerification(
+                                    artisan.id,
+                                    event.target.value as Artisan['verifyStatus']
+                                  ),
+                                `Verification set to ${event.target.value.toLowerCase()}`
+                              )
+                            }
+                          >
+                            <option value="PENDING">Pending</option>
+                            <option value="APPROVED">Approved</option>
+                            <option value="REJECTED">Rejected</option>
+                          </select>
+                        </td>
+                        <td data-label="Rating">
+                          {artisan.avgRating.toFixed(1)} ({artisan.ratingCount})
+                        </td>
+                        <td data-label="Activity">
+                          {artisan._count?.offerings || 0} offers ·{' '}
+                          {artisan._count?.bookingsReceived || 0} jobs
+                        </td>
+                        <td data-label="Photos">
+                          {photoCount > 0 ? (
+                            <button
+                              type="button"
+                              className="text-button admin-profiles-action"
+                              onClick={() =>
+                                setExpandedArtisanId(expanded ? null : artisan.id)
+                              }
+                            >
+                              {photoCount} {expanded ? 'Hide' : 'View'}
+                            </button>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                      </tr>
+                      {expanded && photoCount > 0 && (
+                        <tr key={`${artisan.id}-photos`} className="admin-profiles-expand-row">
+                          <td colSpan={7}>
+                            <AdminPortfolioGallery
+                              images={artisan.portfolioImages ?? []}
+                              artisanName={artisan.displayName}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-          <div className="admin-inline-table" role="list">
-            {artisansList.loading && <p className="muted">Loading artisans…</p>}
-            {!artisansList.loading && artisans.length === 0 && (
-              <EmptyState title="No artisan profiles" body="Artisans will appear here once they register." />
-            )}
-            {artisans.map((artisan) => (
-              <article className="admin-row admin-row--profile" key={artisan.id} role="listitem">
-                <div className="admin-row-grid admin-row-grid--profile">
-                  <div className="admin-row-primary">
-                    <strong className="admin-row-title">{artisan.displayName}</strong>
-                    <p className="admin-row-sub">{artisan.user?.email || artisan.city}</p>
-                    <div className="admin-row-chips">
-                      <span className={`booking-status ${artisan.verifyStatus.toLowerCase()}`}>
-                        {artisan.verifyStatus.toLowerCase()}
-                      </span>
-                      <span className="booking-status">
-                        {artisan.avgRating.toFixed(1)} ({artisan.ratingCount})
-                      </span>
-                    </div>
-                  </div>
-                  <dl className="admin-row-fields admin-row-fields--compact">
-                    <div>
-                      <dt>Location</dt>
-                      <dd>{[artisan.area, artisan.city].filter(Boolean).join(', ') || '—'}</dd>
-                    </div>
-                    <div>
-                      <dt>Photos</dt>
-                      <dd>
-                        {artisan._count?.portfolioImages ?? artisan.portfolioImages?.length ?? 0}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>Activity</dt>
-                      <dd>
-                        {artisan._count?.offerings || 0} offers · {artisan._count?.bookingsReceived || 0} jobs
-                      </dd>
-                    </div>
-                  </dl>
-                </div>
-                {(artisan.portfolioImages?.length ?? 0) > 0 && (
-                  <div className="admin-review-photos admin-review-photos--inline">
-                    <AdminPortfolioGallery images={artisan.portfolioImages ?? []} artisanName={artisan.displayName} />
-                  </div>
-                )}
-                <div className="admin-row-actions admin-row-actions--inline">
-                  {(['PENDING', 'APPROVED', 'REJECTED'] as Artisan['verifyStatus'][]).map((status) => (
-                    <button
-                      key={status}
-                      className={artisan.verifyStatus === status ? 'primary-button' : 'secondary-button'}
-                      disabled={busy}
-                      onClick={() =>
-                        runAction(
-                          () => updateVerification(artisan.id, status),
-                          `Artisan marked ${status.toLowerCase()}`
-                        )
-                      }
-                    >
-                      {status.toLowerCase()}
-                    </button>
-                  ))}
-                </div>
-              </article>
-            ))}
-          </div>
-          <Pagination
-            page={artisansList.page}
-            limit={artisansList.limit}
-            total={artisansList.total}
-            busy={busy || artisansList.loading}
-            onPageChange={artisansList.setPage}
-          />
-        </article>
-      </div>
+        )}
+
+        <Pagination
+          page={activeList.page}
+          limit={activeList.limit}
+          total={activeList.total}
+          busy={busy || activeList.loading}
+          onPageChange={activeList.setPage}
+        />
+      </article>
     </section>
   );
 }

@@ -192,6 +192,7 @@ export function AdminConsole({
             busy={busy}
             runAction={runAction}
             refresh={refresh}
+            stats={stats}
           />
         )}
         {section === 'jobs' && (

@@ -22,8 +22,9 @@ export function useAdminList<T>(options: {
   select: (response: { meta?: { total?: number } } & Record<string, unknown>) => T[];
   limit?: number;
   extraParams?: Record<string, string>;
+  enabled?: boolean;
 }): AdminListResult<T> {
-  const { token, path, limit = 20 } = options;
+  const { token, path, limit = 20, enabled = true } = options;
   const extraKey = options.extraParams ? JSON.stringify(options.extraParams) : '';
 
   // Keep latest select/extraParams in refs so they don't churn the fetch callback.
@@ -40,6 +41,14 @@ export function useAdminList<T>(options: {
 
   const fetchPage = useCallback(
     async (targetPage: number) => {
+      if (!enabled) {
+        setLoading(false);
+        setItems([]);
+        setTotal(0);
+        setError(null);
+        return;
+      }
+
       setLoading(true);
       setError(null);
       try {
@@ -63,7 +72,7 @@ export function useAdminList<T>(options: {
         setLoading(false);
       }
     },
-    [token, path, limit]
+    [token, path, limit, enabled]
   );
 
   // Reset to the first page whenever filters (extra params) change.
@@ -73,7 +82,7 @@ export function useAdminList<T>(options: {
 
   useEffect(() => {
     void fetchPage(page);
-  }, [page, fetchPage, extraKey]);
+  }, [page, fetchPage, extraKey, enabled]);
 
   const reload = useCallback(() => fetchPage(page), [fetchPage, page]);
 

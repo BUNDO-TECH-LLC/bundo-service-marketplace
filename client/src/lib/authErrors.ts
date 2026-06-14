@@ -1,4 +1,5 @@
 import { BUNDO_SUPPORT_EMAIL } from '../constants/support';
+import { ApiError } from './api';
 
 export function formatFirebaseAuthError(
   error: unknown,

@@ -72,9 +72,15 @@ router.get(
 
 router.get('/users', asyncHandler(async (req, res) => {
   const pagination = getPagination(req, 50, 100);
+  const roleParam = typeof req.query.role === 'string' ? req.query.role : undefined;
+  const role =
+    roleParam && (Object.values(Role) as string[]).includes(roleParam)
+      ? (roleParam as Role)
+      : undefined;
+  const filters = role ? { role } : undefined;
   const [users, total] = await Promise.all([
-    getUsers(pagination),
-    countUsers(),
+    getUsers(pagination, filters),
+    countUsers(filters),
   ]);
 
   res.json({
@@ -154,9 +160,16 @@ router.patch('/users/:id/role', asyncHandler(async (req, res) => {
 
 router.get('/artisans', asyncHandler(async (req, res) => {
   const pagination = getPagination(req);
+  const verifyParam =
+    typeof req.query.verifyStatus === 'string' ? req.query.verifyStatus : undefined;
+  const verifyStatus =
+    verifyParam && (Object.values(VerifyStatus) as string[]).includes(verifyParam)
+      ? (verifyParam as VerifyStatus)
+      : undefined;
+  const filters = verifyStatus ? { verifyStatus } : undefined;
   const [artisans, total] = await Promise.all([
-    getAdminArtisans(pagination),
-    countAdminArtisans(),
+    getAdminArtisans(pagination, filters),
+    countAdminArtisans(filters),
   ]);
 
   res.json({
