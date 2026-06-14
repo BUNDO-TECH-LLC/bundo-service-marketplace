@@ -42,7 +42,12 @@ export function OfferingGrid({
 
   return (
     <div className="grid two">
-      {offerings.length === 0 && <EmptyState title="No services yet" body="Approved artisan offerings will appear here." />}
+      {offerings.length === 0 && (
+        <EmptyState
+          title="No services yet"
+          body="Try another state or check back soon as new artisans are approved."
+        />
+      )}
       {offerings.map((offering) => {
         const bookActionKey = `book:${offering.id}`;
         const viewActionKey = `view:${offering.artisan?.id || offering.id}`;
@@ -94,7 +99,6 @@ export function OfferingGrid({
                         body: JSON.stringify({
                           offeringId: offering.id,
                           scheduledAt: new Date(Date.now() + 86400000).toISOString(),
-                          note: 'Booked from web client',
                         }),
                       });
                       await reloadPrivate();

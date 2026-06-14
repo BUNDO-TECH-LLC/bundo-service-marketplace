@@ -15,6 +15,7 @@ import { NotificationsPanel } from '../panels/NotificationsPanel';
 import { ArtisanDashboard } from '../views/ArtisanDashboard';
 import { LoggedInHome } from '../views/LoggedInHome';
 import { useAppRoot } from '../app/appRootContext';
+import { SIGN_IN_UNAVAILABLE_WITH_EMAIL } from '../lib/productionMessages';
 
 export default function WorkspacePage() {
   const ctx = useAppRoot();
@@ -123,7 +124,7 @@ export default function WorkspacePage() {
 
       {!firebaseReady && (
         <div className="notice warning">
-          Add Firebase web config in <code>client/.env</code> to enable login.
+          {SIGN_IN_UNAVAILABLE_WITH_EMAIL}
         </div>
       )}
 

@@ -5,8 +5,8 @@ export function WhySection() {
         <div className="why-copy">
           <h2>Why Bundo?</h2>
           <p className="why-intro">
-            We believe in quality over quantity. Every professional on our platform undergoes a rigorous
-            multi-step verification process to ensure your peace of mind.
+            We believe in quality over quantity. Every professional on Bundo completes identity
+            verification and profile review before listing services.
           </p>
           <ul className="why-features">
             <li className="why-feature">
@@ -18,7 +18,7 @@ export function WhySection() {
               </span>
               <div>
                 <h3>Verified Professionals</h3>
-                <p>Background checks and skills assessment for every artisan.</p>
+                <p>Identity verification and profile approval for every artisan on Bundo.</p>
               </div>
             </li>
             <li className="why-feature">
@@ -40,8 +40,8 @@ export function WhySection() {
                 </svg>
               </span>
               <div>
-                <h3>24/7 Priority Support</h3>
-                <p>A dedicated concierge team to handle any requests or issues.</p>
+                <h3>Dedicated Support</h3>
+                <p>Reach our team for help with bookings, payments, disputes, and account issues.</p>
               </div>
             </li>
           </ul>

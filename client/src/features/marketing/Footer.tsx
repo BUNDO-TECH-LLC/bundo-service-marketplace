@@ -27,8 +27,9 @@ export function Footer({
         <Link to="/terms">Terms</Link>
         <Link to="/privacy">Privacy</Link>
       </div>
-      <h4>Currently live in</h4>
+      <h4>Serving customers across Nigeria</h4>
       <div className="city-list">{cities.map((city) => <span key={city}>{city}</span>)}</div>
+      <p className="footer-coverage-note">Including major cities nationwide — select your state to find services near you.</p>
       <div className="footer-bottom">
         <img className="brand-logo" src={bundoLogo} alt="Bundo logo" />
         <span>Bundo</span>

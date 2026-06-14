@@ -5,6 +5,7 @@ import {
   ensureBrowserPushToken,
   subscribeToForegroundMessages,
 } from '../lib/messaging';
+import { PUSH_ALERTS_UNAVAILABLE } from '../lib/productionMessages';
 import type { PushStatus } from '../appTypes';
 import type { ApiUser } from '../types';
 
@@ -104,7 +105,7 @@ export function useAppPush({
       }
 
       if (result.status === 'missing-config') {
-        setNotice('Push alerts need a Firebase web push VAPID key before they can be enabled');
+        setNotice(PUSH_ALERTS_UNAVAILABLE);
         return;
       }
 

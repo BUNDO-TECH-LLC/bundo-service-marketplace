@@ -12,15 +12,15 @@ export function AppPromo() {
             </svg>
           </span>
           <blockquote className="app-promo-quote" id="app-promo-quote">
-            Bundo changed how I manage my home maintenance. Finding a reliable electrician used to take days;
-            now it&apos;s done in minutes with total peace of mind.
+            Finding a reliable electrician used to take days. With Bundo, I booked a verified professional
+            in minutes and had peace of mind from start to finish.
           </blockquote>
           <div className="app-promo-byline">
             <span className="app-promo-avatar" aria-hidden>
-              AO
+              ★
             </span>
             <div className="app-promo-cite">
-              <span className="app-promo-name">Adaeze Okafor</span>
+              <span className="app-promo-name">Bundo customer</span>
               <span className="app-promo-role">Homeowner in Lagos</span>
             </div>
           </div>

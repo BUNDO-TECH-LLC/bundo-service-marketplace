@@ -15,6 +15,7 @@ import {
 } from './authSignupStorage';
 import { auth } from './firebase';
 import { resolveApiSession } from './resolveApiSession';
+import { SIGN_IN_UNAVAILABLE_WITH_EMAIL } from './productionMessages';
 import type { ApiUser, Role } from '../types';
 
 type AccountKind = Extract<Role, 'CUSTOMER' | 'ARTISAN'>;
@@ -41,7 +42,7 @@ function shouldFallbackToRedirect(error: unknown) {
 
 export async function signInWithGooglePopup() {
   if (!auth) {
-    throw new Error('Firebase is not configured for this environment.');
+    throw new Error(SIGN_IN_UNAVAILABLE_WITH_EMAIL);
   }
 
   const provider = createGoogleProvider();
@@ -60,7 +61,7 @@ export async function signInWithGooglePopup() {
 
 export async function startGoogleRedirectSignIn() {
   if (!auth) {
-    throw new Error('Firebase is not configured for this environment.');
+    throw new Error(SIGN_IN_UNAVAILABLE_WITH_EMAIL);
   }
 
   await signInWithRedirect(auth, createGoogleProvider());

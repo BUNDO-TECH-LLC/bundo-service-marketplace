@@ -8,6 +8,7 @@ import {
 import { ServiceCategoryIcon } from '../lib/serviceCategoryIcons';
 import { heroImage } from '../lib/marketingAssets';
 import { money } from '../lib/formatting';
+import { formatStarDisplay } from '../lib/ratingDisplay';
 import { nigeriaStates } from '../lib/geo';
 import { userDisplayName } from '../lib/userDisplayName';
 import type { ActionRunner, BookingSuccessState } from '../appTypes';
@@ -73,7 +74,6 @@ export function LoggedInHome({
           token,
           body: JSON.stringify({
             offeringId: offering.id,
-            note: 'Booked from dashboard',
           }),
         });
         await reloadPrivate();
@@ -151,7 +151,7 @@ export function LoggedInHome({
         </div>
         <div className="logged-category-row logged-category-row--popular">
           {popularCategories.length === 0 && (
-            <span className="muted">Popular categories will appear here after seeding.</span>
+            <span className="muted">Popular categories will appear here as more services are added.</span>
           )}
           {popularCategories.map((row) => (
             <button key={row.category.id} type="button" onClick={() => void onBrowse(row.category.id)}>
@@ -173,7 +173,7 @@ export function LoggedInHome({
           {recommendedOfferings.length === 0 && (
             <EmptyState
               title="No recommendations yet"
-              body="Approved artisan offerings will appear here as your marketplace grows."
+              body="Approved services in your area will appear here. Try browsing the marketplace or changing your state."
             />
           )}
           {recommendedOfferings.map((offering) => {
@@ -197,7 +197,7 @@ export function LoggedInHome({
                   <span>{offering.title}</span>
                 </div>
                 <div className="recommended-meta">
-                  <span className="rating">★★★★★</span>
+                  <span className="rating">{formatStarDisplay(offering.artisan?.avgRating || 0)}</span>
                   <span>{(offering.artisan?.avgRating || 0).toFixed(1)}({offering.artisan?.ratingCount || 0})</span>
                   <strong>From {money(offering.priceFrom)}</strong>
                 </div>

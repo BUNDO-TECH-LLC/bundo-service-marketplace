@@ -41,7 +41,7 @@ export const helpTopics: HelpTopic[] = [
       {
         heading: 'Bookings',
         questions: [
-          ['How do I place a booking?', 'Sign in as a customer, open a service card, and select Book. Your booking request appears in your customer dashboard.'],
+          ['How do I place a booking?', 'Sign in as a customer, open a service card, and select Book. Your booking request appears in My bookings.'],
           ['Can I chat before booking?', 'No. Messaging unlocks after you place a booking request. Use Open chat from My bookings or the Messages tab once your request is sent.'],
         ],
       },
@@ -62,7 +62,7 @@ export const helpTopics: HelpTopic[] = [
       {
         heading: 'Offerings',
         questions: [
-          ['How do I list a service?', 'After KYC and admin approval, use the artisan dashboard to choose a category, add service details, and create the offering.'],
+          ['How do I list a service?', 'After KYC and approval, open your artisan workspace to choose a category, add service details, and publish your offering.'],
           ['Can customers message me?', 'Yes. Customer messages appear in your conversations, and you can reply back inside the thread.'],
         ],
       },
@@ -83,8 +83,8 @@ export const helpTopics: HelpTopic[] = [
       {
         heading: 'Marketplace safety',
         questions: [
-          ['How does Bundo protect users?', 'Bundo uses role-based access, verified artisan profiles, admin moderation, booking history, and conversation records.'],
-          ['Can Bundo review my messages?', 'Our support team may review conversation history when handling a dispute, safety concern, or account issue. Notes added for internal review are never visible to the other party.'],
+          ['How does Bundo protect users?', 'Bundo verifies artisans before public listing, keeps booking and payment records, and provides support when disputes or safety concerns arise.'],
+          ['Can Bundo review my messages?', 'Our support team may review conversation history when handling a dispute, safety concern, or account issue. Support notes are never visible to the other party.'],
         ],
       },
     ],
@@ -161,7 +161,7 @@ export const helpTopics: HelpTopic[] = [
       {
         heading: 'Verification and trust',
         questions: [
-          ['Why does Bundo ask for KYC?', 'KYC helps Bundo confirm artisan identity before scaling profile visibility, payments, and payouts. It strengthens trust for customers and reduces fraud risk.'],
+          ['Why does Bundo ask for KYC?', 'KYC helps Bundo confirm artisan identity before listing services publicly and enabling payouts. It strengthens trust for customers and reduces fraud risk.'],
           ['What does an artisan submit?', 'You will submit your legal name, document type, document number, a photo of your identity document, an optional selfie, and your address for review.'],
         ],
       },
@@ -205,7 +205,7 @@ export const helpTopics: HelpTopic[] = [
         questions: [
           ['How do I contact Bundo support?', `Email ${BUNDO_SUPPORT_EMAIL} with your account email and a short description of the issue.`],
           ['What if something goes wrong?', 'Message the other party in your booking thread first so there is a clear record. If you still need help, contact Bundo support with your booking details.'],
-          ['What if my account is restricted?', `An admin may restrict accounts that violate marketplace rules. Contact ${BUNDO_SUPPORT_EMAIL} with your account email and a short explanation.`],
+          ['What if my account is restricted?', `Bundo may restrict accounts that violate marketplace rules. Contact ${BUNDO_SUPPORT_EMAIL} with your account email and a short explanation.`],
         ],
       },
     ],

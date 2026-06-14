@@ -19,7 +19,7 @@ export function ServicesSection({
       <div className="section-title-row services-curated-title-row">
         <div className="services-curated-head">
           <h2>Popular service categories</h2>
-          <p className="services-curated-sub">Top booked trades on Bundo — explore more from the marketplace.</p>
+          <p className="services-curated-sub">Popular categories across Nigeria — explore more in the marketplace.</p>
         </div>
         <button type="button" className="services-explore-all" onClick={() => void onBrowse()}>
           Explore All <span aria-hidden>→</span>

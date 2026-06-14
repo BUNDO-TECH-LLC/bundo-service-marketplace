@@ -1,4 +1,4 @@
-import { ApiError } from './api';
+import { BUNDO_SUPPORT_EMAIL } from '../constants/support';
 
 export function formatFirebaseAuthError(
   error: unknown,
@@ -35,9 +35,9 @@ export function formatFirebaseAuthError(
     case 'auth/cancelled-popup-request':
       return 'Google sign-in was cancelled. Try again when you are ready.';
     case 'auth/operation-not-allowed':
-      return 'Google sign-in is not enabled for this Firebase project. Enable Google under Authentication → Sign-in method.';
+      return 'Google sign-in is not available right now. Try email and password instead.';
     case 'auth/unauthorized-domain':
-      return 'This website is not authorized for Google sign-in. Add your domain in Firebase → Authentication → Settings → Authorized domains.';
+      return `Google sign-in is not available from this website right now. Try email and password or contact ${BUNDO_SUPPORT_EMAIL}.`;
     default:
       return error instanceof Error ? error.message : 'Could not complete sign-in.';
   }

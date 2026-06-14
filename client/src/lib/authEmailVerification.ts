@@ -1,6 +1,7 @@
 import type { ActionCodeSettings } from 'firebase/auth';
 import { sendEmailVerification, sendPasswordResetEmail, type User } from 'firebase/auth';
 import { auth } from './firebase';
+import { SIGN_IN_UNAVAILABLE_WITH_EMAIL } from './productionMessages';
 
 function verificationContinueUrl() {
   if (typeof window === 'undefined') {
@@ -29,9 +30,8 @@ function formatVerificationSendError(error: unknown): string {
     case 'auth/too-many-requests':
       return 'Too many verification emails requested. Wait a few minutes, then use Resend on the verification page.';
     case 'auth/unauthorized-continue-uri':
-      return 'This site is not authorized for verification links in Firebase. Add your domain under Authentication → Settings → Authorized domains.';
     case 'auth/invalid-continue-uri':
-      return 'Verification link settings are invalid. Check Firebase authorized domains for this app URL.';
+      return SIGN_IN_UNAVAILABLE_WITH_EMAIL;
     default:
       return error instanceof Error ? error.message : 'Could not send verification email.';
   }
@@ -79,7 +79,7 @@ export function passwordResetActionCodeSettings(): ActionCodeSettings | undefine
 
 export async function sendBundoPasswordResetEmail(email: string) {
   if (!auth) {
-    throw new Error('Firebase is not configured for this environment.');
+    throw new Error(SIGN_IN_UNAVAILABLE_WITH_EMAIL);
   }
 
   const settings = passwordResetActionCodeSettings();

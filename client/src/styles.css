@@ -2497,8 +2497,22 @@ footer h4 {
   color: var(--ink);
   }
 
-.footer-links,
 .city-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 30px;
+  margin-bottom: 12px;
+}
+
+.footer-coverage-note {
+  margin: 0 0 26px;
+  max-width: 42rem;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.footer-links {
   display: flex;
   flex-wrap: wrap;
   gap: 18px 30px;

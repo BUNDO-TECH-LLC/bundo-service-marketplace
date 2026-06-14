@@ -9,6 +9,7 @@ import {
 } from 'firebase/auth';
 import { api } from '../lib/api';
 import { auth, firebaseReady } from '../lib/firebase';
+import { SIGN_IN_UNAVAILABLE_WITH_EMAIL } from '../lib/productionMessages';
 import { ARTISAN_ONBOARDING_PATH, markArtisanApplicant } from '../lib/artisanApplication';
 import type { AuthDrawerPrompt } from '../lib/authDrawerPrompt';
 import {
@@ -371,7 +372,7 @@ export function AuthBox({
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!auth) {
-      onNotice('Sign-in is not configured. Add VITE_FIREBASE_* to your client environment and reload.');
+      onNotice(SIGN_IN_UNAVAILABLE_WITH_EMAIL);
       return;
     }
 
@@ -534,7 +535,7 @@ export function AuthBox({
 
   async function continueWithGoogle() {
     if (!auth) {
-      onNotice('Sign-in is not configured. Add VITE_FIREBASE_* to your client environment and reload.');
+      onNotice(SIGN_IN_UNAVAILABLE_WITH_EMAIL);
       return;
     }
 
@@ -1036,7 +1037,7 @@ export function AuthBox({
 
             {!firebaseReady && (
               <p className="auth-form-error">
-                Sign-in is not configured. Add VITE_FIREBASE_* to your client environment and reload.
+                {SIGN_IN_UNAVAILABLE_WITH_EMAIL}
               </p>
             )}
 

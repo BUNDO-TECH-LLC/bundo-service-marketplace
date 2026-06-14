@@ -254,7 +254,7 @@ export function AccountSettingsHub({
   async function saveLanguage() {
     saveLocalePreference(locale);
     setEditingLanguage(false);
-    onNotice('Language preference saved. More translations are coming soon.');
+    onNotice('Language preference saved.');
   }
 
   async function sendEmailChangeLink() {
@@ -586,7 +586,7 @@ export function AccountSettingsHub({
 
           <article id="account-settings-language" className={`panel-card form-card ${panelClass('language')}`}>
             <h2>Language</h2>
-            <p className="muted">Bundo is currently available in English. More languages are coming soon.</p>
+            <p className="muted">Bundo is currently available in English.</p>
             {!editingLanguage ? (
               <div className="account-settings-readonly-card">
                 <dl className="account-settings-summary-grid">
@@ -675,7 +675,7 @@ export function AccountSettingsHub({
                     : pushStatus === 'denied'
                       ? 'Notifications are blocked in your browser settings for this site.'
                       : pushStatus === 'missing-config'
-                        ? 'Push alerts need Firebase web push configuration before they can be enabled.'
+                        ? 'Push alerts are not available on this device right now. You can still check notifications inside Bundo.'
                         : 'Optional heads-up for new activity without keeping Bundo open.'}
                 </p>
                 <button

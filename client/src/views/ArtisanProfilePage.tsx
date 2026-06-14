@@ -63,7 +63,6 @@ export function ArtisanProfilePage({
       body: JSON.stringify({
         offeringId: selectedOffering.id,
         scheduledAt: new Date(`${date}T${timeSlot}:00`).toISOString(),
-        note: `Booked from ${artisan.displayName} profile`,
       }),
     });
     await reloadPrivate();
@@ -224,9 +223,15 @@ export function ArtisanProfilePage({
           </form>
 
           <div className="profile-stats">
-            <span>Jobs completed <strong>{artisan.ratingCount + offerings.length}</strong></span>
-            <span>Response time <strong>Under 1 hour</strong></span>
-            <span>Member since <strong>{joined}</strong></span>
+            <span>
+              Reviews <strong>{artisan.ratingCount > 0 ? artisan.ratingCount : 'None yet'}</strong>
+            </span>
+            <span>
+              Services listed <strong>{offerings.length}</strong>
+            </span>
+            <span>
+              Member since <strong>{joined}</strong>
+            </span>
           </div>
         </aside>
       </section>

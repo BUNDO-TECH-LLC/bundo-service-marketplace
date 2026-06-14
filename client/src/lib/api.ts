@@ -1,6 +1,11 @@
 import { getFirebaseAppCheckToken } from './appCheck';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:3000';
+const configuredApiBase = import.meta.env.VITE_API_BASE_URL?.trim();
+const API_BASE_URL =
+  configuredApiBase ||
+  (import.meta.env.PROD
+    ? 'https://bundo-service-marketplace.onrender.com'
+    : 'http://127.0.0.1:3000');
 const API_TIMEOUT_MS = 25_000;
 export const AUTH_API_TIMEOUT_MS = 60_000;
 /** Public marketplace bootstrap can hit a cold Render instance on first load. */
