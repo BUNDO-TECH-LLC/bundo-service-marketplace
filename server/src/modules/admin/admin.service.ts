@@ -28,9 +28,16 @@ import {
   LAST_ADMIN_GUARD_MESSAGE,
 } from './adminUserGuard';
 
+type AdminUserListFilters = {
+  role?: Role;
+  /** When true with role CUSTOMER, exclude accounts that have an artisan profile (pending applicants). */
+  clientsOnly?: boolean;
+};
+
 type AdminStatsRow = {
   users: bigint;
   customers: bigint;
+  client_accounts: bigint;
   artisans: bigint;
   admins: bigint;
   banned_users: bigint;
@@ -65,6 +72,10 @@ export const getAdminStats = async () => {
     SELECT
       (SELECT COUNT(*)::bigint FROM users) AS users,
       (SELECT COUNT(*)::bigint FROM users WHERE role = ${Role.CUSTOMER}::"Role") AS customers,
+      (SELECT COUNT(*)::bigint FROM users u
+        WHERE u.role = ${Role.CUSTOMER}::"Role"
+          AND NOT EXISTS (SELECT 1 FROM artisan_profiles ap WHERE ap.user_id = u.firebase_uid)
+      ) AS client_accounts,
       (SELECT COUNT(*)::bigint FROM users WHERE role = ${Role.ARTISAN}::"Role") AS artisans,
       (SELECT COUNT(*)::bigint FROM users WHERE role = ${Role.ADMIN}::"Role") AS admins,
       (SELECT COUNT(*)::bigint FROM users WHERE status = ${UserStatus.BANNED}::"UserStatus") AS banned_users,
@@ -90,6 +101,7 @@ export const getAdminStats = async () => {
   const stats = {
     users: Number(row.users),
     customers: Number(row.customers),
+    clientAccounts: Number(row.client_accounts),
     artisans: Number(row.artisans),
     admins: Number(row.admins),
     bannedUsers: Number(row.banned_users),
@@ -116,12 +128,27 @@ export const getAdminStats = async () => {
   return stats;
 };
 
+const userListWhere = (filters?: AdminUserListFilters) => {
+  if (!filters?.role) {
+    return undefined;
+  }
+
+  if (filters.clientsOnly && filters.role === Role.CUSTOMER) {
+    return {
+      role: Role.CUSTOMER,
+      artisanProfile: { is: null },
+    };
+  }
+
+  return { role: filters.role };
+};
+
 export const getUsers = async (
   pagination?: Pagination,
-  filters?: { role?: Role }
+  filters?: AdminUserListFilters
 ) => {
   return db.user.findMany({
-    where: filters?.role ? { role: filters.role } : undefined,
+    where: userListWhere(filters),
     orderBy: { createdAt: 'desc' },
     ...paginationArgs(pagination),
     include: {
@@ -136,9 +163,9 @@ export const getUsers = async (
   });
 };
 
-export const countUsers = async (filters?: { role?: Role }) => {
+export const countUsers = async (filters?: AdminUserListFilters) => {
   return db.user.count({
-    where: filters?.role ? { role: filters.role } : undefined,
+    where: userListWhere(filters),
   });
 };
 

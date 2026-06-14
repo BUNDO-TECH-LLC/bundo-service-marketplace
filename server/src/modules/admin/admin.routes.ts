@@ -77,7 +77,9 @@ router.get('/users', asyncHandler(async (req, res) => {
     roleParam && (Object.values(Role) as string[]).includes(roleParam)
       ? (roleParam as Role)
       : undefined;
-  const filters = role ? { role } : undefined;
+  const clientsOnly =
+    req.query.clientsOnly === 'true' && role === Role.CUSTOMER;
+  const filters = role ? { role, clientsOnly: clientsOnly || undefined } : undefined;
   const [users, total] = await Promise.all([
     getUsers(pagination, filters),
     countUsers(filters),

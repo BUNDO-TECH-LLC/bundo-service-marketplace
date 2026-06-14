@@ -12,7 +12,7 @@ type VerifyFilter = 'all' | Artisan['verifyStatus'];
 
 const profileFilters: Array<{ id: ProfileFilter; label: string; statKey?: keyof ProfileStats }> = [
   { id: 'all', label: 'All accounts', statKey: 'users' },
-  { id: 'customer', label: 'Customers', statKey: 'customers' },
+  { id: 'customer', label: 'Customers', statKey: 'clientAccounts' },
   { id: 'artisan', label: 'Artisans', statKey: 'artisans' },
   { id: 'admin', label: 'Admins', statKey: 'admins' },
 ];
@@ -26,7 +26,7 @@ const verifyFilters: Array<{ id: VerifyFilter; label: string }> = [
 
 type ProfileStats = {
   users?: number;
-  customers?: number;
+  clientAccounts?: number;
   artisans?: number;
   admins?: number;
   pendingArtisans?: number;
@@ -63,11 +63,13 @@ export function AdminProfilesPanel({
 
   const isArtisanView = profileFilter === 'artisan';
 
-  const userRoleParam = useMemo(() => {
-    if (profileFilter === 'customer') return { role: 'CUSTOMER' };
+  const userRoleParam = useMemo((): Record<string, string> | undefined => {
+    if (profileFilter === 'customer') return { role: 'CUSTOMER', clientsOnly: 'true' };
     if (profileFilter === 'admin') return { role: 'ADMIN' };
     return undefined;
   }, [profileFilter]);
+
+  const isCustomerOnlyView = profileFilter === 'customer';
 
   const verifyParam = useMemo(() => {
     if (!isArtisanView || verifyFilter === 'all') return undefined;
@@ -140,7 +142,8 @@ export function AdminProfilesPanel({
             <p className="eyebrow">Directory</p>
             <h3>Profiles</h3>
             <p className="admin-panel-lead muted">
-              Review customer accounts and artisan listings. Use filters to narrow the list.
+              Review customer accounts and artisan listings. The Customers filter shows booking-only accounts
+              and excludes artisan applicants still awaiting approval.
             </p>
           </div>
           <span className="admin-surface-count">{activeList.total}</span>
@@ -203,7 +206,7 @@ export function AdminProfilesPanel({
                   <th scope="col">Role</th>
                   <th scope="col">Status</th>
                   <th scope="col">Phone</th>
-                  <th scope="col">Artisan profile</th>
+                  {!isCustomerOnlyView && <th scope="col">Artisan profile</th>}
                   <th scope="col">Actions</th>
                 </tr>
               </thead>
@@ -238,18 +241,20 @@ export function AdminProfilesPanel({
                       </span>
                     </td>
                     <td data-label="Phone">{user.phone || '—'}</td>
-                    <td data-label="Artisan profile">
-                      {user.artisanProfile ? (
-                        <>
-                          <span>{user.artisanProfile.displayName}</span>
-                          <span className={`booking-status ${statusClass(user.artisanProfile.verifyStatus)}`}>
-                            {user.artisanProfile.verifyStatus.toLowerCase()}
-                          </span>
-                        </>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
+                    {!isCustomerOnlyView && (
+                      <td data-label="Artisan profile">
+                        {user.artisanProfile ? (
+                          <>
+                            <span>{user.artisanProfile.displayName}</span>
+                            <span className={`booking-status ${statusClass(user.artisanProfile.verifyStatus)}`}>
+                              {user.artisanProfile.verifyStatus.toLowerCase()}
+                            </span>
+                          </>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                    )}
                     <td data-label="Actions">
                       <button
                         type="button"
