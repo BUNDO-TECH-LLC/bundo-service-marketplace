@@ -52,6 +52,7 @@ import {
   updateUserRole,
   updateUserStatus,
   verifyArtisan,
+  type AdminUserListFilters,
 } from './admin.service';
 
 const router = Router();
@@ -79,7 +80,10 @@ router.get('/users', asyncHandler(async (req, res) => {
       : undefined;
   const clientsOnly =
     req.query.clientsOnly === 'true' && role === Role.CUSTOMER;
-  const filters = role ? { role, clientsOnly: clientsOnly || undefined } : undefined;
+  let filters: AdminUserListFilters | undefined;
+  if (role) {
+    filters = clientsOnly ? { role, clientsOnly: true } : { role };
+  }
   const [users, total] = await Promise.all([
     getUsers(pagination, filters),
     countUsers(filters),

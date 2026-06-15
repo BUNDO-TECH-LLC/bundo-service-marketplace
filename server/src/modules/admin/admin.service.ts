@@ -28,7 +28,7 @@ import {
   LAST_ADMIN_GUARD_MESSAGE,
 } from './adminUserGuard';
 
-type AdminUserListFilters = {
+export type AdminUserListFilters = {
   role?: Role;
   /** When true with role CUSTOMER, exclude accounts that have an artisan profile (pending applicants). */
   clientsOnly?: boolean;
@@ -147,8 +147,9 @@ export const getUsers = async (
   pagination?: Pagination,
   filters?: AdminUserListFilters
 ) => {
+  const where = buildUserListWhere(filters);
   return db.user.findMany({
-    where: buildUserListWhere(filters),
+    ...(where ? { where } : {}),
     orderBy: { createdAt: 'desc' },
     ...paginationArgs(pagination),
     include: {
@@ -164,8 +165,9 @@ export const getUsers = async (
 };
 
 export const countUsers = async (filters?: AdminUserListFilters) => {
+  const where = buildUserListWhere(filters);
   return db.user.count({
-    where: buildUserListWhere(filters),
+    ...(where ? { where } : {}),
   });
 };
 
@@ -260,8 +262,9 @@ export const getAdminArtisans = async (
   pagination?: Pagination,
   filters?: { verifyStatus?: VerifyStatus }
 ) => {
+  const where = filters?.verifyStatus ? { verifyStatus: filters.verifyStatus } : undefined;
   return db.artisanProfile.findMany({
-    where: filters?.verifyStatus ? { verifyStatus: filters.verifyStatus } : undefined,
+    ...(where ? { where } : {}),
     orderBy: { createdAt: 'desc' },
     ...paginationArgs(pagination),
     include: {
@@ -291,8 +294,9 @@ export const getAdminArtisans = async (
 };
 
 export const countAdminArtisans = async (filters?: { verifyStatus?: VerifyStatus }) => {
+  const where = filters?.verifyStatus ? { verifyStatus: filters.verifyStatus } : undefined;
   return db.artisanProfile.count({
-    where: filters?.verifyStatus ? { verifyStatus: filters.verifyStatus } : undefined,
+    ...(where ? { where } : {}),
   });
 };
 
