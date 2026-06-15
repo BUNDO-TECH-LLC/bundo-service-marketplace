@@ -15,10 +15,12 @@
  */
 
 import 'dotenv/config';
+import { getAuth } from 'firebase-admin/auth';
 import { PrismaClient, Role } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import { buildPoolConfig } from '../src/db/poolConfig';
+import '../src/config/firebase';
 
 const CONFIRM_ENV = 'PURGE_CONFIRM';
 const REQUIRED_CONFIRM_VALUE = 'YES';
@@ -30,6 +32,9 @@ function readArgs(argv: string[]) {
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+    if (!arg) {
+      continue;
+    }
 
     if (arg === '--firebase') {
       purgeFirebase = true;
@@ -103,17 +108,17 @@ async function resolveKeepAdminUids(
 }
 
 async function deleteFirebaseUsersExcept(keepUids: Set<string>) {
-  const admin = (await import('../src/config/firebase')).default;
+  const auth = getAuth();
 
   let nextPageToken: string | undefined;
   let deleted = 0;
   let kept = 0;
 
   do {
-    const page = await admin.auth().listUsers(1000, nextPageToken);
+    const page = await auth.listUsers(1000, nextPageToken);
     const toDelete = page.users
       .map((user) => user.uid)
-      .filter((uid) => !keepUids.has(uid));
+      .filter((uid: string) => !keepUids.has(uid));
 
     kept += page.users.length - toDelete.length;
 
@@ -123,7 +128,7 @@ async function deleteFirebaseUsersExcept(keepUids: Set<string>) {
         continue;
       }
 
-      const result = await admin.auth().deleteUsers(batch);
+      const result = await auth.deleteUsers(batch);
       deleted += result.successCount;
       if (result.failureCount > 0) {
         console.warn(`Firebase deleteUsers reported ${result.failureCount} failures in this batch.`);

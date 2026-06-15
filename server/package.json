@@ -15,7 +15,7 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "db:migrate:deploy:pooler": "node scripts/migrate-deploy-pooler.mjs",
     "db:seed": "ts-node prisma/seed.ts",
-    "db:purge": "ts-node scripts/purge-user-data.ts",
+    "db:purge": "ts-node --transpile-only scripts/purge-user-data.ts",
     "db:studio": "prisma studio"
   },
   "repository": {
