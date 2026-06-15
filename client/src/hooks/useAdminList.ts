@@ -26,8 +26,8 @@ export function useAdminList<T>(options: {
 }): AdminListResult<T> {
   const { token, path, limit = 20, enabled = true } = options;
   const extraKey = options.extraParams ? JSON.stringify(options.extraParams) : '';
+  const listKey = `${enabled}:${extraKey}`;
 
-  // Keep latest select/extraParams in refs so they don't churn the fetch callback.
   const selectRef = useRef(options.select);
   selectRef.current = options.select;
   const extraParamsRef = useRef(options.extraParams);
@@ -39,6 +39,14 @@ export function useAdminList<T>(options: {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [prevListKey, setPrevListKey] = useState(listKey);
+  if (prevListKey !== listKey) {
+    setPrevListKey(listKey);
+    setPage(1);
+  }
+
+  const fetchGenerationRef = useRef(0);
+
   const fetchPage = useCallback(
     async (targetPage: number) => {
       if (!enabled) {
@@ -49,8 +57,11 @@ export function useAdminList<T>(options: {
         return;
       }
 
+      const generation = ++fetchGenerationRef.current;
       setLoading(true);
       setError(null);
+      setItems([]);
+
       try {
         const params = new URLSearchParams({
           page: String(targetPage),
@@ -61,28 +72,34 @@ export function useAdminList<T>(options: {
           `${path}?${params.toString()}`,
           { token }
         );
+
+        if (generation !== fetchGenerationRef.current) {
+          return;
+        }
+
         const list = selectRef.current(response);
         setItems(list);
         setTotal(response.meta?.total ?? list.length);
       } catch (caught) {
+        if (generation !== fetchGenerationRef.current) {
+          return;
+        }
+
         setError(caught instanceof Error ? caught.message : 'Could not load this list.');
         setItems([]);
         setTotal(0);
       } finally {
-        setLoading(false);
+        if (generation === fetchGenerationRef.current) {
+          setLoading(false);
+        }
       }
     },
     [token, path, limit, enabled]
   );
 
-  // Reset to the first page whenever filters (extra params) change.
-  useEffect(() => {
-    setPage(1);
-  }, [extraKey]);
-
   useEffect(() => {
     void fetchPage(page);
-  }, [page, fetchPage, extraKey, enabled]);
+  }, [page, fetchPage, listKey]);
 
   const reload = useCallback(() => fetchPage(page), [fetchPage, page]);
 

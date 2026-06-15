@@ -22,6 +22,25 @@ Or use Prisma Studio: `npm run db:studio` → `users` → set `role` to `ADMIN`.
 
 Secure that Firebase account with MFA before launch.
 
+## Pre-launch data purge (one-time)
+
+Use this only **before public launch** when the database holds test accounts only (no real payments you must retain).
+
+From `server/` against your production `DATABASE_URL`:
+
+```bash
+PURGE_CONFIRM=YES npm run db:purge -- --keep-admin-uid=<your-firebase-uid>
+npm run db:seed
+```
+
+Optional: also remove Firebase Auth test users (requires server Firebase env vars on your machine):
+
+```bash
+PURGE_CONFIRM=YES npm run db:purge -- --keep-admin-uid=<your-firebase-uid> --firebase
+```
+
+The script keeps categories and the admin UID(s) you specify. Cloudinary assets are not deleted — remove test folders manually in the Cloudinary console if needed.
+
 ## Paystack (live payments)
 
 On Render:

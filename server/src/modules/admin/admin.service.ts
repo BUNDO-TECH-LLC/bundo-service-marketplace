@@ -128,7 +128,7 @@ export const getAdminStats = async () => {
   return stats;
 };
 
-const userListWhere = (filters?: AdminUserListFilters) => {
+export const buildUserListWhere = (filters?: AdminUserListFilters) => {
   if (!filters?.role) {
     return undefined;
   }
@@ -148,7 +148,7 @@ export const getUsers = async (
   filters?: AdminUserListFilters
 ) => {
   return db.user.findMany({
-    where: userListWhere(filters),
+    where: buildUserListWhere(filters),
     orderBy: { createdAt: 'desc' },
     ...paginationArgs(pagination),
     include: {
@@ -165,7 +165,7 @@ export const getUsers = async (
 
 export const countUsers = async (filters?: AdminUserListFilters) => {
   return db.user.count({
-    where: userListWhere(filters),
+    where: buildUserListWhere(filters),
   });
 };
 
