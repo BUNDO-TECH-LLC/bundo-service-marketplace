@@ -5,8 +5,9 @@
  * migrations or schema.
  *
  * Usage:
+ *   PURGE_CONFIRM=YES npm run db:purge -- --keep-admin-email=you@bundo.ng
  *   PURGE_CONFIRM=YES npm run db:purge -- --keep-admin-uid=<firebase-uid>
- *   PURGE_CONFIRM=YES npm run db:purge -- --keep-admin-uid=<uid> --firebase
+ *   PURGE_CONFIRM=YES npm run db:purge -- --keep-admin-email=you@bundo.ng --firebase
  *
  * After running:
  *   npm run db:seed
@@ -24,6 +25,7 @@ const REQUIRED_CONFIRM_VALUE = 'YES';
 
 function readArgs(argv: string[]) {
   const keepAdminUids: string[] = [];
+  const keepAdminEmails: string[] = [];
   let purgeFirebase = false;
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -48,10 +50,56 @@ function readArgs(argv: string[]) {
         keepAdminUids.push(uid);
         index += 1;
       }
+      continue;
+    }
+
+    if (arg.startsWith('--keep-admin-email=')) {
+      const email = arg.slice('--keep-admin-email='.length).trim();
+      if (email) {
+        keepAdminEmails.push(email);
+      }
+      continue;
+    }
+
+    if (arg === '--keep-admin-email') {
+      const email = argv[index + 1]?.trim();
+      if (email) {
+        keepAdminEmails.push(email);
+        index += 1;
+      }
     }
   }
 
-  return { keepAdminUids, purgeFirebase };
+  return { keepAdminUids, keepAdminEmails, purgeFirebase };
+}
+
+async function resolveKeepAdminUids(
+  db: PrismaClient,
+  keepAdminUids: string[],
+  keepAdminEmails: string[]
+) {
+  const resolved = [...keepAdminUids];
+
+  for (const email of keepAdminEmails) {
+    const user = await db.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+      select: { firebaseUid: true, email: true, role: true },
+    });
+
+    if (!user) {
+      throw new Error(`No Postgres user found for --keep-admin-email=${email}`);
+    }
+
+    if (user.role !== Role.ADMIN) {
+      throw new Error(
+        `User ${user.email ?? email} is not ADMIN (current role: ${user.role ?? 'null'}). Promote them first.`
+      );
+    }
+
+    resolved.push(user.firebaseUid);
+  }
+
+  return [...new Set(resolved)];
 }
 
 async function deleteFirebaseUsersExcept(keepUids: Set<string>) {
@@ -89,7 +137,7 @@ async function deleteFirebaseUsersExcept(keepUids: Set<string>) {
 }
 
 async function main() {
-  const { keepAdminUids, purgeFirebase } = readArgs(process.argv.slice(2));
+  const { keepAdminUids, keepAdminEmails, purgeFirebase } = readArgs(process.argv.slice(2));
 
   if (process.env[CONFIRM_ENV] !== REQUIRED_CONFIRM_VALUE) {
     throw new Error(
@@ -97,8 +145,10 @@ async function main() {
     );
   }
 
-  if (keepAdminUids.length === 0) {
-    throw new Error('Provide at least one --keep-admin-uid=<firebase-uid> to retain your operator account.');
+  if (keepAdminUids.length === 0 && keepAdminEmails.length === 0) {
+    throw new Error(
+      'Provide at least one --keep-admin-email=<email> or --keep-admin-uid=<firebase-uid> to retain your operator account.'
+    );
   }
 
   const databaseUrl = process.env.DATABASE_URL;
@@ -111,17 +161,18 @@ async function main() {
   const db = new PrismaClient({ adapter });
 
   try {
-    const keepSet = new Set(keepAdminUids);
+    const resolvedKeepAdminUids = await resolveKeepAdminUids(db, keepAdminUids, keepAdminEmails);
+    const keepSet = new Set(resolvedKeepAdminUids);
     const keptAdmins = await db.user.findMany({
       where: {
-        firebaseUid: { in: keepAdminUids },
+        firebaseUid: { in: resolvedKeepAdminUids },
         role: Role.ADMIN,
       },
       select: { firebaseUid: true, email: true },
     });
 
-    if (keptAdmins.length !== keepAdminUids.length) {
-      const missing = keepAdminUids.filter(
+    if (keptAdmins.length !== resolvedKeepAdminUids.length) {
+      const missing = resolvedKeepAdminUids.filter(
         (uid) => !keptAdmins.some((admin) => admin.firebaseUid === uid)
       );
       throw new Error(
@@ -167,7 +218,7 @@ async function main() {
       await tx.artisanProfile.deleteMany();
       await tx.user.deleteMany({
         where: {
-          firebaseUid: { notIn: keepAdminUids },
+          firebaseUid: { notIn: resolvedKeepAdminUids },
         },
       });
     });

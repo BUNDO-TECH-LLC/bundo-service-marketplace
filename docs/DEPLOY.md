@@ -29,15 +29,13 @@ Use this only **before public launch** when the database holds test accounts onl
 From `server/` against your production `DATABASE_URL`:
 
 ```bash
-PURGE_CONFIRM=YES npm run db:purge -- --keep-admin-uid=<your-firebase-uid>
+PURGE_CONFIRM=YES npm run db:purge -- --keep-admin-email=you@bundo.ng --firebase
 npm run db:seed
 ```
 
-Optional: also remove Firebase Auth test users (requires server Firebase env vars on your machine):
+You can use `--keep-admin-uid=<firebase-uid>` instead of email if you prefer.
 
-```bash
-PURGE_CONFIRM=YES npm run db:purge -- --keep-admin-uid=<your-firebase-uid> --firebase
-```
+Optional: run without `--firebase` first to wipe Postgres only, then add `--firebase` on a second run to clear Auth test users (requires server Firebase env vars on your machine).
 
 The script keeps categories and the admin UID(s) you specify. Cloudinary assets are not deleted — remove test folders manually in the Cloudinary console if needed.
 
