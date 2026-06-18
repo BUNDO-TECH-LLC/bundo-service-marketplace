@@ -4,7 +4,7 @@ import { useAppRoot } from '../../app/appRootContext';
 import { AuthLayout } from '../../layouts/AuthLayout';
 import { ApiError } from '../../lib/api';
 import { EmailInboxHint } from '../../components/EmailInboxHint';
-import { sendBundoEmailVerification } from '../../lib/authEmailVerification';
+import { resendBundoEmailVerification } from '../../lib/verificationEmailResend';
 import { ARTISAN_ONBOARDING_PATH, markArtisanApplicant } from '../../lib/artisanApplication';
 import { CUSTOMER_PROFILE_PATH, isCustomerProfileComplete } from '../../lib/customerProfile';
 import { buildAuthDrawerSearch } from '../../lib/authDrawerPrompt';
@@ -99,7 +99,7 @@ export function EmailVerificationPage() {
     setMessage('');
 
     try {
-      await sendBundoEmailVerification(auth.currentUser);
+      await resendBundoEmailVerification(auth.currentUser);
       setMessage('Verification link sent again. Check your inbox and spam folder.');
     } catch (error) {
       setMessage(

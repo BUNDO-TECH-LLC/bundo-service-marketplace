@@ -28,7 +28,7 @@ function formatVerificationSendError(error: unknown): string {
 
   switch (code) {
     case 'auth/too-many-requests':
-      return 'Too many verification emails requested. Wait a few minutes, then use Resend on the verification page.';
+      return 'Firebase is temporarily limiting verification emails for this account—usually after many resend attempts while testing. Wait about an hour, then try Resend once. If you already received a link, open that instead (older links may still work).';
     case 'auth/unauthorized-continue-uri':
     case 'auth/invalid-continue-uri':
       return SIGN_IN_UNAVAILABLE_WITH_EMAIL;

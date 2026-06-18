@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import admin from '../config/firebase';
 import { ForbiddenError, UnauthorizedError } from '../utils/errors';
 
-/** Blocks sensitive actions until Firebase marks the email verified. */
+/** Optional gate for routes that require Firebase email_verified. Not mounted by default. */
 export const requireVerifiedEmail = async (
   req: Request,
   _res: Response,

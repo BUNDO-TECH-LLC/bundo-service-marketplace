@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { BookingStatus, Role } from '@prisma/client';
 import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
-import { requireVerifiedEmail } from '../../middlewares/requireVerifiedEmail';
 import { requireRole } from '../../middlewares/requireRole';
 import { asyncHandler } from '../../middlewares/errorHandler';
 import {
@@ -32,7 +31,6 @@ const router = Router();
 router.post(
   '/',
   verifyFirebaseToken,
-  requireVerifiedEmail,
   requireRole(Role.CUSTOMER),
   asyncHandler(async (req, res) => {
     try {

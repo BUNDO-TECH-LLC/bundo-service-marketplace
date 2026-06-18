@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { User } from 'firebase/auth';
-import { sendBundoEmailVerification } from '../../lib/authEmailVerification';
+import { resendBundoEmailVerification } from '../../lib/verificationEmailResend';
 import { needsEmailVerification } from '../../lib/authSignupStorage';
 import type { ActionRunner } from '../../appTypes';
 
@@ -24,7 +24,7 @@ export function EmailVerificationReminder({
   const user = firebaseUser;
 
   async function resendVerification() {
-    await sendBundoEmailVerification(user);
+    await resendBundoEmailVerification(user);
   }
 
   async function refreshStatus() {
@@ -48,8 +48,8 @@ export function EmailVerificationReminder({
     <aside className="settings-email-reminder" role="status" aria-live="polite">
       <p className="settings-email-reminder-title">Verify your email</p>
       <p className="settings-email-reminder-copy">
-        We sent a link to <strong>{user.email}</strong>. Confirm it when you can to secure bookings and
-        messages. You can keep using Bundo in the meantime.
+        We sent a link to <strong>{user.email}</strong>. Confirm it when you can so we can reach you about
+        bookings and account updates. You can keep using Bundo in the meantime.
       </p>
       <div className="settings-email-reminder-actions">
         <button

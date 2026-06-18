@@ -45,6 +45,7 @@ import type { ApiUser, Role } from '../types';
 import type { SignupRole, View, WorkspaceSection } from '../appTypes';
 import bundoLogo from '../assets/BundoLogo.png';
 import { sendBundoEmailVerification } from '../lib/authEmailVerification';
+import { markVerificationEmailSent, resendBundoEmailVerification } from '../lib/verificationEmailResend';
 import { LegalLinks } from '../components/LegalLinks';
 import { PasswordInput } from '../components/PasswordInput';
 import {
@@ -260,6 +261,7 @@ export function AuthBox({
 
     try {
       await sendBundoEmailVerification(user);
+      markVerificationEmailSent(user.uid);
       return true;
     } catch {
       return false;
