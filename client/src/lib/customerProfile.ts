@@ -1,5 +1,9 @@
 import type { ApiUser } from '../types';
-import { ARTISAN_ONBOARDING_PATH, isArtisanApplicantSession } from './artisanApplication';
+import {
+  ARTISAN_ONBOARDING_PATH,
+  isApprovedArtisanSession,
+  isArtisanApplicant,
+} from './artisanApplication';
 
 export const CUSTOMER_PROFILE_PATH = '/onboarding/profile';
 
@@ -37,10 +41,13 @@ export function onboardingRedirectPath(
   }
 
   if (user.role === 'ARTISAN') {
+    if (isApprovedArtisanSession(user.firebaseUid)) {
+      return '/workspace/overview';
+    }
     return ARTISAN_ONBOARDING_PATH;
   }
 
-  if (user.role === 'CUSTOMER' && isArtisanApplicantSession(user.firebaseUid)) {
+  if (isArtisanApplicant(user)) {
     return ARTISAN_ONBOARDING_PATH;
   }
 

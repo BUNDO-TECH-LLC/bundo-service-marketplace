@@ -11,11 +11,12 @@ vi.mock('./artisanApplication', async () => {
   const actual = await vi.importActual<typeof import('./artisanApplication')>('./artisanApplication');
   return {
     ...actual,
-    isArtisanApplicantSession: vi.fn(() => false),
+    isArtisanApplicant: vi.fn(() => false),
+    isApprovedArtisanSession: vi.fn(() => false),
   };
 });
 
-const { isArtisanApplicantSession } = await import('./artisanApplication');
+const { isArtisanApplicant, isApprovedArtisanSession } = await import('./artisanApplication');
 
 const customer = (overrides: Partial<ApiUser> = {}): ApiUser => ({
   firebaseUid: 'uid-1',
@@ -27,7 +28,8 @@ const customer = (overrides: Partial<ApiUser> = {}): ApiUser => ({
 
 describe('customer onboarding redirects', () => {
   beforeEach(() => {
-    vi.mocked(isArtisanApplicantSession).mockReturnValue(false);
+    vi.mocked(isArtisanApplicant).mockReturnValue(false);
+    vi.mocked(isApprovedArtisanSession).mockReturnValue(false);
   });
 
   it('treats incomplete customer profiles as incomplete', () => {
@@ -41,15 +43,23 @@ describe('customer onboarding redirects', () => {
   });
 
   it('sends artisan applicants to artisan onboarding', () => {
-    vi.mocked(isArtisanApplicantSession).mockReturnValue(true);
+    vi.mocked(isArtisanApplicant).mockReturnValue(true);
 
-    expect(onboardingRedirectPath(customer(), '/workspace/overview')).toBe(
+    expect(onboardingRedirectPath(customer({ onboardingIntent: 'ARTISAN' }), '/workspace/overview')).toBe(
       ARTISAN_ONBOARDING_PATH
     );
-    expect(onboardingRedirectPath(customer(), ARTISAN_ONBOARDING_PATH)).toBeNull();
+    expect(onboardingRedirectPath(customer({ onboardingIntent: 'ARTISAN' }), ARTISAN_ONBOARDING_PATH)).toBeNull();
   });
 
-  it('sends artisans to artisan onboarding', () => {
+  it('sends approved artisans to workspace', () => {
+    vi.mocked(isApprovedArtisanSession).mockReturnValue(true);
+
+    expect(
+      onboardingRedirectPath(customer({ role: 'ARTISAN', profileComplete: true }), '/')
+    ).toBe('/workspace/overview');
+  });
+
+  it('sends unapproved artisans to onboarding', () => {
     expect(
       onboardingRedirectPath(customer({ role: 'ARTISAN', profileComplete: true }), '/')
     ).toBe(ARTISAN_ONBOARDING_PATH);

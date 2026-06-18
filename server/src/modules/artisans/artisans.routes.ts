@@ -440,7 +440,7 @@ router.get('/me', verifyFirebaseToken, requireArtisanOrApplicant, asyncHandler(a
   });
 }));
 
-router.get('/payout-account', verifyFirebaseToken, requireRole(Role.ARTISAN), asyncHandler(async (req, res) => {
+router.get('/payout-account', verifyFirebaseToken, requireArtisanOrApplicant, asyncHandler(async (req, res) => {
   const account = await getPayoutAccountForArtisanUser((req as any).user.firebaseUid);
 
   res.json({
@@ -449,7 +449,7 @@ router.get('/payout-account', verifyFirebaseToken, requireRole(Role.ARTISAN), as
   });
 }));
 
-router.post('/payout-account', verifyFirebaseToken, requireRole(Role.ARTISAN), asyncHandler(async (req, res) => {
+router.post('/payout-account', verifyFirebaseToken, requireArtisanOrApplicant, asyncHandler(async (req, res) => {
   const { bankCode, bankName, accountNumber, accountName } = req.body;
 
   if (typeof bankCode !== 'string' || !bankCode.trim()) {

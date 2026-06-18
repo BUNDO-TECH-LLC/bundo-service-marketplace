@@ -6,7 +6,9 @@ import { buildAppPath } from '../lib/appPaths';
 import {
   ARTISAN_ONBOARDING_PATH,
   clearArtisanApplicant,
-  isArtisanApplicantSession,
+  isApprovedArtisanSession,
+  isArtisanApplicant,
+  markArtisanApplicant,
 } from '../lib/artisanApplication';
 import { locationErrorMessage } from '../lib/geolocation';
 import { nigeriaStates } from '../lib/geo';
@@ -21,7 +23,7 @@ export default function HomePage() {
       return;
     }
 
-    if (ctx.me.role === 'CUSTOMER' && isArtisanApplicantSession(ctx.me.firebaseUid)) {
+    if (ctx.me.role === 'CUSTOMER' && isArtisanApplicant(ctx.me)) {
       ctx.navigate(ARTISAN_ONBOARDING_PATH, { replace: true });
     }
   }, [ctx.me, ctx.navigate]);
@@ -29,10 +31,13 @@ export default function HomePage() {
   if (ctx.isAuthed && ctx.me) {
     if (ctx.me.role === 'ARTISAN') {
       clearArtisanApplicant(ctx.me.firebaseUid);
+      if (isApprovedArtisanSession(ctx.me.firebaseUid)) {
+        return <Navigate to="/workspace/overview" replace />;
+      }
       return <Navigate to="/artisan/onboarding" replace />;
     }
 
-    if (ctx.me.role === 'CUSTOMER' && isArtisanApplicantSession(ctx.me.firebaseUid)) {
+    if (ctx.me.role === 'CUSTOMER' && isArtisanApplicant(ctx.me)) {
       return null;
     }
 
@@ -94,6 +99,7 @@ export default function HomePage() {
           }, queryText.trim() ? `Searching for ${queryText.trim()}` : 'Showing available services');
         }}
         onBrowse={() => ctx.navigate('/marketplace')}
+        onBecomeArtisan={() => ctx.navigate('/signup?role=artisan')}
         onUseMyLocation={() => {
           void ctx.useMyLocation().then((result) => {
             if (result.ok) {

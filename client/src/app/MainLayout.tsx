@@ -17,7 +17,7 @@ import { PaymentSuccessDialog } from '../components/PaymentSuccessDialog';
 import { ArtisanAppHeader } from '../features/artisan/ArtisanAppHeader';
 import { BookingSuccessDialog } from '../features/booking/BookingSuccessDialog';
 import { SignedInTopbarNav } from './SignedInTopbarNav';
-import { ARTISAN_ONBOARDING_PATH, isArtisanApplicantSession } from '../lib/artisanApplication';
+import { ARTISAN_ONBOARDING_PATH, isArtisanApplicant } from '../lib/artisanApplication';
 import { CUSTOMER_PROFILE_PATH, isCustomerProfileComplete } from '../lib/customerProfile';
 import { useAppRoot } from './appRootContext';
 
@@ -38,7 +38,7 @@ export function MainLayout() {
       return;
     }
 
-    if (isArtisanApplicantSession(ctx.me.firebaseUid)) {
+    if (isArtisanApplicant(ctx.me)) {
       return;
     }
 
@@ -252,7 +252,7 @@ export function MainLayout() {
                   ctx.navigate('/artisan/onboarding');
                 } else if (
                   nextUser.role === 'CUSTOMER' &&
-                  isArtisanApplicantSession(nextUser.firebaseUid)
+                  isArtisanApplicant(nextUser)
                 ) {
                   ctx.navigate(ARTISAN_ONBOARDING_PATH);
                 } else if (nextUser.role === 'CUSTOMER' && !isCustomerProfileComplete(nextUser)) {

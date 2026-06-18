@@ -112,6 +112,7 @@ export function ArtisanPortfolioManager({
               <input
                 type="file"
                 accept="image/*"
+                capture={variant === 'onboarding' ? 'environment' : undefined}
                 multiple
                 disabled={busy || uploadingPortfolio}
                 onChange={(event) => {

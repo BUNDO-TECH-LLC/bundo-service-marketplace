@@ -1,4 +1,4 @@
-import { BookingStatus, DisputeStatus, PaymentStatus, Prisma, Role, UserStatus } from '@prisma/client';
+import { BookingStatus, DisputeStatus, OnboardingIntent, PaymentStatus, Prisma, Role, UserStatus } from '@prisma/client';
 import db from '../../db/client';
 import {
   defaultNotificationPreferences,
@@ -401,6 +401,44 @@ export const completeCustomerProfile = async (
   }
 };
 
+export function isArtisanApplicantUser(user: {
+  role: Role | null;
+  onboardingIntent?: OnboardingIntent | null;
+}) {
+  return user.role === Role.CUSTOMER && user.onboardingIntent === OnboardingIntent.ARTISAN;
+}
+
+export const setUserOnboardingIntent = async (
+  firebaseUid: string,
+  intent: OnboardingIntent | null
+) => {
+  const user = await db.user.findUnique({ where: { firebaseUid } });
+
+  if (!user) {
+    return { status: 'missing_user' as const };
+  }
+
+  if (user.role === Role.ADMIN) {
+    return { status: 'locked_role' as const };
+  }
+
+  if (intent === OnboardingIntent.ARTISAN && user.role === Role.ARTISAN) {
+    return { status: 'already_artisan' as const, user };
+  }
+
+  if (intent === OnboardingIntent.ARTISAN && user.role !== Role.CUSTOMER) {
+    return { status: 'locked_role' as const };
+  }
+
+  const updated = await db.user.update({
+    where: { firebaseUid },
+    data: { onboardingIntent: intent },
+  });
+
+  invalidateCachedAuthUser(firebaseUid);
+  return { status: 'updated' as const, user: updated };
+};
+
 export function serializeUser(user: {
   firebaseUid: string;
   email: string | null;
@@ -411,6 +449,7 @@ export function serializeUser(user: {
   area?: string | null;
   address?: string | null;
   profileCompletedAt?: Date | null;
+  onboardingIntent?: OnboardingIntent | null;
   notificationPreferences?: unknown | null;
 }) {
   return {
@@ -424,6 +463,7 @@ export function serializeUser(user: {
     address: user.address ?? null,
     profileCompletedAt: user.profileCompletedAt?.toISOString() ?? null,
     profileComplete: isCustomerProfileComplete(user),
+    onboardingIntent: user.onboardingIntent ?? null,
     notificationPreferences: getUserNotificationPreferences(user),
   };
 }

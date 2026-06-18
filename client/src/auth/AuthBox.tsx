@@ -201,11 +201,15 @@ export function AuthBox({
       forceTokenRefresh,
     });
 
+    let nextUser = session.user;
     if (artisanIntent && session.user.role === 'CUSTOMER') {
-      markArtisanApplicant(session.user.firebaseUid);
+      const updated = await markArtisanApplicant(session.token, session.user.firebaseUid);
+      if (updated) {
+        nextUser = updated;
+      }
     }
 
-    onReady(session.token, session.user);
+    onReady(session.token, nextUser);
 
     if (session.user.role === 'ARTISAN') {
       onNotice(
@@ -745,13 +749,16 @@ export function AuthBox({
       openResetPassword(prefillEmail);
     } else if (authDrawerPrompt.mode === 'choose-role') {
       if (firebaseUser && me) {
-        markArtisanApplicant(me.firebaseUid);
-        if (onNavigatePath) {
-          onNavigatePath(ARTISAN_ONBOARDING_PATH);
-        } else {
-          onNavigate('home');
-        }
-        onNotice('Continue with artisan onboarding.');
+        void (async () => {
+          const token = await firebaseUser.getIdToken();
+          await markArtisanApplicant(token, me.firebaseUid);
+          if (onNavigatePath) {
+            onNavigatePath(ARTISAN_ONBOARDING_PATH);
+          } else {
+            onNavigate('home');
+          }
+          onNotice('Continue with artisan onboarding.');
+        })();
       } else {
         openSignup('ARTISAN');
       }

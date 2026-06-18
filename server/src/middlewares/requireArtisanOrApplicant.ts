@@ -1,10 +1,19 @@
-import { Role } from '@prisma/client';
+import { OnboardingIntent, Role } from '@prisma/client';
 import { getArtisanProfileByUserId } from '../modules/artisans/artisans.service';
+import { isArtisanApplicantUser } from '../modules/users/users.service';
 import { ForbiddenError } from '../utils/errors';
 
 /** Lets approved artisans and customers in the artisan onboarding pipeline use self-service artisan routes. */
 export const requireArtisanOrApplicant = async (
-  req: { user?: { firebaseUid: string; role: Role | null }; method: string; path: string },
+  req: {
+    user?: {
+      firebaseUid: string;
+      role: Role | null;
+      onboardingIntent?: OnboardingIntent | null;
+    };
+    method: string;
+    path: string;
+  },
   _res: unknown,
   next: (error?: unknown) => void
 ) => {
@@ -25,9 +34,10 @@ export const requireArtisanOrApplicant = async (
   }
 
   const profile = await getArtisanProfileByUserId(user.firebaseUid);
+  const isApplicant = isArtisanApplicantUser(user);
   const isProfileCreate = req.method === 'POST' && req.path === '/profile';
 
-  if (profile || isProfileCreate) {
+  if (profile || (isApplicant && isProfileCreate)) {
     return next();
   }
 

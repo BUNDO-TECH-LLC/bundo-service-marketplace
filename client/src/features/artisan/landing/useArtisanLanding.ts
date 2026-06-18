@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../../lib/api';
+import {
+  computeOnboardingProgress,
+  computeResumeState,
+} from '../../../lib/artisanOnboarding';
 import { artisanVerificationPhase } from '../../../lib/artisanVerification';
 import { locationErrorMessage, readBrowserLocation } from '../../../lib/geolocation';
 import { inferNigeriaState } from '../../../lib/inferNigeriaState';
@@ -13,10 +17,13 @@ import type {
   AvailabilitySlot,
   PortfolioImage,
 } from '../../../types';
-import type { ArtisanLandingModel, ArtisanLandingProps } from './artisanLandingTypes';
+import type { ArtisanLandingModel, ArtisanLandingProps, ArtisanSetupSubPhase } from './artisanLandingTypes';
+
+const SAVED_NOTICE = 'Saved — you can come back anytime.';
 
 export function useArtisanLanding({
   token,
+  me,
   categories,
   offerings,
   firebaseUser,
@@ -29,27 +36,29 @@ export function useArtisanLanding({
   const [availabilitySlots, setAvailabilitySlots] = useState<AvailabilitySlot[]>([]);
   const [kycSubmission, setKycSubmission] = useState<ArtisanKycSubmission | null>(null);
   const [step, setStep] = useState(1);
+  const [setupSubPhase, setSetupSubPhase] = useState<ArtisanSetupSubPhase>('wizard');
+  const [resumeMessage, setResumeMessage] = useState<string | null>(null);
   const [uploadingPortfolio, setUploadingPortfolio] = useState(false);
   const [kycDocumentFile, setKycDocumentFile] = useState<File | null>(null);
   const [setup, setSetup] = useState({
     fullName: firebaseUser?.displayName || '',
     businessName: '',
     categoryId: '',
-    location: 'Lagos',
-    area: '',
+    location: me?.state || 'Lagos',
+    area: me?.area || '',
     lat: '6.5244',
     lng: '3.3792',
     title: 'Basic inspection',
     priceFrom: '',
     description: '',
     documentNumber: '',
-    address: 'Lagos',
+    address: me?.address || 'Lagos',
   });
   const [servicePackages, setServicePackages] = useState([
     {
       localId: 'package-1',
       categoryId: '',
-      title: 'Basic inspection',
+      title: '',
       priceFrom: '',
       description: '',
     },
@@ -64,16 +73,18 @@ export function useArtisanLanding({
 
   const kycStatus = kycSubmission?.status ?? 'NOT_SUBMITTED';
   const displayName = profile?.displayName || firebaseUser?.displayName || 'Artisan';
-  const accountEmail = firebaseUser?.email || null;
+  const accountEmail = firebaseUser?.email || me?.email || null;
   const verificationPhase = artisanVerificationPhase({ profile, kycStatus, hydrated });
   const phase =
     forceSetup && (verificationPhase === 'rejected' || verificationPhase === 'changes_requested')
       ? 'setup'
       : verificationPhase;
+  const progressPercent = computeOnboardingProgress(step, setupSubPhase);
 
   function openSetupEditor() {
     setForceSetup(true);
-    setStep(4);
+    setSetupSubPhase('verification');
+    setStep(3);
   }
 
   useEffect(() => {
@@ -88,22 +99,71 @@ export function useArtisanLanding({
     ])
       .then(([profileResponse, imageResponse, slotResponse, kycResponse]) => {
         if (!mounted) return;
+
         const nextProfile = profileResponse.profile || null;
+        const nextOfferings = offerings;
+        const nextSlots = slotResponse.slots;
+        const nextKyc = kycResponse.submission;
+
         setProfile(nextProfile);
         setPortfolioImages(imageResponse.images);
-        setAvailabilitySlots(slotResponse.slots);
-        setKycSubmission(kycResponse.submission);
+        setAvailabilitySlots(nextSlots);
+        setKycSubmission(nextKyc);
+
+        const resume = computeResumeState({
+          profile: nextProfile,
+          offerings: nextOfferings,
+          availabilitySlots: nextSlots,
+          kycSubmission: nextKyc,
+        });
+
+        setStep(resume.step);
+        setSetupSubPhase(resume.subPhase);
+
+        const firstName = (firebaseUser?.displayName || nextProfile?.displayName || '').split(' ')[0];
+        if (resume.resumeLabel && firstName) {
+          setResumeMessage(`Welcome back, ${firstName}. You left off at ${resume.resumeLabel}.`);
+        } else if (resume.resumeLabel) {
+          setResumeMessage(`Welcome back. You left off at ${resume.resumeLabel}.`);
+        } else {
+          setResumeMessage(null);
+        }
+
+        const matchedCategory = categories.find(
+          (category) => category.name.toLowerCase() === (nextProfile?.bio || '').toLowerCase()
+        );
+
         setSetup((current) => ({
           ...current,
           fullName: current.fullName || nextProfile?.displayName || firebaseUser?.displayName || '',
           businessName: nextProfile?.displayName || current.businessName,
-          location: nextProfile?.city || current.location,
-          area: nextProfile?.area || current.area,
+          categoryId: matchedCategory?.id || current.categoryId,
+          location: nextProfile?.city || me?.state || current.location,
+          area: nextProfile?.area || me?.area || current.area,
           lat: String(nextProfile?.lat ?? current.lat),
           lng: String(nextProfile?.lng ?? current.lng),
-          address: kycResponse.submission?.address || current.address,
-          documentNumber: kycResponse.submission?.documentNumber || current.documentNumber,
+          address: nextKyc?.address || me?.address || current.address,
+          documentNumber: nextKyc?.documentNumber || current.documentNumber,
         }));
+
+        if (nextOfferings[0]) {
+          setServicePackages([
+            {
+              localId: 'package-1',
+              categoryId: nextOfferings[0].categoryId,
+              title: nextOfferings[0].title,
+              priceFrom: String(nextOfferings[0].priceFrom),
+              description: nextOfferings[0].description || '',
+            },
+          ]);
+        } else if (matchedCategory?.id) {
+          setServicePackages((current) =>
+            current.map((servicePackage) => ({
+              ...servicePackage,
+              categoryId: matchedCategory.id,
+            }))
+          );
+        }
       })
       .finally(() => {
         if (mounted) {
@@ -114,7 +174,7 @@ export function useArtisanLanding({
     return () => {
       mounted = false;
     };
-  }, [firebaseUser, token]);
+  }, [categories, firebaseUser, me?.address, me?.area, me?.state, offerings, token]);
 
   async function ensureArtisanProfileForUpload() {
     if (profile?.id) {
@@ -128,10 +188,7 @@ export function useArtisanLanding({
     }
 
     const profileDisplayName =
-      setup.businessName.trim() ||
-      setup.fullName.trim() ||
-      firebaseUser?.displayName?.trim() ||
-      'Artisan';
+      setup.fullName.trim() || firebaseUser?.displayName?.trim() || 'Artisan';
 
     await api('/artisans/profile', {
       method: 'POST',
@@ -176,36 +233,21 @@ export function useArtisanLanding({
     );
   }
 
-  function addServicePackage() {
-    setServicePackages((current) => [
-      ...current,
-      {
-        localId: `package-${Date.now()}`,
-        categoryId: setup.categoryId,
-        title: '',
-        priceFrom: '',
-        description: '',
-      },
-    ]);
-  }
-
-  function removeServicePackage(localId: string) {
-    setServicePackages((current) =>
-      current.length === 1 ? current : current.filter((servicePackage) => servicePackage.localId !== localId)
-    );
-  }
-
   async function saveBasicInfo() {
     const nameCheck = validateLegalName(setup.fullName);
     if (!nameCheck.ok) {
       throw new Error(nameCheck.message);
     }
 
+    if (!setup.area.trim()) {
+      throw new Error('Enter your area or neighbourhood.');
+    }
+
     await api('/artisans/profile', {
       method: profile ? 'PATCH' : 'POST',
       token,
       body: JSON.stringify({
-        displayName: setup.businessName.trim() || setup.fullName.trim(),
+        displayName: setup.fullName.trim(),
         bio: categories.find((category) => category.id === setup.categoryId)?.name || 'Bundo artisan',
         city: setup.location.trim(),
         area: setup.area.trim(),
@@ -213,56 +255,56 @@ export function useArtisanLanding({
         lng: Number(setup.lng),
       }),
     });
+
+    setServicePackages((current) =>
+      current.map((servicePackage) => ({
+        ...servicePackage,
+        categoryId: servicePackage.categoryId || setup.categoryId,
+      }))
+    );
+
     await hydrateOnboarding();
     await refresh();
+    setResumeMessage(null);
     setStep(2);
   }
 
   async function saveOffering() {
-    const packagesToSave = servicePackages
-      .map((servicePackage) => ({
-        ...servicePackage,
-        categoryId: servicePackage.categoryId || setup.categoryId || categories[0]?.id || '',
-        title: servicePackage.title.trim(),
-        description: servicePackage.description.trim(),
-        priceFrom: Number(servicePackage.priceFrom.replace(/[^\d]/g, '')),
-      }))
-      .filter((servicePackage) => servicePackage.categoryId && servicePackage.title && servicePackage.priceFrom > 0);
+    const servicePackage = servicePackages[0];
+    const categoryId = setup.categoryId || servicePackage?.categoryId || categories[0]?.id || '';
+    const title = servicePackage?.title.trim() || '';
+    const priceFrom = Number((servicePackage?.priceFrom || '').replace(/[^\d]/g, ''));
 
-    if (!packagesToSave.length) {
-      throw new Error('Add at least one service package with a category, name, and price.');
+    if (!categoryId || !title || !priceFrom) {
+      throw new Error('Enter your main service name and starting price.');
     }
 
-    const minGuidePrice = 500;
-    if (packagesToSave.some((servicePackage) => servicePackage.priceFrom < minGuidePrice)) {
-      throw new Error(
-        `Each guide price must be at least ₦${minGuidePrice.toLocaleString('en-NG')}.`
-      );
+    if (priceFrom < 500) {
+      throw new Error('Guide price must be at least ₦500.');
     }
 
-    for (const servicePackage of packagesToSave) {
-      const alreadyExists = offerings.some(
-        (offering) =>
-          offering.categoryId === servicePackage.categoryId &&
-          offering.title.trim().toLowerCase() === servicePackage.title.toLowerCase() &&
-          offering.priceFrom === servicePackage.priceFrom
-      );
+    const alreadyExists = offerings.some(
+      (offering) =>
+        offering.categoryId === categoryId &&
+        offering.title.trim().toLowerCase() === title.toLowerCase() &&
+        offering.priceFrom === priceFrom
+    );
 
-      if (alreadyExists) continue;
-
+    if (!alreadyExists) {
       await api('/offerings', {
         method: 'POST',
         token,
         body: JSON.stringify({
-          categoryId: servicePackage.categoryId,
-          title: servicePackage.title,
-          description: servicePackage.description || undefined,
-          priceFrom: servicePackage.priceFrom,
+          categoryId,
+          title,
+          description: servicePackage?.description.trim() || undefined,
+          priceFrom,
         }),
       });
     }
 
     await refresh();
+    setResumeMessage(null);
     setStep(3);
   }
 
@@ -305,7 +347,11 @@ export function useArtisanLanding({
     await hydrateOnboarding();
   }
 
-  async function submitForVerification() {
+  async function saveAvailabilityAndContinue() {
+    if (!selectedDays.length) {
+      throw new Error('Select at least one day you are available.');
+    }
+
     await Promise.all(
       selectedDays
         .filter(
@@ -324,8 +370,14 @@ export function useArtisanLanding({
         )
     );
 
+    await hydrateOnboarding();
+    setResumeMessage(null);
+    setSetupSubPhase('verification');
+  }
+
+  async function submitKycVerification() {
     if (!kycDocumentFile) {
-      throw new Error('Please upload a photo of your ID document before submitting.');
+      throw new Error('Please upload a photo of your NIN slip or ID before submitting.');
     }
 
     const documentImageUrl = await uploadKycImage(token, kycDocumentFile);
@@ -353,6 +405,7 @@ export function useArtisanLanding({
         city: setup.location,
       }),
     });
+
     setKycSubmission(response.submission);
     setForceSetup(false);
     await hydrateOnboarding();
@@ -378,12 +431,24 @@ export function useArtisanLanding({
     }, 'Location updated');
   }
 
+  function saveAndExit() {
+    window.location.assign('/');
+  }
+
+  function backToGoLiveFromVerification() {
+    setSetupSubPhase('wizard');
+    setStep(3);
+  }
+
   return {
     displayName,
     accountEmail,
     phase,
     step,
     setStep,
+    setupSubPhase,
+    progressPercent,
+    resumeMessage,
     busy,
     runAction,
     categories,
@@ -393,8 +458,6 @@ export function useArtisanLanding({
     setAgreed,
     servicePackages,
     updateServicePackage,
-    addServicePackage,
-    removeServicePackage,
     portfolioImages,
     uploadingPortfolio,
     uploadPortfolioFile,
@@ -414,8 +477,12 @@ export function useArtisanLanding({
     profile,
     saveBasicInfo,
     saveOffering,
-    submitForVerification,
+    saveAvailabilityAndContinue,
+    submitKycVerification,
     openSetupEditor,
     useCurrentLocation,
+    saveAndExit,
+    backToGoLiveFromVerification,
+    token,
   };
 }

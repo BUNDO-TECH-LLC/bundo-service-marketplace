@@ -1,4 +1,5 @@
 import { Navigate } from 'react-router-dom';
+import { markArtisanApproved } from '../../../lib/artisanApplication';
 import { EmptyState } from '../../../components/EmptyState';
 import { buildAppPath } from '../../../lib/appPaths';
 import { ArtisanPendingApproval } from '../../../views/ArtisanPendingApproval';
@@ -20,6 +21,7 @@ export function ArtisanLandingPhases({ landing }: { landing: ArtisanLandingModel
     uploadPortfolioFiles,
     removePortfolioImage,
     openSetupEditor,
+    token,
   } = landing;
 
   if (phase === 'loading') {
@@ -48,6 +50,7 @@ export function ArtisanLandingPhases({ landing }: { landing: ArtisanLandingModel
           uploadPortfolioFile={uploadPortfolioFile}
           uploadPortfolioFiles={uploadPortfolioFiles}
           removePortfolioImage={removePortfolioImage}
+          token={token}
         />
       </ArtisanSetupShell>
     );
@@ -68,6 +71,7 @@ export function ArtisanLandingPhases({ landing }: { landing: ArtisanLandingModel
           uploadPortfolioFile={uploadPortfolioFile}
           uploadPortfolioFiles={uploadPortfolioFiles}
           removePortfolioImage={removePortfolioImage}
+          token={token}
         />
       </ArtisanSetupShell>
     );
@@ -88,12 +92,14 @@ export function ArtisanLandingPhases({ landing }: { landing: ArtisanLandingModel
           uploadPortfolioFile={uploadPortfolioFile}
           uploadPortfolioFiles={uploadPortfolioFiles}
           removePortfolioImage={removePortfolioImage}
+          token={token}
         />
       </ArtisanSetupShell>
     );
   }
 
   if (phase === 'approved') {
+    markArtisanApproved(profile?.userId);
     return (
       <Navigate to={buildAppPath({ view: 'workspace', workspaceSection: 'overview' })} replace />
     );

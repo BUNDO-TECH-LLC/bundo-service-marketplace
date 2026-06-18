@@ -146,7 +146,8 @@ export function EmailVerificationPage() {
     await ctx.loadPrivateData(session.token, session.user).catch(() => undefined);
 
     if (signupIntent === 'ARTISAN') {
-      markArtisanApplicant(session.user.firebaseUid);
+      const updated = await markArtisanApplicant(session.token, session.user.firebaseUid);
+      ctx.acknowledgeSession(session.token, updated || session.user);
       navigate(ARTISAN_ONBOARDING_PATH, { replace: true });
       return;
     }

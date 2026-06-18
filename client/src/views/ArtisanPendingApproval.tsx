@@ -1,8 +1,11 @@
 import { ArtisanPortfolioManager } from '../components/ArtisanPortfolioManager';
+import { ArtisanPayoutSection } from '../features/artisan/ArtisanPayoutSection';
 import type { ActionRunner } from '../appTypes';
 import type { Artisan, ArtisanKycSubmission, PortfolioImage } from '../types';
 import { kycStatusLabel } from '../lib/artisanVerification';
 import { bookingDate } from '../lib/bookingDisplay';
+
+const SUPPORT_EMAIL = 'support@bundo.ng';
 
 export function ArtisanPendingApproval({
   profile,
@@ -16,6 +19,8 @@ export function ArtisanPendingApproval({
   uploadPortfolioFile,
   uploadPortfolioFiles,
   removePortfolioImage,
+  token,
+  onOpenHelp,
 }: {
   profile: Artisan | null;
   kycSubmission: ArtisanKycSubmission | null;
@@ -28,6 +33,8 @@ export function ArtisanPendingApproval({
   uploadPortfolioFile?: (file: File, displayOrder: number) => Promise<void>;
   uploadPortfolioFiles?: (files: File[]) => Promise<void>;
   removePortfolioImage?: (imageId: string) => Promise<void>;
+  token?: string;
+  onOpenHelp?: () => void;
 }) {
   const displayName = profile?.displayName || 'Artisan';
   const submittedAt = kycSubmission?.submittedAt
@@ -59,10 +66,10 @@ export function ArtisanPendingApproval({
         </h1>
         <p className="artisan-pending-lead">
           {variant === 'rejected'
-            ? 'You can update your public profile or resubmit verification in Settings, then wait for review.'
+            ? 'You can update your public profile or resubmit verification, then wait for review.'
             : variant === 'changes_requested'
               ? 'Our team reviewed your submission and left notes. Update your details and resubmit so we can finish verification.'
-              : 'Your artisan profile is complete and with our verification team. You will get an in-app notification as soon as you are approved.'}
+              : 'Your profile is with our verification team. You can still complete the checklist below while you wait.'}
         </p>
 
         <div className="artisan-pending-status-row">
@@ -79,7 +86,10 @@ export function ArtisanPendingApproval({
           </div>
           <div>
             <dt>Location</dt>
-            <dd>{profile?.city || '—'}{profile?.area ? ` · ${profile.area}` : ''}</dd>
+            <dd>
+              {profile?.city || '—'}
+              {profile?.area ? ` · ${profile.area}` : ''}
+            </dd>
           </div>
           {kycSubmission?.reviewNote && variant === 'changes_requested' && (
             <div className="full">
@@ -93,27 +103,52 @@ export function ArtisanPendingApproval({
           <h2>What happens next</h2>
           <ol>
             <li>
-              <strong>We review your KYC and profile</strong>
-              <span>Usually within 1–2 business days.</span>
+              <strong>Submitted</strong>
+              <span>Your profile and verification details are in our queue.</span>
             </li>
             <li>
-              <strong>You receive a notification</strong>
-              <span>Approved artisans unlock jobs, messages, and payouts setup.</span>
+              <strong>Under review (24–48 hours)</strong>
+              <span>Our team checks your identity and service details.</span>
             </li>
             <li>
-              <strong>Your public profile goes live</strong>
-              <span>Customers can discover you and send booking requests.</span>
+              <strong>Approved</strong>
+              <span>You receive a notification and can start receiving bookings.</span>
+            </li>
+            <li>
+              <strong>Go live</strong>
+              <span>Your public profile appears in the marketplace.</span>
             </li>
           </ol>
         </div>
 
         <aside className="artisan-pending-callout">
           <strong>While you wait</strong>
-          <p>
-            Jobs, marketplace visibility, and customer messaging stay locked until approval. You can
-            still add photos below, sign out, read Help, or check notifications once they arrive.
+          <ul className="become-artisan-confirm-list">
+            <li>Add portfolio photos below to strengthen your profile.</li>
+            <li>Set up your payout bank account so you are ready on day one.</li>
+            <li>Read how bookings and payments work in Help.</li>
+          </ul>
+          <p className="muted">
+            Need help? Email{' '}
+            <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
+            {onOpenHelp ? (
+              <>
+                {' '}
+                or{' '}
+                <button type="button" className="link-button" onClick={onOpenHelp}>
+                  open Help
+                </button>
+              </>
+            ) : null}
+            .
           </p>
         </aside>
+
+        {token && runAction && (
+          <div className="artisan-pending-payout">
+            <ArtisanPayoutSection token={token} busy={busy} runAction={runAction} />
+          </div>
+        )}
 
         {runAction && uploadPortfolioFile && uploadPortfolioFiles && removePortfolioImage && (
           <ArtisanPortfolioManager

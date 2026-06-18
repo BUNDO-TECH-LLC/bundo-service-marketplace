@@ -5,7 +5,7 @@ import { api } from '../lib/api';
 import { buildAppPath, parseAppPath } from '../lib/appPaths';
 import { isAuthPathname } from '../lib/appRouting';
 import { auth } from '../lib/firebase';
-import { isArtisanApplicantSession } from '../lib/artisanApplication';
+import { isArtisanApplicant } from '../lib/artisanApplication';
 import { routeStorageKey } from '../lib/workspaceRoute';
 import type { AdminSection, View, WorkspaceSection } from '../appTypes';
 import type { ApiUser, Artisan, Review } from '../types';
@@ -94,7 +94,7 @@ export function useAppRouteSync({
     if (
       parsed.view === 'artisan-onboarding' &&
       me?.role === 'CUSTOMER' &&
-      !isArtisanApplicantSession(me.firebaseUid)
+      !isArtisanApplicant(me)
     ) {
       navigate('/', { replace: true });
       return;

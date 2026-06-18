@@ -49,6 +49,7 @@ export type ApiUser = {
   address?: string | null;
   profileCompletedAt?: string | null;
   profileComplete?: boolean;
+  onboardingIntent?: 'ARTISAN' | null;
   notificationPreferences?: NotificationPreferences;
 };
 

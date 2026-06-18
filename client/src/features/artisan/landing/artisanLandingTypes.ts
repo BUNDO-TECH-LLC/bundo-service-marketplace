@@ -5,10 +5,13 @@ import type {
   Artisan,
   ArtisanKycSubmission,
   AvailabilitySlot,
+  ApiUser,
   Category,
   Offering,
   PortfolioImage,
 } from '../../../types';
+
+export type ArtisanSetupSubPhase = 'wizard' | 'verification';
 
 export type ArtisanSetupState = {
   fullName: string;
@@ -34,14 +37,14 @@ export type ServicePackageDraft = {
 };
 
 export const ARTISAN_SETUP_STEPS = [
-  { id: 'basic', label: 'Basic info', shortLabel: 'Basic' },
-  { id: 'pricing', label: 'Services & pricing', shortLabel: 'Pricing' },
-  { id: 'portfolio', label: 'Portfolio', shortLabel: 'Photos' },
-  { id: 'submit', label: 'Availability & submit', shortLabel: 'Submit' },
+  { id: 'basic', label: 'About you', shortLabel: 'About' },
+  { id: 'service', label: 'Your service', shortLabel: 'Service' },
+  { id: 'golive', label: 'Go live', shortLabel: 'Go live' },
 ] as const;
 
 export type ArtisanLandingProps = {
   token: string;
+  me: ApiUser | null;
   categories: Category[];
   offerings: Offering[];
   /** Passed from HomePage; onboarding flow does not use these yet. */
@@ -62,6 +65,9 @@ export type ArtisanLandingModel = {
   phase: string;
   step: number;
   setStep: (step: number | ((current: number) => number)) => void;
+  setupSubPhase: ArtisanSetupSubPhase;
+  progressPercent: number;
+  resumeMessage: string | null;
   busy: boolean;
   runAction: ActionRunner;
   categories: Category[];
@@ -75,8 +81,6 @@ export type ArtisanLandingModel = {
     field: 'categoryId' | 'title' | 'priceFrom' | 'description',
     value: string
   ) => void;
-  addServicePackage: () => void;
-  removeServicePackage: (localId: string) => void;
   portfolioImages: PortfolioImage[];
   uploadingPortfolio: boolean;
   uploadPortfolioFile: (file: File, displayOrder: number) => Promise<void>;
@@ -96,7 +100,11 @@ export type ArtisanLandingModel = {
   profile: Artisan | null;
   saveBasicInfo: () => Promise<void>;
   saveOffering: () => Promise<void>;
-  submitForVerification: () => Promise<void>;
+  saveAvailabilityAndContinue: () => Promise<void>;
+  submitKycVerification: () => Promise<void>;
   openSetupEditor: () => void;
   useCurrentLocation: () => Promise<void>;
+  saveAndExit: () => void;
+  backToGoLiveFromVerification: () => void;
+  token: string;
 };

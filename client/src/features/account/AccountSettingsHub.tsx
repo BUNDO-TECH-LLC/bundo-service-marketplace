@@ -477,7 +477,11 @@ export function AccountSettingsHub({
                 </div>
                 <BecomeArtisanButton
                   me={me}
+                  token={token}
                   busy={busy}
+                  onApplicantMarked={() => {
+                    void refresh();
+                  }}
                   onStart={() => {
                     onNavigate(ARTISAN_ONBOARDING_PATH);
                     onNotice('Continue with artisan onboarding.');

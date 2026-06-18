@@ -10,6 +10,7 @@ export function Hero({
   onSearch,
   onBrowse,
   onUseMyLocation,
+  onBecomeArtisan,
   isDetectingLocation = false,
 }: {
   selectedState: string;
@@ -20,6 +21,7 @@ export function Hero({
   onSearch: (state: string, queryText: string) => Promise<void>;
   onBrowse: () => void;
   onUseMyLocation: () => void;
+  onBecomeArtisan?: () => void;
   isDetectingLocation?: boolean;
 }) {
   async function submitSearch(event: FormEvent<HTMLFormElement>) {
@@ -92,6 +94,11 @@ export function Hero({
           <button className="browse-link" type="button" onClick={onBrowse}>
             Browse all services
           </button>
+          {onBecomeArtisan && (
+            <button className="browse-link artisan-hero-link" type="button" onClick={onBecomeArtisan}>
+              Offer your services on Bundo
+            </button>
+          )}
         </form>
       </div>
     </section>

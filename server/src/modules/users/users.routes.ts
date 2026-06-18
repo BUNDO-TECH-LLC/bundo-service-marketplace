@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
-import { Role } from '@prisma/client';
+import { OnboardingIntent, Role } from '@prisma/client';
 import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
 import { asyncHandler } from '../../middlewares/errorHandler';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../utils/errors';
@@ -9,6 +9,7 @@ import {
   completeCustomerProfile,
   deleteUserAccount,
   serializeUser,
+  setUserOnboardingIntent,
   updateUserFcmToken,
   updateUserNotificationPreferences,
   updateUserPhone,
@@ -167,6 +168,38 @@ router.patch(
     res.json({
       message: 'Phone updated',
       user,
+    });
+  })
+);
+
+router.patch(
+  '/onboarding-intent',
+  verifyFirebaseToken,
+  asyncHandler(async (req, res) => {
+    const { intent } = req.body;
+
+    if (intent !== null && intent !== OnboardingIntent.ARTISAN) {
+      throw new ValidationError('intent must be ARTISAN or null');
+    }
+
+    const result = await setUserOnboardingIntent((req as any).user.firebaseUid, intent);
+
+    if (result.status === 'already_artisan') {
+      res.json({
+        message: 'Artisan account already active',
+        user: serializeUser(result.user),
+      });
+      return;
+    }
+
+    throwOnServiceStatus(result.status, {
+      missing_user: new NotFoundError('User'),
+      locked_role: new ForbiddenError('This account cannot start artisan onboarding.'),
+    });
+
+    res.json({
+      message: intent ? 'Artisan onboarding started' : 'Artisan onboarding intent cleared',
+      user: serializeUser(result.user!),
     });
   })
 );

@@ -1,18 +1,22 @@
 import { useState } from 'react';
-import { isArtisanApplicantSession, markArtisanApplicant } from '../../lib/artisanApplication';
+import { isArtisanApplicant, markArtisanApplicant } from '../../lib/artisanApplication';
 import type { ApiUser } from '../../types';
 
 export function BecomeArtisanButton({
   me,
+  token,
   busy,
   onStart,
+  onApplicantMarked,
 }: {
   me: ApiUser;
+  token: string;
   busy?: boolean;
   onStart: () => void;
+  onApplicantMarked?: (user: ApiUser) => void;
 }) {
   const [confirming, setConfirming] = useState(false);
-  const alreadyApplicant = isArtisanApplicantSession(me.firebaseUid);
+  const alreadyApplicant = isArtisanApplicant(me);
 
   if (me.role === 'ARTISAN' || me.role === 'ADMIN') {
     return null;
@@ -44,7 +48,7 @@ export function BecomeArtisanButton({
         </div>
         <ul className="become-artisan-confirm-list">
           <li>Your account stays a client until verification is approved.</li>
-          <li>Onboarding includes profile, pricing, portfolio, and KYC documents.</li>
+          <li>Three quick setup steps, then a separate identity verification review.</li>
           <li>This is intended for people who want to sell services—not only book them.</li>
         </ul>
         <div className="auth-action-stack">
@@ -52,9 +56,14 @@ export function BecomeArtisanButton({
             type="button"
             disabled={busy}
             onClick={() => {
-              markArtisanApplicant(me.firebaseUid);
-              setConfirming(false);
-              onStart();
+              void (async () => {
+                const updated = await markArtisanApplicant(token, me.firebaseUid);
+                if (updated) {
+                  onApplicantMarked?.(updated);
+                }
+                setConfirming(false);
+                onStart();
+              })();
             }}
           >
             Yes, start artisan onboarding

@@ -19,6 +19,10 @@ enum UserStatus {
   BANNED
 }
 
+enum OnboardingIntent {
+  ARTISAN
+}
+
 enum VerifyStatus {
   PENDING
   APPROVED
@@ -105,6 +109,7 @@ model User {
   area               String?
   address            String?
   profileCompletedAt DateTime?      @map("profile_completed_at")
+  onboardingIntent   OnboardingIntent? @map("onboarding_intent")
   fcmToken           String?        @map("fcm_token")
   notificationPreferences Json?     @map("notification_preferences")
   createdAt          DateTime       @default(now()) @map("created_at")

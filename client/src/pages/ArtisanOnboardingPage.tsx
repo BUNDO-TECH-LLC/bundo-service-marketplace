@@ -1,7 +1,7 @@
 import { Navigate } from 'react-router-dom';
 import { ArtisanLanding } from '../features/artisan/ArtisanLanding';
 import { buildAppPath } from '../lib/appPaths';
-import { isArtisanApplicantSession } from '../lib/artisanApplication';
+import { isArtisanApplicant } from '../lib/artisanApplication';
 import { useAppRoot } from '../app/appRootContext';
 
 export default function ArtisanOnboardingPage() {
@@ -15,7 +15,7 @@ export default function ArtisanOnboardingPage() {
     return <Navigate to="/admin/overview" replace />;
   }
 
-  const isApplicant = ctx.me.role === 'CUSTOMER' && isArtisanApplicantSession(ctx.me.firebaseUid);
+  const isApplicant = ctx.me.role === 'CUSTOMER' && isArtisanApplicant(ctx.me);
 
   if (ctx.me.role === 'CUSTOMER' && !isApplicant) {
     return <Navigate to="/" replace />;
@@ -23,6 +23,7 @@ export default function ArtisanOnboardingPage() {
 
   return (
     <ArtisanLanding
+      me={ctx.me}
       token={ctx.token}
       categories={ctx.categories}
       offerings={ctx.myOfferings}
@@ -32,7 +33,7 @@ export default function ArtisanOnboardingPage() {
       runAction={ctx.withNotice}
       refresh={async () => {
         await ctx.loadPublicData();
-        await ctx.loadPrivateData();
+        await ctx.loadPrivateData(ctx.token, ctx.me);
       }}
       openBookings={() => {
         ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'bookings' }));

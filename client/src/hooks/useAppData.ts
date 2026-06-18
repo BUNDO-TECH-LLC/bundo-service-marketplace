@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { api, ApiError, PUBLIC_API_TIMEOUT_MS } from '../lib/api';
-import { isArtisanApplicantSession } from '../lib/artisanApplication';
+import { isArtisanApplicant } from '../lib/artisanApplication';
 import { paymentSuccessFromVerify, type VerifyPaymentResponse } from '../lib/paymentReturn';
 import { sortCategoriesByCatalog } from '../lib/serviceCategoryCatalog';
 import type {
@@ -211,7 +211,7 @@ export function useAppData(filters: MarketplaceFilterState, options?: UseAppData
       setConversations(conversationRes.conversations);
       setNotifications(notificationRes.notifications);
 
-      if (isArtisanApplicantSession(user.firebaseUid)) {
+      if (isArtisanApplicant(user)) {
         const offeringRes = await api<{ offerings: Offering[] }>('/offerings/me', { token: authToken }).catch(
           () => ({ offerings: [] })
         );
