@@ -5,6 +5,7 @@ import { MarketplacePreview } from '../features/marketplace';
 import { buildAppPath } from '../lib/appPaths';
 import {
   ARTISAN_ONBOARDING_PATH,
+  artisanApplicantHomePath,
   clearArtisanApplicant,
   isApprovedArtisanSession,
   isArtisanApplicant,
@@ -23,7 +24,7 @@ export default function HomePage() {
     }
 
     if (ctx.me.role === 'CUSTOMER' && isArtisanApplicant(ctx.me, { email: ctx.firebaseUser?.email })) {
-      ctx.navigate(ARTISAN_ONBOARDING_PATH, { replace: true });
+      ctx.navigate(artisanApplicantHomePath(ctx.me, { email: ctx.firebaseUser?.email }), { replace: true });
     }
   }, [ctx.me, ctx.firebaseUser?.email, ctx.navigate]);
 
@@ -37,7 +38,7 @@ export default function HomePage() {
     }
 
     if (ctx.me.role === 'CUSTOMER' && isArtisanApplicant(ctx.me, { email: ctx.firebaseUser?.email })) {
-      return <Navigate to={ARTISAN_ONBOARDING_PATH} replace />;
+      return <Navigate to={artisanApplicantHomePath(ctx.me, { email: ctx.firebaseUser?.email })} replace />;
     }
 
     return (

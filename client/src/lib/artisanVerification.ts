@@ -42,6 +42,15 @@ export function artisanVerificationPhase(input: {
   return 'setup';
 }
 
+export function isPostSetupVerificationPhase(phase: ArtisanVerificationPhase) {
+  return (
+    phase === 'awaiting_approval' ||
+    phase === 'changes_requested' ||
+    phase === 'rejected' ||
+    phase === 'approved'
+  );
+}
+
 export function kycStatusLabel(status: KycStatus | 'NOT_SUBMITTED') {
   switch (status) {
     case 'PENDING':

@@ -7,7 +7,7 @@ import { auth } from '../lib/firebase';
 import { hasPushConfig } from '../lib/messaging';
 import { resolveApiSession } from '../lib/resolveApiSession';
 import { clearStoredRoute, isAuthPathname, isPublicBrowsePathname } from '../lib/appRouting';
-import { ARTISAN_ONBOARDING_PATH, isArtisanApplicant } from '../lib/artisanApplication';
+import { ARTISAN_ONBOARDING_PATH, artisanApplicantHomePath, isArtisanApplicant } from '../lib/artisanApplication';
 import { onboardingRedirectPath } from '../lib/customerProfile';
 import { readStoredRoute, storedRouteToPath } from '../lib/workspaceRoute';
 import type { PushStatus } from '../appTypes';
@@ -242,7 +242,10 @@ export function useAppAuth({
 
           if (isArtisanApplicant(session.user, { email: user.email }) && !isStale()) {
             clearStoredRoute();
-            navigateRef.current(ARTISAN_ONBOARDING_PATH, { replace: true });
+            navigateRef.current(
+              artisanApplicantHomePath(session.user, { email: user.email }),
+              { replace: true }
+            );
             return;
           }
 

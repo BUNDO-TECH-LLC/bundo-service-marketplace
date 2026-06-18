@@ -4,9 +4,11 @@ import type { ApiUser } from '../types';
 
 const ARTISAN_APPLICANT_SESSION_KEY = 'bundo:artisan-applicant';
 const ARTISAN_APPLICANT_USER_PREFIX = 'bundo:artisan-applicant:';
+const ARTISAN_APPLICANT_SUBMITTED_PREFIX = 'bundo:artisan-applicant-submitted:';
 const ARTISAN_GATE_CACHE_PREFIX = 'bundo:artisan-gate:';
 
 export const ARTISAN_ONBOARDING_PATH = '/artisan/onboarding';
+export const ARTISAN_APPLICANT_WORKSPACE_PATH = '/workspace/overview';
 /** @deprecated Welcome step removed — applicants go straight to onboarding. */
 export const ARTISAN_ONBOARDING_WELCOME_PATH = ARTISAN_ONBOARDING_PATH;
 
@@ -64,9 +66,47 @@ export function isArtisanApplicant(
   return hasPendingArtisanSignupIntent(options.email ?? user?.email);
 }
 
-export function artisanApplicantAllowedPath(pathname: string) {
+export function hasArtisanApplicantSubmittedVerification(firebaseUid?: string | null) {
+  if (typeof window === 'undefined' || !firebaseUid) {
+    return false;
+  }
+
+  return (
+    window.localStorage.getItem(`${ARTISAN_APPLICANT_SUBMITTED_PREFIX}${firebaseUid}`) === '1'
+  );
+}
+
+export function markArtisanApplicantSubmitted(firebaseUid?: string | null) {
+  if (typeof window === 'undefined' || !firebaseUid) {
+    return;
+  }
+
+  window.localStorage.setItem(`${ARTISAN_APPLICANT_SUBMITTED_PREFIX}${firebaseUid}`, '1');
+}
+
+export function isArtisanApplicantInWorkspace(
+  user?: ApiUser | null,
+  options: ArtisanApplicantOptions = {}
+): boolean {
+  const firebaseUid = user?.firebaseUid;
+  return isArtisanApplicant(user, options) && hasArtisanApplicantSubmittedVerification(firebaseUid);
+}
+
+export function artisanApplicantHomePath(
+  user?: ApiUser | null,
+  options: ArtisanApplicantOptions = {}
+) {
+  return isArtisanApplicantInWorkspace(user, options)
+    ? ARTISAN_APPLICANT_WORKSPACE_PATH
+    : ARTISAN_ONBOARDING_PATH;
+}
+
+export function artisanApplicantAllowedPath(pathname: string, workspaceAllowed = false) {
   const path = pathname.replace(/\/+$/, '') || '/';
-  return ARTISAN_APPLICANT_ALLOWED_PREFIXES.some((prefix) => path.startsWith(prefix));
+  const prefixes = workspaceAllowed
+    ? [...ARTISAN_APPLICANT_ALLOWED_PREFIXES, '/workspace']
+    : ARTISAN_APPLICANT_ALLOWED_PREFIXES;
+  return prefixes.some((prefix) => path.startsWith(prefix));
 }
 
 export function artisanApplicantRedirectPath(
@@ -78,11 +118,12 @@ export function artisanApplicantRedirectPath(
     return null;
   }
 
-  if (artisanApplicantAllowedPath(pathname)) {
+  const workspaceAllowed = hasArtisanApplicantSubmittedVerification(user?.firebaseUid);
+  if (artisanApplicantAllowedPath(pathname, workspaceAllowed)) {
     return null;
   }
 
-  return ARTISAN_ONBOARDING_PATH;
+  return workspaceAllowed ? ARTISAN_APPLICANT_WORKSPACE_PATH : ARTISAN_ONBOARDING_PATH;
 }
 
 function cacheArtisanApplicant(firebaseUid?: string | null) {
@@ -111,6 +152,7 @@ export function clearArtisanApplicant(firebaseUid?: string | null) {
   window.sessionStorage.removeItem(ARTISAN_APPLICANT_SESSION_KEY);
   if (firebaseUid) {
     window.localStorage.removeItem(`${ARTISAN_APPLICANT_USER_PREFIX}${firebaseUid}`);
+    window.localStorage.removeItem(`${ARTISAN_APPLICANT_SUBMITTED_PREFIX}${firebaseUid}`);
     window.sessionStorage.removeItem(`${ARTISAN_GATE_CACHE_PREFIX}${firebaseUid}`);
   }
 }

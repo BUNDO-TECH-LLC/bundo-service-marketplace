@@ -5,7 +5,7 @@ import { api } from '../lib/api';
 import { buildAppPath, parseAppPath } from '../lib/appPaths';
 import { isAuthPathname } from '../lib/appRouting';
 import { auth } from '../lib/firebase';
-import { ARTISAN_ONBOARDING_PATH, isArtisanApplicant } from '../lib/artisanApplication';
+import { ARTISAN_ONBOARDING_PATH, isArtisanApplicant, hasArtisanApplicantSubmittedVerification } from '../lib/artisanApplication';
 import { routeStorageKey } from '../lib/workspaceRoute';
 import type { AdminSection, View, WorkspaceSection } from '../appTypes';
 import type { ApiUser, Artisan, Review } from '../types';
@@ -83,7 +83,8 @@ export function useAppRouteSync({
     if (
       parsed.view === 'workspace' &&
       me &&
-      isArtisanApplicant(me, { email: firebaseUser?.email })
+      isArtisanApplicant(me, { email: firebaseUser?.email }) &&
+      !hasArtisanApplicantSubmittedVerification(me.firebaseUid)
     ) {
       navigate(ARTISAN_ONBOARDING_PATH, { replace: true });
       return;

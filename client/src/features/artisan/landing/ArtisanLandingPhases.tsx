@@ -39,20 +39,7 @@ export function ArtisanLandingPhases({ landing }: { landing: ArtisanLandingModel
 
   if (phase === 'awaiting_approval') {
     return (
-      <ArtisanSetupShell displayName={displayName} email={accountEmail}>
-        <ArtisanPendingApproval
-          profile={profile}
-          kycSubmission={kycSubmission}
-          portfolioImages={portfolioImages}
-          busy={busy}
-          uploadingPortfolio={uploadingPortfolio}
-          runAction={runAction}
-          uploadPortfolioFile={uploadPortfolioFile}
-          uploadPortfolioFiles={uploadPortfolioFiles}
-          removePortfolioImage={removePortfolioImage}
-          token={token}
-        />
-      </ArtisanSetupShell>
+      <Navigate to={buildAppPath({ view: 'workspace', workspaceSection: 'overview' })} replace />
     );
   }
 

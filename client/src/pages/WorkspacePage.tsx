@@ -5,7 +5,7 @@ import { EmptyState } from '../components/EmptyState';
 import { AccountSettingsHub } from '../features/account/AccountSettingsHub';
 import { ArtisanOffersPanel, ArtisanProfileSettings, ArtisanReviewsPanel } from '../features/artisan';
 import { api } from '../lib/api';
-import { isArtisanApplicant, ARTISAN_ONBOARDING_PATH } from '../lib/artisanApplication';
+import { isArtisanApplicant, ARTISAN_ONBOARDING_PATH, hasArtisanApplicantSubmittedVerification } from '../lib/artisanApplication';
 import type { ApiUser } from '../types';
 import { artisanVerificationPhase } from '../lib/artisanVerification';
 import { buildAppPath, buildArtisanBookingPath } from '../lib/appPaths';
@@ -23,7 +23,11 @@ export default function WorkspacePage() {
   const ctx = useAppRoot();
   const { workspaceSection, me, firebaseUser } = ctx;
 
-  if (me && isArtisanApplicant(me, { email: firebaseUser?.email })) {
+  const isApplicant = Boolean(me && isArtisanApplicant(me, { email: firebaseUser?.email }));
+  const applicantWorkspace = isApplicant && hasArtisanApplicantSubmittedVerification(me?.firebaseUid);
+  const artisanWorkspace = me?.role === 'ARTISAN' || applicantWorkspace;
+
+  if (isApplicant && !applicantWorkspace) {
     return <Navigate to={ARTISAN_ONBOARDING_PATH} replace />;
   }
 
@@ -105,9 +109,9 @@ export default function WorkspacePage() {
 
   return (
     <main
-      className={`page workspace-page ${workspaceSection === 'messages' ? 'messages-workspace' : ''} ${me?.role === 'ARTISAN' ? 'artisan-workspace-page' : ''}`}
+      className={`page workspace-page ${workspaceSection === 'messages' ? 'messages-workspace' : ''} ${artisanWorkspace ? 'artisan-workspace-page' : ''}`}
     >
-      {workspaceSection !== 'messages' && me?.role !== 'ARTISAN' && workspaceSection !== 'settings' && (
+      {workspaceSection !== 'messages' && !artisanWorkspace && workspaceSection !== 'settings' && (
         <section className="section-head">
           <p className="eyebrow">Workspace</p>
           <h1>
@@ -156,7 +160,7 @@ export default function WorkspacePage() {
       {me && workspaceSection === 'bookings' && (
         <BookingsPage
           bookings={ctx.bookings}
-          mode={me.role === 'ARTISAN' ? 'artisan' : 'customer'}
+          mode={artisanWorkspace ? 'artisan' : 'customer'}
           token={ctx.token}
           busy={ctx.busy}
           runAction={ctx.withNotice}
@@ -165,7 +169,7 @@ export default function WorkspacePage() {
         />
       )}
 
-      {me && workspaceSection === 'offers' && me.role === 'ARTISAN' && (
+      {me && workspaceSection === 'offers' && artisanWorkspace && (
         <ArtisanOffersPanel
           token={ctx.token}
           categories={ctx.categoryOptions}
@@ -179,7 +183,7 @@ export default function WorkspacePage() {
         />
       )}
 
-      {me && workspaceSection === 'offers' && me.role !== 'ARTISAN' && (
+      {me && workspaceSection === 'offers' && !artisanWorkspace && (
         <EmptyState
           title="Artisan tools"
           body="Apply as an artisan from profile settings, then complete KYC and wait for admin approval before listing offers."
@@ -197,9 +201,9 @@ export default function WorkspacePage() {
         />
       )}
 
-      {me && workspaceSection === 'reviews' && me.role === 'ARTISAN' && <ArtisanReviewsPanel token={ctx.token} />}
+      {me && workspaceSection === 'reviews' && artisanWorkspace && <ArtisanReviewsPanel token={ctx.token} />}
 
-      {me && workspaceSection === 'profile' && me.role === 'ARTISAN' && (
+      {me && workspaceSection === 'profile' && artisanWorkspace && (
         <ArtisanProfileSettings
           token={ctx.token}
           busy={ctx.busy}
@@ -231,7 +235,7 @@ export default function WorkspacePage() {
 
       {me && workspaceSection === 'overview' && (
         <>
-          {me.role === 'ARTISAN' ? (
+          {artisanWorkspace ? (
             <ArtisanDashboard
               token={ctx.token}
               bookings={ctx.bookings}

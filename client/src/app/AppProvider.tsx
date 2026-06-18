@@ -10,7 +10,7 @@ import { useAppData } from '../hooks/useAppData';
 import { useAppPush } from '../hooks/useAppPush';
 import { useAppRouteSync } from '../hooks/useAppRouteSync';
 import { mergeAuthDrawerIntoSearch } from '../lib/authDrawerPrompt';
-import { isArtisanApplicant } from '../lib/artisanApplication';
+import { isArtisanApplicant, hasArtisanApplicantSubmittedVerification } from '../lib/artisanApplication';
 import { useMarketplaceFilters } from '../hooks/useMarketplaceFilters';
 import { useUserLocation } from '../hooks/useUserLocation';
 import type { ApiUser } from '../types';
@@ -144,7 +144,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     onArtisanOnboardingRoute &&
     (auth.me?.role === 'ARTISAN' ||
       (auth.me?.role === 'CUSTOMER' && isArtisanApplicant(auth.me)));
-  const usesArtisanWorkspaceHeader = isAuthed && auth.me?.role === 'ARTISAN' && routeSync.view === 'workspace';
+  const applicantWorkspaceMode =
+    auth.me?.role === 'CUSTOMER' &&
+    isArtisanApplicant(auth.me) &&
+    hasArtisanApplicantSubmittedVerification(auth.me.firebaseUid);
+  const usesArtisanWorkspaceHeader =
+    isAuthed &&
+    (auth.me?.role === 'ARTISAN' || applicantWorkspaceMode) &&
+    routeSync.view === 'workspace';
   const hideGlobalHeader =
     isAuthed && (auth.me?.role === 'ADMIN' || usesArtisanSetupHeader || usesArtisanWorkspaceHeader);
 

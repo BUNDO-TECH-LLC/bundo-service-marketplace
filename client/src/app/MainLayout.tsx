@@ -17,7 +17,7 @@ import { PaymentSuccessDialog } from '../components/PaymentSuccessDialog';
 import { ArtisanAppHeader } from '../features/artisan/ArtisanAppHeader';
 import { BookingSuccessDialog } from '../features/booking/BookingSuccessDialog';
 import { SignedInTopbarNav } from './SignedInTopbarNav';
-import { ARTISAN_ONBOARDING_PATH, artisanApplicantAllowedPath, isArtisanApplicant } from '../lib/artisanApplication';
+import { ARTISAN_ONBOARDING_PATH, artisanApplicantAllowedPath, artisanApplicantHomePath, hasArtisanApplicantSubmittedVerification, isArtisanApplicant } from '../lib/artisanApplication';
 import { CUSTOMER_PROFILE_PATH, isCustomerProfileComplete } from '../lib/customerProfile';
 import { useAppRoot } from './appRootContext';
 
@@ -39,8 +39,9 @@ export function MainLayout() {
     }
 
     if (isArtisanApplicant(ctx.me, { email: ctx.firebaseUser?.email })) {
-      if (!artisanApplicantAllowedPath(ctx.location.pathname)) {
-        ctx.navigate(ARTISAN_ONBOARDING_PATH, { replace: true });
+      const workspaceAllowed = hasArtisanApplicantSubmittedVerification(ctx.me.firebaseUid);
+      if (!artisanApplicantAllowedPath(ctx.location.pathname, workspaceAllowed)) {
+        ctx.navigate(artisanApplicantHomePath(ctx.me, { email: ctx.firebaseUser?.email }), { replace: true });
       }
       return;
     }

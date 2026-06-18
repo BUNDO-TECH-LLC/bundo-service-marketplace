@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { api, ApiError, PUBLIC_API_TIMEOUT_MS } from '../lib/api';
-import { isArtisanApplicant } from '../lib/artisanApplication';
+import { isArtisanApplicant, markArtisanApplicantSubmitted } from '../lib/artisanApplication';
+import { isPostSetupVerificationPhase, artisanVerificationPhase } from '../lib/artisanVerification';
 import { paymentSuccessFromVerify, type VerifyPaymentResponse } from '../lib/paymentReturn';
 import { sortCategoriesByCatalog } from '../lib/serviceCategoryCatalog';
 import type {
@@ -212,10 +213,23 @@ export function useAppData(filters: MarketplaceFilterState, options?: UseAppData
       setNotifications(notificationRes.notifications);
 
       if (isArtisanApplicant(user)) {
-        const offeringRes = await api<{ offerings: Offering[] }>('/offerings/me', { token: authToken }).catch(
-          () => ({ offerings: [] })
-        );
+        const [offeringRes, kycRes] = await Promise.all([
+          api<{ offerings: Offering[] }>('/offerings/me', { token: authToken }).catch(() => ({
+            offerings: [],
+          })),
+          api<{ submission: ArtisanKycSubmission | null }>('/artisans/kyc', { token: authToken }).catch(() => ({
+            submission: null,
+          })),
+        ]);
         setMyOfferings(offeringRes.offerings);
+        const phase = artisanVerificationPhase({
+          profile: null,
+          kycStatus: kycRes.submission?.status ?? 'NOT_SUBMITTED',
+          hydrated: true,
+        });
+        if (isPostSetupVerificationPhase(phase) && user.firebaseUid) {
+          markArtisanApplicantSubmitted(user.firebaseUid);
+        }
       } else {
         setMyOfferings([]);
       }

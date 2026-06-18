@@ -4,7 +4,8 @@ import {
   computeOnboardingProgress,
   computeResumeState,
 } from '../../../lib/artisanOnboarding';
-import { artisanVerificationPhase } from '../../../lib/artisanVerification';
+import { markArtisanApplicantSubmitted } from '../../../lib/artisanApplication';
+import { artisanVerificationPhase, isPostSetupVerificationPhase } from '../../../lib/artisanVerification';
 import { locationErrorMessage, readBrowserLocation } from '../../../lib/geolocation';
 import { inferNigeriaState } from '../../../lib/inferNigeriaState';
 import { uploadKycImage } from '../../../lib/kycUpload';
@@ -109,6 +110,15 @@ export function useArtisanLanding({
         setPortfolioImages(imageResponse.images);
         setAvailabilitySlots(nextSlots);
         setKycSubmission(nextKyc);
+
+        const nextPhase = artisanVerificationPhase({
+          profile: nextProfile,
+          kycStatus: nextKyc?.status ?? 'NOT_SUBMITTED',
+          hydrated: true,
+        });
+        if (isPostSetupVerificationPhase(nextPhase) && me?.firebaseUid) {
+          markArtisanApplicantSubmitted(me.firebaseUid);
+        }
 
         const resume = computeResumeState({
           profile: nextProfile,
@@ -408,6 +418,9 @@ export function useArtisanLanding({
 
     setKycSubmission(response.submission);
     setForceSetup(false);
+    if (me?.firebaseUid) {
+      markArtisanApplicantSubmitted(me.firebaseUid);
+    }
     await hydrateOnboarding();
     await refresh();
   }
