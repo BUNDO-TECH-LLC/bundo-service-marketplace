@@ -4,7 +4,7 @@ import {
   computeOnboardingProgress,
   computeResumeState,
 } from '../../../lib/artisanOnboarding';
-import { markArtisanApplicantSubmitted } from '../../../lib/artisanApplication';
+import { ensureArtisanApplicantOnServer, markArtisanApplicantSubmitted } from '../../../lib/artisanApplication';
 import { artisanVerificationPhase, isPostSetupVerificationPhase } from '../../../lib/artisanVerification';
 import { locationErrorMessage, readBrowserLocation } from '../../../lib/geolocation';
 import { inferNigeriaState } from '../../../lib/inferNigeriaState';
@@ -251,6 +251,10 @@ export function useArtisanLanding({
 
     if (!setup.area.trim()) {
       throw new Error('Enter your area or neighbourhood.');
+    }
+
+    if (me?.role === 'CUSTOMER' && me.onboardingIntent !== 'ARTISAN') {
+      await ensureArtisanApplicantOnServer(token, me.firebaseUid);
     }
 
     await api('/artisans/profile', {

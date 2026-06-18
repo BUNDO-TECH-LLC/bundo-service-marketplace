@@ -35,9 +35,8 @@ export const requireArtisanOrApplicant = async (
 
   const profile = await getArtisanProfileByUserId(user.firebaseUid);
   const isApplicant = isArtisanApplicantUser(user);
-  const isProfileCreate = req.method === 'POST' && req.path === '/profile';
 
-  if (profile || (isApplicant && isProfileCreate)) {
+  if (profile || isApplicant) {
     return next();
   }
 

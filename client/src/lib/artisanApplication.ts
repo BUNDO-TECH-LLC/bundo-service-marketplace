@@ -133,16 +133,20 @@ function cacheArtisanApplicant(firebaseUid?: string | null) {
   }
 }
 
-export async function markArtisanApplicant(token: string, firebaseUid?: string | null) {
+export async function ensureArtisanApplicantOnServer(token: string, firebaseUid?: string | null) {
   cacheArtisanApplicant(firebaseUid);
 
+  const response = await api<{ user: ApiUser }>('/users/onboarding-intent', {
+    method: 'PATCH',
+    token,
+    body: JSON.stringify({ intent: 'ARTISAN' }),
+  });
+  return response.user;
+}
+
+export async function markArtisanApplicant(token: string, firebaseUid?: string | null) {
   try {
-    const response = await api<{ user: ApiUser }>('/users/onboarding-intent', {
-      method: 'PATCH',
-      token,
-      body: JSON.stringify({ intent: 'ARTISAN' }),
-    });
-    return response.user;
+    return await ensureArtisanApplicantOnServer(token, firebaseUid);
   } catch {
     return null;
   }
