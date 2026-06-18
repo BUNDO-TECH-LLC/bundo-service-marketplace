@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { validateAvailabilitySlotTimes } from '../../lib/bookingSchedule';
 import { asyncHandler } from '../../middlewares/errorHandler';
 import { BadGatewayError, httpError } from '../../utils/errors';
-import { Prisma, Role } from '@prisma/client';
+import { Prisma, Role, OnboardingIntent } from '@prisma/client';
 import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
 import { requireArtisanOrApplicant } from '../../middlewares/requireArtisanOrApplicant';
 import { requireRole } from '../../middlewares/requireRole';
@@ -11,7 +11,7 @@ import {
   createOrUpdatePayoutAccount,
   getPayoutAccountForArtisanUser,
 } from '../payments/payments.service';
-import { getPagination, paginationMeta } from '../../utils/pagination';
+import { setUserOnboardingIntent } from '../users/users.service';
 import {
   addAvailabilitySlot,
   addPortfolioImage,
@@ -213,6 +213,11 @@ router.post(
         lat,
         lng,
       });
+
+      const authUser = (req as any).user;
+      if (authUser.role === Role.CUSTOMER) {
+        await setUserOnboardingIntent(authUser.firebaseUid, OnboardingIntent.ARTISAN).catch(() => undefined);
+      }
 
       return res.status(201).json({
         message: 'Artisan profile created',
