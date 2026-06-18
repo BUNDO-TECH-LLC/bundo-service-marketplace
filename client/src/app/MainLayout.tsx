@@ -241,7 +241,10 @@ export function MainLayout() {
               firebaseUser={ctx.firebaseUser}
               me={ctx.me}
               authDrawerPrompt={authDrawerPrompt}
-              onAuthDrawerPromptHandled={() => setAuthDrawerPrompt(null)}
+              onAuthDrawerPromptHandled={() => {
+                consumedAuthPromptRef.current = '';
+                setAuthDrawerPrompt(null);
+              }}
               unreadCount={ctx.notifications.filter((notification) => !notification.readAt).length}
               onOpenAuth={closeMobileNav}
               onReady={(nextToken, nextUser) => {

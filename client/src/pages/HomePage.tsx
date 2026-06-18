@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { AppPromo, Footer, Hero, ServicesSection, WhySection } from '../features/marketing';
 import { MarketplacePreview } from '../features/marketplace';
+import { buildAuthDrawerSearch } from '../lib/authDrawerPrompt';
 import { buildAppPath } from '../lib/appPaths';
 import {
   ARTISAN_ONBOARDING_PATH,
@@ -99,7 +100,9 @@ export default function HomePage() {
           }, queryText.trim() ? `Searching for ${queryText.trim()}` : 'Showing available services');
         }}
         onBrowse={() => ctx.navigate('/marketplace')}
-        onBecomeArtisan={() => ctx.navigate('/signup?role=artisan')}
+        onBecomeArtisan={() =>
+          ctx.navigate({ pathname: '/', search: buildAuthDrawerSearch({ mode: 'signup', role: 'ARTISAN' }) })
+        }
         onUseMyLocation={() => {
           void ctx.useMyLocation().then((result) => {
             if (result.ok) {
