@@ -47,7 +47,8 @@ const preserved = parts.filter(
     part.startsWith('wss://') ||
     part.includes('google') ||
     part.includes('firebase') ||
-    part.includes('recaptcha')
+    part.includes('recaptcha') ||
+    part.includes('cloudinary')
 );
 const nextConnectSrc = ["'self'", origin, ...preserved.filter((part) => part !== "'self'")];
 cspHeader.value = cspHeader.value.replace(connectSrcMatch[0], `connect-src ${nextConnectSrc.join(' ')}`);
