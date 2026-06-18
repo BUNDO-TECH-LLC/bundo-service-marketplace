@@ -3,17 +3,15 @@ import { useSearchParams } from 'react-router-dom';
 import { LeaveReviewDialog } from '../components/LeaveReviewDialog';
 import { PromptDialog } from '../components/PromptDialog';
 import { RescheduleBookingDialog } from '../components/RescheduleBookingDialog';
+import { PaymentAmountDialog, PaymentConfirmDialog } from '../features/booking/PaymentPromptDialogs';
 import { api } from '../lib/api';
 import { formatMessageTime, money } from '../lib/formatting';
 import {
-  agreedAmountInputValue,
   bookingContactName,
   bookingDate,
   bookingGuidePrice,
   bookingLocation,
   bookingPayableAmount,
-  MIN_PAYMENT_AMOUNT_NGN,
-  parseAgreedAmountInput,
   paymentLabel,
   statusLabel,
 } from '../lib/bookingDisplay';
@@ -412,67 +410,39 @@ export function BookingsPage({
         onSubmit={(input) => runAction(() => submitReview(input), 'Review submitted')}
       />
     )}
-    <PromptDialog
+    <PaymentAmountDialog
       open={paymentPrompt?.step === 'amount'}
-      title="Confirm payment amount"
-      message={
-        paymentPrompt?.booking && bookingGuidePrice(paymentPrompt.booking) !== null
-          ? `The listing price (${money(bookingGuidePrice(paymentPrompt.booking)!)}) is a guide. Enter the amount you agreed on with ${paymentPrompt.booking.artisan?.displayName || 'your artisan'} (minimum ₦${MIN_PAYMENT_AMOUNT_NGN.toLocaleString('en-NG')}).`
-          : `Enter the amount you agreed on with your artisan (minimum ₦${MIN_PAYMENT_AMOUNT_NGN.toLocaleString('en-NG')}).`
-      }
-      label="Amount to pay (₦)"
-      defaultValue={paymentPrompt?.booking ? agreedAmountInputValue(paymentPrompt.booking) : ''}
-      inputType="number"
-      confirmLabel="Review payment"
+      booking={paymentPrompt?.booking ?? null}
       busy={busy}
       onCancel={() => setPaymentPrompt(null)}
-      onConfirm={(value) =>
-        runAction(async () => {
-          if (!paymentPrompt) {
-            return;
-          }
+      onConfirm={(amount) => {
+        if (!paymentPrompt) {
+          return;
+        }
 
-          const amount = parseAgreedAmountInput(value);
-          if (!amount || amount < MIN_PAYMENT_AMOUNT_NGN) {
-            throw new Error(
-              `Enter a valid amount in naira (minimum ₦${MIN_PAYMENT_AMOUNT_NGN.toLocaleString('en-NG')}).`
-            );
-          }
-
-          setPaymentPrompt({
-            booking: paymentPrompt.booking,
-            step: 'confirm',
-            amount,
-          });
-        }, '')
-      }
+        setPaymentPrompt({
+          booking: paymentPrompt.booking,
+          step: 'confirm',
+          amount,
+        });
+      }}
     />
-    <PromptDialog
+    <PaymentConfirmDialog
       open={paymentPrompt?.step === 'confirm'}
-      title="Proceed to Paystack?"
-      message={
-        paymentPrompt?.amount
-          ? `You are about to pay ${money(paymentPrompt.amount)} securely via Paystack for ${paymentPrompt.booking.offering?.title || 'this service'}.`
-          : 'Confirm payment to continue.'
-      }
-      label="Type PAY to confirm"
-      confirmLabel="Pay now"
+      booking={paymentPrompt?.booking ?? null}
+      amount={paymentPrompt?.amount ?? 0}
       busy={busy}
-      onCancel={() =>
+      onBack={() =>
         setPaymentPrompt((current) =>
           current ? { booking: current.booking, step: 'amount', amount: current.amount } : null
         )
       }
-      onConfirm={(value) => {
+      onConfirm={() => {
         if (!paymentPrompt?.amount) {
-          throw new Error('Enter PAY to confirm.');
+          return;
         }
 
-        if (value.trim().toUpperCase() !== 'PAY') {
-          throw new Error('Type PAY to confirm this payment.');
-        }
-
-        return runAction(
+        void runAction(
           () => startPayment(paymentPrompt.booking.id, paymentPrompt.amount!),
           'Payment checkout opened'
         );
