@@ -1,18 +1,18 @@
 import type { ApiUser } from '../types';
 import {
   ARTISAN_ONBOARDING_PATH,
+  artisanApplicantRedirectPath,
   isApprovedArtisanSession,
   isArtisanApplicant,
 } from './artisanApplication';
 
 export const CUSTOMER_PROFILE_PATH = '/onboarding/profile';
 
-const ONBOARDING_ALLOWED_PREFIXES = [
+const CUSTOMER_ONBOARDING_ALLOWED_PREFIXES = [
   CUSTOMER_PROFILE_PATH,
   '/verify-email',
   '/terms',
   '/privacy',
-  ARTISAN_ONBOARDING_PATH,
 ];
 
 export function isCustomerProfileComplete(user: ApiUser | null | undefined) {
@@ -29,29 +29,31 @@ export function customerProfileRedirectPath(user: ApiUser | null | undefined) {
 
 export function onboardingRedirectPath(
   user: ApiUser | null | undefined,
-  currentPathname: string
+  currentPathname: string,
+  email?: string | null
 ): string | null {
   if (!user?.role) {
     return null;
   }
 
-  const path = currentPathname.replace(/\/+$/, '') || '/';
-  if (ONBOARDING_ALLOWED_PREFIXES.some((prefix) => path.startsWith(prefix))) {
-    return null;
+  const applicantTarget = artisanApplicantRedirectPath(user, currentPathname, { email });
+  if (applicantTarget) {
+    return applicantTarget;
   }
+
+  const path = currentPathname.replace(/\/+$/, '') || '/';
 
   if (user.role === 'ARTISAN') {
     if (isApprovedArtisanSession(user.firebaseUid)) {
-      return '/workspace/overview';
+      return path.startsWith('/workspace') ? null : '/workspace/overview';
     }
-    return ARTISAN_ONBOARDING_PATH;
-  }
-
-  if (isArtisanApplicant(user)) {
-    return ARTISAN_ONBOARDING_PATH;
+    return path.startsWith(ARTISAN_ONBOARDING_PATH) ? null : ARTISAN_ONBOARDING_PATH;
   }
 
   if (user.role === 'CUSTOMER' && !isCustomerProfileComplete(user)) {
+    if (CUSTOMER_ONBOARDING_ALLOWED_PREFIXES.some((prefix) => path.startsWith(prefix))) {
+      return null;
+    }
     return CUSTOMER_PROFILE_PATH;
   }
 

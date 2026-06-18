@@ -13,10 +13,12 @@ vi.mock('./artisanApplication', async () => {
     ...actual,
     isArtisanApplicant: vi.fn(() => false),
     isApprovedArtisanSession: vi.fn(() => false),
+    artisanApplicantRedirectPath: vi.fn(() => null),
   };
 });
 
-const { isArtisanApplicant, isApprovedArtisanSession } = await import('./artisanApplication');
+const { isArtisanApplicant, isApprovedArtisanSession, artisanApplicantRedirectPath } =
+  await import('./artisanApplication');
 
 const customer = (overrides: Partial<ApiUser> = {}): ApiUser => ({
   firebaseUid: 'uid-1',
@@ -30,6 +32,7 @@ describe('customer onboarding redirects', () => {
   beforeEach(() => {
     vi.mocked(isArtisanApplicant).mockReturnValue(false);
     vi.mocked(isApprovedArtisanSession).mockReturnValue(false);
+    vi.mocked(artisanApplicantRedirectPath).mockReturnValue(null);
   });
 
   it('treats incomplete customer profiles as incomplete', () => {
@@ -42,13 +45,12 @@ describe('customer onboarding redirects', () => {
     expect(onboardingRedirectPath(customer(), CUSTOMER_PROFILE_PATH)).toBeNull();
   });
 
-  it('sends artisan applicants to artisan onboarding', () => {
-    vi.mocked(isArtisanApplicant).mockReturnValue(true);
+  it('sends artisan applicants to artisan onboarding before client workspace', () => {
+    vi.mocked(artisanApplicantRedirectPath).mockReturnValue(ARTISAN_ONBOARDING_PATH);
 
     expect(onboardingRedirectPath(customer({ onboardingIntent: 'ARTISAN' }), '/workspace/overview')).toBe(
       ARTISAN_ONBOARDING_PATH
     );
-    expect(onboardingRedirectPath(customer({ onboardingIntent: 'ARTISAN' }), ARTISAN_ONBOARDING_PATH)).toBeNull();
   });
 
   it('sends approved artisans to workspace', () => {

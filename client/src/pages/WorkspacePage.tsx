@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { BundoLoadingScreen } from '../components/BundoLoadingScreen';
 import { EmptyState } from '../components/EmptyState';
 import { AccountSettingsHub } from '../features/account/AccountSettingsHub';
 import { ArtisanOffersPanel, ArtisanProfileSettings, ArtisanReviewsPanel } from '../features/artisan';
 import { api } from '../lib/api';
+import { isArtisanApplicant, ARTISAN_ONBOARDING_PATH } from '../lib/artisanApplication';
 import type { ApiUser } from '../types';
 import { artisanVerificationPhase } from '../lib/artisanVerification';
 import { buildAppPath, buildArtisanBookingPath } from '../lib/appPaths';
@@ -20,6 +22,11 @@ import { SIGN_IN_UNAVAILABLE_WITH_EMAIL } from '../lib/productionMessages';
 export default function WorkspacePage() {
   const ctx = useAppRoot();
   const { workspaceSection, me, firebaseUser } = ctx;
+
+  if (me && isArtisanApplicant(me, { email: firebaseUser?.email })) {
+    return <Navigate to={ARTISAN_ONBOARDING_PATH} replace />;
+  }
+
   const artisanGateCheckedRef = useRef(false);
   const [artisanGate, setArtisanGate] = useState<'checking' | 'allowed' | 'blocked'>(() => {
     if (me?.role !== 'ARTISAN' || !me.firebaseUid) {

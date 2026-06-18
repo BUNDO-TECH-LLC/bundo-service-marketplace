@@ -8,7 +8,6 @@ import {
   clearArtisanApplicant,
   isApprovedArtisanSession,
   isArtisanApplicant,
-  markArtisanApplicant,
 } from '../lib/artisanApplication';
 import { locationErrorMessage } from '../lib/geolocation';
 import { nigeriaStates } from '../lib/geo';
@@ -23,10 +22,10 @@ export default function HomePage() {
       return;
     }
 
-    if (ctx.me.role === 'CUSTOMER' && isArtisanApplicant(ctx.me)) {
+    if (ctx.me.role === 'CUSTOMER' && isArtisanApplicant(ctx.me, { email: ctx.firebaseUser?.email })) {
       ctx.navigate(ARTISAN_ONBOARDING_PATH, { replace: true });
     }
-  }, [ctx.me, ctx.navigate]);
+  }, [ctx.me, ctx.firebaseUser?.email, ctx.navigate]);
 
   if (ctx.isAuthed && ctx.me) {
     if (ctx.me.role === 'ARTISAN') {
@@ -37,8 +36,8 @@ export default function HomePage() {
       return <Navigate to="/artisan/onboarding" replace />;
     }
 
-    if (ctx.me.role === 'CUSTOMER' && isArtisanApplicant(ctx.me)) {
-      return null;
+    if (ctx.me.role === 'CUSTOMER' && isArtisanApplicant(ctx.me, { email: ctx.firebaseUser?.email })) {
+      return <Navigate to={ARTISAN_ONBOARDING_PATH} replace />;
     }
 
     return (

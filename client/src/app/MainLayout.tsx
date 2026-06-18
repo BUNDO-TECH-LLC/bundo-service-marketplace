@@ -17,7 +17,7 @@ import { PaymentSuccessDialog } from '../components/PaymentSuccessDialog';
 import { ArtisanAppHeader } from '../features/artisan/ArtisanAppHeader';
 import { BookingSuccessDialog } from '../features/booking/BookingSuccessDialog';
 import { SignedInTopbarNav } from './SignedInTopbarNav';
-import { ARTISAN_ONBOARDING_PATH, isArtisanApplicant } from '../lib/artisanApplication';
+import { ARTISAN_ONBOARDING_PATH, artisanApplicantAllowedPath, isArtisanApplicant } from '../lib/artisanApplication';
 import { CUSTOMER_PROFILE_PATH, isCustomerProfileComplete } from '../lib/customerProfile';
 import { useAppRoot } from './appRootContext';
 
@@ -38,7 +38,10 @@ export function MainLayout() {
       return;
     }
 
-    if (isArtisanApplicant(ctx.me)) {
+    if (isArtisanApplicant(ctx.me, { email: ctx.firebaseUser?.email })) {
+      if (!artisanApplicantAllowedPath(ctx.location.pathname)) {
+        ctx.navigate(ARTISAN_ONBOARDING_PATH, { replace: true });
+      }
       return;
     }
 
@@ -52,7 +55,7 @@ export function MainLayout() {
     }
 
     ctx.navigate(CUSTOMER_PROFILE_PATH, { replace: true });
-  }, [ctx.isAuthed, ctx.me, ctx.location.pathname, ctx.navigate]);
+  }, [ctx.isAuthed, ctx.me, ctx.firebaseUser?.email, ctx.location.pathname, ctx.navigate]);
 
   useEffect(() => {
     if (!ctx.notice) return;
@@ -252,9 +255,9 @@ export function MainLayout() {
                   ctx.navigate('/artisan/onboarding');
                 } else if (
                   nextUser.role === 'CUSTOMER' &&
-                  isArtisanApplicant(nextUser)
+                  isArtisanApplicant(nextUser, { email: ctx.firebaseUser?.email })
                 ) {
-                  ctx.navigate(ARTISAN_ONBOARDING_PATH);
+                  ctx.navigate(ARTISAN_ONBOARDING_PATH, { replace: true });
                 } else if (nextUser.role === 'CUSTOMER' && !isCustomerProfileComplete(nextUser)) {
                   ctx.navigate(CUSTOMER_PROFILE_PATH);
                 } else if (nextUser.role === 'CUSTOMER') {

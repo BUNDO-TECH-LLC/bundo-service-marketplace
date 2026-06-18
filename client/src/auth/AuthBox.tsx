@@ -10,7 +10,7 @@ import {
 import { api } from '../lib/api';
 import { auth, firebaseReady } from '../lib/firebase';
 import { SIGN_IN_UNAVAILABLE_WITH_EMAIL } from '../lib/productionMessages';
-import { ARTISAN_ONBOARDING_PATH, markArtisanApplicant } from '../lib/artisanApplication';
+import { ARTISAN_ONBOARDING_PATH, markArtisanApplicant, stageArtisanApplicantIntent } from '../lib/artisanApplication';
 import type { AuthDrawerPrompt } from '../lib/authDrawerPrompt';
 import {
   checkEmailAccountStatus,
@@ -194,6 +194,10 @@ export function AuthBox({
     const artisanIntent = resolvedRole === 'ARTISAN';
     const intendedRole = resolvedRole === 'CUSTOMER' ? ('CUSTOMER' as const) : undefined;
 
+    if (artisanIntent) {
+      stageArtisanApplicantIntent();
+    }
+
     const { session } = await finalizeAuthSession(firebaseAuthUser, {
       mode: authMode === 'login' ? 'login' : 'signup',
       intendedRole,
@@ -207,6 +211,10 @@ export function AuthBox({
       if (updated) {
         nextUser = updated;
       }
+    }
+
+    if (artisanIntent) {
+      clearSessionSignupIntent();
     }
 
     onReady(session.token, nextUser);
@@ -564,6 +572,9 @@ export function AuthBox({
   function chooseRole(role: SignupRole) {
     setPreferredRole(role);
     saveSessionSignupIntent(role);
+    if (role === 'ARTISAN') {
+      stageArtisanApplicantIntent();
+    }
     if (email.trim()) {
       savePendingSignupRole(email.trim(), role);
     }

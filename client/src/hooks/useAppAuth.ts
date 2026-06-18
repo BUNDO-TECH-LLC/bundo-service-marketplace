@@ -7,6 +7,7 @@ import { auth } from '../lib/firebase';
 import { hasPushConfig } from '../lib/messaging';
 import { resolveApiSession } from '../lib/resolveApiSession';
 import { clearStoredRoute, isAuthPathname, isPublicBrowsePathname } from '../lib/appRouting';
+import { ARTISAN_ONBOARDING_PATH, isArtisanApplicant } from '../lib/artisanApplication';
 import { onboardingRedirectPath } from '../lib/customerProfile';
 import { readStoredRoute, storedRouteToPath } from '../lib/workspaceRoute';
 import type { PushStatus } from '../appTypes';
@@ -230,9 +231,18 @@ export function useAppAuth({
             return;
           }
 
-          const onboardingTarget = onboardingRedirectPath(session.user, path);
+          const onboardingTarget = onboardingRedirectPath(session.user, path, user.email);
           if (onboardingTarget && !isStale()) {
+            if (isArtisanApplicant(session.user, { email: user.email })) {
+              clearStoredRoute();
+            }
             navigateRef.current(onboardingTarget, { replace: true });
+            return;
+          }
+
+          if (isArtisanApplicant(session.user, { email: user.email }) && !isStale()) {
+            clearStoredRoute();
+            navigateRef.current(ARTISAN_ONBOARDING_PATH, { replace: true });
             return;
           }
 
@@ -240,7 +250,9 @@ export function useAppAuth({
           if (!isStale()) {
             if (storedRoute) {
               navigateRef.current({ pathname: storedRouteToPath(storedRoute), search: '' }, { replace: true });
-            } else if (session.user.role === 'ARTISAN' || session.user.role === 'CUSTOMER') {
+            } else if (session.user.role === 'ARTISAN') {
+              navigateRef.current(ARTISAN_ONBOARDING_PATH, { replace: true });
+            } else if (session.user.role === 'CUSTOMER') {
               navigateRef.current('/workspace/overview', { replace: true });
             }
           }

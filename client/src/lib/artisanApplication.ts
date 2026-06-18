@@ -1,4 +1,5 @@
 import { api } from './api';
+import { readSessionSignupIntent, resolveSignupIntent } from './authSignupStorage';
 import type { ApiUser } from '../types';
 
 const ARTISAN_APPLICANT_SESSION_KEY = 'bundo:artisan-applicant';
@@ -9,16 +10,79 @@ export const ARTISAN_ONBOARDING_PATH = '/artisan/onboarding';
 /** @deprecated Welcome step removed — applicants go straight to onboarding. */
 export const ARTISAN_ONBOARDING_WELCOME_PATH = ARTISAN_ONBOARDING_PATH;
 
-export function isArtisanApplicant(user?: ApiUser | null): boolean {
-  if (!user || user.role !== 'CUSTOMER') {
-    return false;
-  }
+const ARTISAN_APPLICANT_ALLOWED_PREFIXES = [
+  ARTISAN_ONBOARDING_PATH,
+  '/verify-email',
+  '/terms',
+  '/privacy',
+  '/help',
+];
 
-  if (user.onboardingIntent === 'ARTISAN') {
+type ArtisanApplicantOptions = {
+  email?: string | null;
+};
+
+function hasPendingArtisanSignupIntent(email?: string | null) {
+  if (readSessionSignupIntent() === 'ARTISAN') {
     return true;
   }
 
-  return isArtisanApplicantSession(user.firebaseUid);
+  if (email && resolveSignupIntent(email) === 'ARTISAN') {
+    return true;
+  }
+
+  return false;
+}
+
+/** Call as soon as the user picks Artisan at signup — before Firebase auth finishes. */
+export function stageArtisanApplicantIntent() {
+  window.sessionStorage.setItem(ARTISAN_APPLICANT_SESSION_KEY, '1');
+}
+
+export function isArtisanApplicant(
+  user?: ApiUser | null,
+  options: ArtisanApplicantOptions = {}
+): boolean {
+  if (user?.role === 'ARTISAN' || user?.role === 'ADMIN') {
+    return false;
+  }
+
+  if (user?.role === 'CUSTOMER') {
+    if (user.onboardingIntent === 'ARTISAN') {
+      return true;
+    }
+
+    if (isArtisanApplicantSession(user.firebaseUid)) {
+      return true;
+    }
+  }
+
+  if (isArtisanApplicantSession()) {
+    return true;
+  }
+
+  return hasPendingArtisanSignupIntent(options.email ?? user?.email);
+}
+
+export function artisanApplicantAllowedPath(pathname: string) {
+  const path = pathname.replace(/\/+$/, '') || '/';
+  return ARTISAN_APPLICANT_ALLOWED_PREFIXES.some((prefix) => path.startsWith(prefix));
+}
+
+export function artisanApplicantRedirectPath(
+  user: ApiUser | null | undefined,
+  pathname: string,
+  options: ArtisanApplicantOptions = {}
+) {
+  if (!isArtisanApplicant(user, options)) {
+    return null;
+  }
+
+  if (artisanApplicantAllowedPath(pathname)) {
+    return null;
+  }
+
+  return ARTISAN_ONBOARDING_PATH;
 }
 
 function cacheArtisanApplicant(firebaseUid?: string | null) {
@@ -59,7 +123,9 @@ export function markArtisanApproved(firebaseUid?: string | null) {
 }
 
 export function isApprovedArtisanSession(firebaseUid?: string | null) {
-  return Boolean(firebaseUid && window.sessionStorage.getItem(`${ARTISAN_GATE_CACHE_PREFIX}${firebaseUid}`) === 'approved');
+  return Boolean(
+    firebaseUid && window.sessionStorage.getItem(`${ARTISAN_GATE_CACHE_PREFIX}${firebaseUid}`) === 'approved'
+  );
 }
 
 export function isArtisanApplicantSession(firebaseUid?: string | null): boolean {

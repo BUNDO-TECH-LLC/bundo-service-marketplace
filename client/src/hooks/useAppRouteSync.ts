@@ -5,7 +5,7 @@ import { api } from '../lib/api';
 import { buildAppPath, parseAppPath } from '../lib/appPaths';
 import { isAuthPathname } from '../lib/appRouting';
 import { auth } from '../lib/firebase';
-import { isArtisanApplicant } from '../lib/artisanApplication';
+import { ARTISAN_ONBOARDING_PATH, isArtisanApplicant } from '../lib/artisanApplication';
 import { routeStorageKey } from '../lib/workspaceRoute';
 import type { AdminSection, View, WorkspaceSection } from '../appTypes';
 import type { ApiUser, Artisan, Review } from '../types';
@@ -81,6 +81,15 @@ export function useAppRouteSync({
     }
 
     if (
+      parsed.view === 'workspace' &&
+      me &&
+      isArtisanApplicant(me, { email: firebaseUser?.email })
+    ) {
+      navigate(ARTISAN_ONBOARDING_PATH, { replace: true });
+      return;
+    }
+
+    if (
       parsed.view === 'artisan-onboarding' &&
       authChecked &&
       !firebaseProvisional &&
@@ -94,7 +103,7 @@ export function useAppRouteSync({
     if (
       parsed.view === 'artisan-onboarding' &&
       me?.role === 'CUSTOMER' &&
-      !isArtisanApplicant(me)
+      !isArtisanApplicant(me, { email: firebaseUser?.email })
     ) {
       navigate('/', { replace: true });
       return;
@@ -116,6 +125,7 @@ export function useAppRouteSync({
     me,
     navigate,
     token,
+    firebaseUser?.email,
     setSelectedArtisan,
     setSelectedArtisanReviews,
   ]);
