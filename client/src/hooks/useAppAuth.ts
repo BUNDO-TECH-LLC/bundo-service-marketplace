@@ -149,6 +149,10 @@ export function useAppAuth({
           const session = await resolveApiSession(user);
           if (isStale()) return;
 
+          if (authBootstrapCompletedRef.current) {
+            return;
+          }
+
           setToken(session.token);
           setMe(session.user);
 
@@ -255,7 +259,10 @@ export function useAppAuth({
               navigateRef.current({ pathname: storedRouteToPath(storedRoute), search: '' }, { replace: true });
             } else if (session.user.role === 'ARTISAN') {
               navigateRef.current(ARTISAN_ONBOARDING_PATH, { replace: true });
-            } else if (session.user.role === 'CUSTOMER') {
+            } else if (
+              session.user.role === 'CUSTOMER' &&
+              !isArtisanApplicant(session.user, { email: user.email })
+            ) {
               navigateRef.current('/workspace/overview', { replace: true });
             }
           }

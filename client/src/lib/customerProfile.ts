@@ -50,6 +50,10 @@ export function onboardingRedirectPath(
     return path.startsWith(ARTISAN_ONBOARDING_PATH) ? null : ARTISAN_ONBOARDING_PATH;
   }
 
+  if (user.role === 'CUSTOMER' && user.onboardingIntent === 'ARTISAN') {
+    return path.startsWith(ARTISAN_ONBOARDING_PATH) ? null : ARTISAN_ONBOARDING_PATH;
+  }
+
   if (user.role === 'CUSTOMER' && !isCustomerProfileComplete(user)) {
     if (CUSTOMER_ONBOARDING_ALLOWED_PREFIXES.some((prefix) => path.startsWith(prefix))) {
       return null;

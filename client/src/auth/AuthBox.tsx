@@ -10,7 +10,7 @@ import {
 import { api } from '../lib/api';
 import { auth, firebaseReady } from '../lib/firebase';
 import { SIGN_IN_UNAVAILABLE_WITH_EMAIL } from '../lib/productionMessages';
-import { ARTISAN_ONBOARDING_PATH, markArtisanApplicant, stageArtisanApplicantIntent } from '../lib/artisanApplication';
+import { ARTISAN_ONBOARDING_PATH, artisanApplicantHomePath, markArtisanApplicant, stageArtisanApplicantIntent } from '../lib/artisanApplication';
 import type { AuthDrawerPrompt } from '../lib/authDrawerPrompt';
 import {
   checkEmailAccountStatus,
@@ -210,14 +210,15 @@ export function AuthBox({
       const updated = await markArtisanApplicant(session.token, session.user.firebaseUid);
       if (updated) {
         nextUser = updated;
+        clearSessionSignupIntent();
       }
     }
 
-    if (artisanIntent) {
-      clearSessionSignupIntent();
-    }
-
     onReady(session.token, nextUser);
+
+    if (artisanIntent && onNavigatePath) {
+      onNavigatePath(artisanApplicantHomePath(nextUser, { email: firebaseAuthUser.email }));
+    }
 
     if (session.user.role === 'ARTISAN') {
       onNotice(
@@ -242,7 +243,9 @@ export function AuthBox({
     setPreferredRole(null);
     setPendingAuthUser(null);
     setAuthStep('account');
-    clearSessionSignupIntent();
+    if (!artisanIntent) {
+      clearSessionSignupIntent();
+    }
   }
 
   async function queueVerificationEmail(user: User) {
@@ -451,6 +454,7 @@ export function AuthBox({
           await updateProfile(credential.user, { displayName });
         }
         if (preferredRole === 'ARTISAN') {
+          stageArtisanApplicantIntent();
           saveSessionSignupIntent('ARTISAN');
           savePendingSignupIntent(credential.user.email, 'ARTISAN');
         }
@@ -609,6 +613,9 @@ export function AuthBox({
     onOpenAuth?.();
     setPreferredRole(role);
     saveSessionSignupIntent(role);
+    if (role === 'ARTISAN') {
+      stageArtisanApplicantIntent();
+    }
     setConfirmPassword('');
     setEmailError('');
     setPhoneError('');

@@ -17,7 +17,7 @@ import { PaymentSuccessDialog } from '../components/PaymentSuccessDialog';
 import { ArtisanAppHeader } from '../features/artisan/ArtisanAppHeader';
 import { BookingSuccessDialog } from '../features/booking/BookingSuccessDialog';
 import { SignedInTopbarNav } from './SignedInTopbarNav';
-import { ARTISAN_ONBOARDING_PATH, artisanApplicantAllowedPath, artisanApplicantHomePath, hasArtisanApplicantSubmittedVerification, isArtisanApplicant } from '../lib/artisanApplication';
+import { ARTISAN_ONBOARDING_PATH, artisanApplicantHomePath, artisanApplicantAllowedPath, hasArtisanApplicantSubmittedVerification, isArtisanApplicant } from '../lib/artisanApplication';
 import { CUSTOMER_PROFILE_PATH, isCustomerProfileComplete } from '../lib/customerProfile';
 import { useAppRoot } from './appRootContext';
 
@@ -256,9 +256,13 @@ export function MainLayout() {
                   ctx.navigate('/artisan/onboarding');
                 } else if (
                   nextUser.role === 'CUSTOMER' &&
-                  isArtisanApplicant(nextUser, { email: ctx.firebaseUser?.email })
+                  (isArtisanApplicant(nextUser, { email: nextUser.email }) ||
+                    nextUser.onboardingIntent === 'ARTISAN')
                 ) {
-                  ctx.navigate(ARTISAN_ONBOARDING_PATH, { replace: true });
+                  ctx.navigate(
+                    artisanApplicantHomePath(nextUser, { email: nextUser.email }),
+                    { replace: true }
+                  );
                 } else if (nextUser.role === 'CUSTOMER' && !isCustomerProfileComplete(nextUser)) {
                   ctx.navigate(CUSTOMER_PROFILE_PATH);
                 } else if (nextUser.role === 'CUSTOMER') {
