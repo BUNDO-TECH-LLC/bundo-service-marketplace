@@ -9267,6 +9267,53 @@ footer h4 {
     padding-left: 20px;
   }
 
+  footer {
+    padding-top: 32px;
+    padding-bottom: 40px;
+  }
+
+  .footer-links {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 20px;
+    margin-bottom: 28px;
+  }
+
+  .footer-links button,
+  .footer-links a {
+    justify-self: start;
+    text-align: left;
+    font-size: 15px;
+    line-height: 1.35;
+  }
+
+  footer h4 {
+    margin-top: 0;
+    margin-bottom: 14px;
+  }
+
+  .city-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 20px;
+    margin-bottom: 14px;
+    font-size: 15px;
+  }
+
+  .city-list span {
+    line-height: 1.35;
+  }
+
+  .footer-coverage-note {
+    margin-bottom: 24px;
+    font-size: 14px;
+  }
+
+  .footer-bottom {
+    gap: 10px;
+    padding-top: 22px;
+  }
+
   .section-title-row {
     align-items: start;
     flex-direction: column;
