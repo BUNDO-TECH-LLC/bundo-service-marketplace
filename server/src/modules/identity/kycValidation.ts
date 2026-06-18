@@ -201,7 +201,7 @@ export function validateKycPayload(input: {
     documentType,
     documentNumber,
     documentImageUrl,
-    selfieImageUrl,
+    ...(selfieImageUrl !== undefined ? { selfieImageUrl } : {}),
     address,
     city,
   };
