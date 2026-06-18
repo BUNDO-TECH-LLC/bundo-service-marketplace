@@ -5,6 +5,8 @@ import { ConflictError } from '../../utils/errors';
 import { buildNigeriaStateWhere, buildCityOrStateWhere, normalizeArtisanCity, normalizeArtisanLocation } from '../../lib/nigeriaStateFilter';
 import { workspaceLink } from '../../lib/appLinks';
 import { createNotification } from '../notifications/notifications.service';
+import { verifyIdentityWithProvider } from '../identity/identityVerification.service';
+import { validateKycPayload } from '../identity/kycValidation';
 
 type CreateArtisanProfileInput = {
   userId: string;
@@ -376,11 +378,40 @@ export const createOrUpdateKycSubmission = async (
     );
   }
 
+  const validated = validateKycPayload(input);
+
+  const duplicateSubmission = await db.artisanKycSubmission.findFirst({
+    where: {
+      documentType: validated.documentType,
+      documentNumber: validated.documentNumber,
+      status: { in: [KycStatus.PENDING, KycStatus.APPROVED] },
+      artisanId: { not: artisan.id },
+    },
+    select: { id: true },
+  });
+
+  if (duplicateSubmission) {
+    throw new ConflictError(
+      'This identity number is already linked to another Bundo account. Contact support if you believe this is a mistake.',
+      'KYC_DOCUMENT_IN_USE'
+    );
+  }
+
+  await verifyIdentityWithProvider({
+    legalName: validated.legalName,
+    documentType: validated.documentType,
+    documentNumber: validated.documentNumber,
+  });
+
+  const normalizedInput = {
+    ...validated,
+    city: normalizeArtisanCity(validated.city),
+  };
+
   const submission = await db.artisanKycSubmission.upsert({
     where: { artisanId: artisan.id },
     update: {
-      ...input,
-      city: normalizeArtisanCity(input.city),
+      ...normalizedInput,
       status: KycStatus.PENDING,
       reviewNote: null,
       reviewedAt: null,
@@ -388,7 +419,7 @@ export const createOrUpdateKycSubmission = async (
     },
     create: {
       artisanId: artisan.id,
-      ...input,
+      ...normalizedInput,
       status: KycStatus.PENDING,
     },
   });

@@ -1,4 +1,5 @@
 import { dayLabels } from '../../../lib/formatting';
+import { formatNinInput } from '../../../lib/kycValidation';
 import type { ArtisanLandingModel } from './artisanLandingTypes';
 
 export function ArtisanLandingStepSubmit({ landing }: { landing: ArtisanLandingModel }) {
@@ -61,15 +62,24 @@ export function ArtisanLandingStepSubmit({ landing }: { landing: ArtisanLandingM
         />
       </label>
       <label>
-        NIN or ID number
+        NIN (11 digits)
         <input
           value={setup.documentNumber}
-          onChange={(event) => updateSetup('documentNumber', event.target.value)}
-          placeholder="Required for verification"
+          onChange={(event) => updateSetup('documentNumber', formatNinInput(event.target.value))}
+          placeholder="12345678901"
+          inputMode="numeric"
+          pattern="\d{11}"
+          maxLength={11}
+          autoComplete="off"
+          required
         />
+        <small className="muted">
+          Enter your 11-digit National Identification Number exactly as on your NIN slip. Automated
+          verification is coming soon — correct details speed up approval.
+        </small>
       </label>
       <label>
-        ID document photo
+        NIN slip or ID photo
         <input
           type="file"
           accept="image/*"

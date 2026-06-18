@@ -3,6 +3,7 @@ import { ConflictError } from '../../utils/errors';
 
 const findUniqueArtisan = vi.fn();
 const findUniqueKyc = vi.fn();
+const findFirstKyc = vi.fn();
 const upsertKyc = vi.fn();
 const createNotification = vi.fn();
 
@@ -13,6 +14,7 @@ vi.mock('../../db/client', () => ({
     },
     artisanKycSubmission: {
       findUnique: (...args: unknown[]) => findUniqueKyc(...args),
+      findFirst: (...args: unknown[]) => findFirstKyc(...args),
       upsert: (...args: unknown[]) => upsertKyc(...args),
     },
   },
@@ -26,8 +28,12 @@ describe('createOrUpdateKycSubmission', () => {
   beforeEach(() => {
     findUniqueArtisan.mockReset();
     findUniqueKyc.mockReset();
+    findFirstKyc.mockReset();
     upsertKyc.mockReset();
     createNotification.mockReset();
+
+    findUniqueKyc.mockResolvedValue(null);
+    findFirstKyc.mockResolvedValue(null);
 
     findUniqueArtisan.mockResolvedValue({
       id: 'artisan-1',
@@ -40,7 +46,7 @@ describe('createOrUpdateKycSubmission', () => {
     documentType: 'NIN',
     documentNumber: '12345678901',
     documentImageUrl: 'https://example.com/id.jpg',
-    address: '12 Market Road',
+    address: '12 Market Road, Lagos Island',
     city: 'Lagos',
   };
 
@@ -77,5 +83,16 @@ describe('createOrUpdateKycSubmission', () => {
     expect(submission?.status).toBe('PENDING');
     expect(upsertKyc).toHaveBeenCalled();
     expect(createNotification).toHaveBeenCalled();
+  });
+
+  it('rejects duplicate NIN already in use', async () => {
+    findFirstKyc.mockResolvedValueOnce({ id: 'kyc-other' });
+
+    const { createOrUpdateKycSubmission } = await import('./artisans.service');
+
+    await expect(createOrUpdateKycSubmission('user-1', input)).rejects.toBeInstanceOf(
+      ConflictError
+    );
+    expect(upsertKyc).not.toHaveBeenCalled();
   });
 });

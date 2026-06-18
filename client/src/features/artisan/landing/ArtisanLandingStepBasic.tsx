@@ -18,7 +18,7 @@ export function ArtisanLandingStepBasic({ landing }: { landing: ArtisanLandingMo
           required
         />
       </label>
-      <small>As in any legal documentation</small>
+        <small className="muted">First name and surname exactly as they appear on your NIN.</small>
       <label>
         Business Name<span>(Optional)</span>
         <input

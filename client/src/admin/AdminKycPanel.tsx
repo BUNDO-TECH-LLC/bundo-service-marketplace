@@ -1,13 +1,22 @@
 import { useState } from 'react';
 import { api } from '../lib/api';
 import { bookingDate } from '../lib/bookingDisplay';
-import { PromptDialog } from '../components/PromptDialog';
 import type { ActionRunner } from '../appTypes';
 import type { ArtisanKycSubmission } from '../types';
 import { AdminPortfolioGallery } from '../components/AdminPortfolioGallery';
 import { EmptyState } from '../components/EmptyState';
+import { PromptDialog } from '../components/PromptDialog';
 import { Pagination } from '../components/Pagination';
 import { useAdminList } from '../hooks/useAdminList';
+
+function maskDocumentNumber(value: string) {
+  const trimmed = value.trim();
+  if (trimmed.length <= 4) {
+    return '••••';
+  }
+
+  return `•••• ${trimmed.slice(-4)}`;
+}
 
 export function AdminKycPanel({
   token,
@@ -115,7 +124,7 @@ export function AdminKycPanel({
                 </div>
                 <div>
                   <dt>Number</dt>
-                  <dd>{submission.documentNumber}</dd>
+                  <dd>{maskDocumentNumber(submission.documentNumber)}</dd>
                 </div>
                 <div>
                   <dt>City</dt>

@@ -2,6 +2,11 @@ import { useEffect, useState } from 'react';
 import { KycImageUploadField } from '../../components/KycImageUploadField';
 import { api } from '../../lib/api';
 import { kycStatusLabel } from '../../lib/artisanVerification';
+import {
+  documentNumberLabel,
+  documentNumberPlaceholder,
+  validateKycForm,
+} from '../../lib/kycValidation';
 import { nigeriaStates } from '../../lib/geo';
 import { uploadKycImage } from '../../lib/kycUpload';
 import type { ActionRunner } from '../../appTypes';
@@ -72,17 +77,29 @@ export function ArtisanKycSection({
     if (!documentImageUrl) {
       throw new Error('Please upload your ID document photo.');
     }
+
+    const validation = validateKycForm({
+      legalName: String(form.get('legalName') || ''),
+      documentType: String(form.get('documentType') || 'NIN'),
+      documentNumber: String(form.get('documentNumber') || ''),
+      address: String(form.get('address') || ''),
+    });
+
+    if (!validation.ok) {
+      throw new Error(validation.message);
+    }
+
     const selfieImageUrl = String(form.get('selfieImageUrl') || '').trim();
     const response = await api<{ submission: ArtisanKycSubmission }>('/artisans/kyc', {
       method: 'POST',
       token,
       body: JSON.stringify({
-        legalName: form.get('legalName'),
-        documentType: form.get('documentType'),
-        documentNumber: form.get('documentNumber'),
+        legalName: validation.legalName,
+        documentType: validation.documentType,
+        documentNumber: validation.documentNumber,
         documentImageUrl,
         selfieImageUrl: selfieImageUrl || undefined,
-        address: form.get('address'),
+        address: validation.address,
         city: form.get('city'),
       }),
     });
@@ -158,7 +175,8 @@ export function ArtisanKycSection({
     >
       <h2>Identity verification (KYC)</h2>
       <p className="muted">
-        Submit your identity details for review. If our team requests changes, update the details here and resubmit.
+        Use the same legal name and NIN on your government ID. Automated NIN checks will be enabled
+        soon; accurate details help us approve your profile faster.
       </p>
       {kycSubmission && (
         <div className={`payment-note ${kycSubmission.status === 'APPROVED' ? 'success' : ''}`}>
@@ -168,12 +186,19 @@ export function ArtisanKycSection({
       )}
       <label>
         Legal name
-        <input name="legalName" defaultValue={kycSubmission?.legalName || ''} required />
+        <input
+          name="legalName"
+          defaultValue={kycSubmission?.legalName || ''}
+          placeholder="First name and surname (as on NIN)"
+          autoComplete="name"
+          required
+        />
+        <small className="muted">Must match your NIN exactly, including spelling.</small>
       </label>
       <label>
         Document type
         <select name="documentType" defaultValue={kycSubmission?.documentType || 'NIN'} required>
-          <option value="NIN">NIN</option>
+          <option value="NIN">NIN (recommended)</option>
           <option value="BVN">BVN</option>
           <option value="DRIVERS_LICENSE">Driver&apos;s license</option>
           <option value="INTERNATIONAL_PASSPORT">International passport</option>
@@ -181,7 +206,15 @@ export function ArtisanKycSection({
       </label>
       <label>
         Document number
-        <input name="documentNumber" defaultValue={kycSubmission?.documentNumber || ''} required />
+        <input
+          name="documentNumber"
+          defaultValue={kycSubmission?.documentNumber || ''}
+          placeholder={documentNumberPlaceholder('NIN')}
+          inputMode="numeric"
+          autoComplete="off"
+          required
+        />
+        <small className="muted">{documentNumberLabel('NIN')} — numbers only, no spaces.</small>
       </label>
       <KycImageUploadField
         label="Document photo"

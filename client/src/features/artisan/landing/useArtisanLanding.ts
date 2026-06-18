@@ -4,6 +4,7 @@ import { artisanVerificationPhase } from '../../../lib/artisanVerification';
 import { locationErrorMessage, readBrowserLocation } from '../../../lib/geolocation';
 import { inferNigeriaState } from '../../../lib/inferNigeriaState';
 import { uploadKycImage } from '../../../lib/kycUpload';
+import { validateKycForm } from '../../../lib/kycValidation';
 import { uploadPortfolioImage } from '../../../lib/portfolioUpload';
 import type {
   Artisan,
@@ -318,15 +319,26 @@ export function useArtisanLanding({
 
     const documentImageUrl = await uploadKycImage(token, kycDocumentFile);
 
+    const validation = validateKycForm({
+      legalName: setup.fullName || displayName,
+      documentType: 'NIN',
+      documentNumber: setup.documentNumber,
+      address: setup.address || setup.location,
+    });
+
+    if (!validation.ok) {
+      throw new Error(validation.message);
+    }
+
     const response = await api<{ submission: ArtisanKycSubmission }>('/artisans/kyc', {
       method: 'POST',
       token,
       body: JSON.stringify({
-        legalName: setup.fullName || displayName,
-        documentType: 'NIN',
-        documentNumber: setup.documentNumber,
+        legalName: validation.legalName,
+        documentType: validation.documentType,
+        documentNumber: validation.documentNumber,
         documentImageUrl,
-        address: setup.address || setup.location,
+        address: validation.address,
         city: setup.location,
       }),
     });

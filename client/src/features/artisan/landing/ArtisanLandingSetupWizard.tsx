@@ -125,7 +125,11 @@ export function ArtisanLandingSetupWizard({ landing }: { landing: ArtisanLanding
           {step === 4 && (
             <button
               disabled={
-                busy || !submitAgreed || !setup.documentNumber || !kycDocumentFile || selectedDays.length === 0
+                busy ||
+                !submitAgreed ||
+                setup.documentNumber.length !== 11 ||
+                !kycDocumentFile ||
+                selectedDays.length === 0
               }
               onClick={() => runAction(submitForVerification, 'Application submitted — awaiting approval')}
             >
