@@ -444,6 +444,28 @@ export const verifyArtisan = async (
   id: string,
   verifyStatus: VerifyStatus
 ) => {
+  if (verifyStatus === VerifyStatus.APPROVED) {
+    const artisan = await db.artisanProfile.findUnique({
+      where: { id },
+      include: {
+        kycSubmission: {
+          select: { status: true },
+        },
+      },
+    });
+
+    if (!artisan) {
+      throw new NotFoundError('Artisan');
+    }
+
+    if (artisan.kycSubmission?.status !== KycStatus.APPROVED) {
+      throw new ConflictError(
+        'Approve identity verification (KYC) before approving this artisan for the marketplace.',
+        'KYC_REQUIRED'
+      );
+    }
+  }
+
   const artisan = await db.artisanProfile.update({
     where: { id },
     data: {

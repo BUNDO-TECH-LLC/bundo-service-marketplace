@@ -59,6 +59,19 @@ export function ArtisanAvailabilityEditor({
   function handleAdd(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
+    const formData = new FormData(form);
+    const startTime = String(formData.get('startTime') || '');
+    const endTime = String(formData.get('endTime') || '');
+    const [startH = 0, startM = 0] = startTime.split(':').map(Number);
+    const [endH = 0, endM = 0] = endTime.split(':').map(Number);
+
+    if (endH * 60 + endM <= startH * 60 + startM) {
+      void runAction(async () => {
+        throw new Error('End time must be after start time.');
+      }, '');
+      return;
+    }
+
     void runAction(() => addSlot(form), 'Availability updated');
   }
 

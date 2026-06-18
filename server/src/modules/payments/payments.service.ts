@@ -6,6 +6,8 @@ import {
   PaymentStatus,
   PayoutStatus,
   Prisma,
+  Role,
+  UserStatus,
 } from '@prisma/client';
 import { env } from '../../config/env';
 import db from '../../db/client';
@@ -26,6 +28,11 @@ import {
   verifyPaystackTransaction,
 } from './paystack.service';
 import { resolveAgreedPaymentAmount } from './paymentsAmount';
+import {
+  bookingStatusAllowsPaymentInit,
+  isBookingPaymentRefundableOnCancel,
+  isBookingPaymentSecured,
+} from '../../lib/bookingPayment';
 
 const toKobo = (amount: number) => amount * 100;
 
@@ -170,6 +177,10 @@ export const initializeBookingPayment = async (input: {
     return { status: 'forbidden' as const };
   }
 
+  if (!bookingStatusAllowsPaymentInit(booking.status)) {
+    return { status: 'not_payable' as const };
+  }
+
   const blockedStatuses: BookingStatus[] = [
     BookingStatus.CANCELLED,
     BookingStatus.DECLINED,
@@ -255,6 +266,169 @@ export const initializeBookingPayment = async (input: {
   });
 
   return { status: 'initialized' as const, payment };
+};
+
+export const refundBookingPaymentOnCancel = async (bookingId: string) => {
+  const booking = await db.booking.findUnique({
+    where: { id: bookingId },
+    include: {
+      payment: true,
+      offering: { select: { title: true } },
+      customerUser: { select: { firebaseUid: true } },
+    },
+  });
+
+  if (!booking?.payment || !isBookingPaymentRefundableOnCancel(booking.payment)) {
+    return { status: 'nothing_to_refund' as const };
+  }
+
+  const payment = booking.payment;
+
+  if (payment.status === PaymentStatus.PAYMENT_PENDING) {
+    await db.payment.update({
+      where: { id: payment.id },
+      data: { status: PaymentStatus.FAILED },
+    });
+    return { status: 'cancelled_pending' as const };
+  }
+
+  if (!isBookingPaymentSecured(payment)) {
+    return { status: 'nothing_to_refund' as const };
+  }
+
+  await db.$transaction(async (tx: Prisma.TransactionClient) => {
+    await tx.payment.update({
+      where: { id: payment.id },
+      data: { status: PaymentStatus.REFUND_REQUESTED },
+    });
+
+    await tx.ledgerEntry.create({
+      data: {
+        bookingId: booking.id,
+        paymentId: payment.id,
+        type: LedgerEntryType.ADJUSTMENT,
+        amount: payment.amount,
+        note: 'Cancellation refund requested — pending admin approval',
+      },
+    });
+  });
+
+  const serviceTitle = booking.offering?.title || 'a service';
+
+  await createNotifications([
+    {
+      userId: booking.customerId,
+      type: NotificationType.PAYMENT,
+      title: 'Refund review started',
+      body: `Your booking for ${serviceTitle} was cancelled. Our team will review and process your refund shortly.`,
+      link: workspaceBookingLink(booking.id),
+    },
+  ]);
+
+  const admins = await db.user.findMany({
+    where: { role: Role.ADMIN, status: UserStatus.ACTIVE },
+    select: { firebaseUid: true },
+  });
+
+  if (admins.length) {
+    await createNotifications(
+      admins.map((admin) => ({
+        userId: admin.firebaseUid,
+        type: NotificationType.ADMIN,
+        title: 'Cancellation refund to approve',
+        body: `Booking for ${serviceTitle} was cancelled with ${payment.amount.toLocaleString('en-NG')} NGN held. Approve the refund in Admin → Jobs.`,
+        link: workspaceBookingLink(booking.id),
+      }))
+    );
+  }
+
+  return { status: 'refund_requested' as const };
+};
+
+export const approveCancellationRefund = async (input: {
+  paymentId: string;
+  adminId: string;
+  resolution?: string;
+}) => {
+  const payment = await db.payment.findUnique({
+    where: { id: input.paymentId },
+    include: {
+      booking: {
+        include: {
+          offering: { select: { title: true } },
+        },
+      },
+    },
+  });
+
+  if (!payment) {
+    return { status: 'missing_payment' as const };
+  }
+
+  if (payment.status !== PaymentStatus.REFUND_REQUESTED) {
+    return { status: 'not_refund_requested' as const };
+  }
+
+  if (payment.booking.status !== BookingStatus.CANCELLED) {
+    return { status: 'booking_not_cancelled' as const };
+  }
+
+  if ((payment.releasedAmount ?? 0) > 0) {
+    return { status: 'refund_after_release' as const };
+  }
+
+  if (!isPaystackConfigured() || !payment.paystackReference) {
+    return { status: 'paystack_not_configured' as const };
+  }
+
+  const refund = await createPaystackRefund({
+    transactionReference: payment.paystackReference,
+    customerNote:
+      input.resolution?.trim() || 'Bundo marketplace cancellation refund approved by admin',
+  });
+
+  const result = await db.$transaction(async (tx: Prisma.TransactionClient) => {
+    const updatedPayment = await tx.payment.update({
+      where: { id: payment.id },
+      data: {
+        status: PaymentStatus.REFUNDED,
+        platformFee: 0,
+        providerEarning: 0,
+      },
+    });
+
+    await tx.ledgerEntry.create({
+      data: {
+        bookingId: payment.bookingId,
+        paymentId: payment.id,
+        type: LedgerEntryType.CUSTOMER_REFUND,
+        amount: payment.amount,
+        note:
+          input.resolution?.trim() ||
+          `Cancellation refund approved by admin ${input.adminId}`,
+      },
+    });
+
+    return updatedPayment;
+  });
+
+  const serviceTitle = payment.booking.offering?.title || 'a service';
+
+  await createNotifications([
+    {
+      userId: payment.customerId,
+      type: NotificationType.PAYMENT,
+      title: 'Refund processed',
+      body: `Your refund for ${serviceTitle} has been approved and sent back to your payment method.`,
+      link: workspaceBookingLink(payment.bookingId),
+    },
+  ]);
+
+  return {
+    status: 'refunded' as const,
+    payment: result,
+    refundReference: refund.data.transaction_reference,
+  };
 };
 
 export const getPaymentForBooking = async (input: {
@@ -1116,7 +1290,7 @@ export const createBookingDispute = async (input: {
 }) => {
   const booking = await db.booking.findUnique({
     where: { id: input.bookingId },
-    include: { artisan: true },
+    include: { artisan: true, payment: true },
   });
 
   if (!booking) {
@@ -1128,6 +1302,29 @@ export const createBookingDispute = async (input: {
 
   if (!isCustomer && !isArtisan) {
     return { status: 'forbidden' as const };
+  }
+
+  const allowedBookingStatuses: BookingStatus[] = [
+    BookingStatus.ACCEPTED,
+    BookingStatus.ONGOING,
+    BookingStatus.COMPLETED,
+  ];
+
+  if (!allowedBookingStatuses.includes(booking.status)) {
+    return { status: 'not_disputable' as const };
+  }
+
+  if (!booking.payment || booking.payment.status !== PaymentStatus.PAID_HELD) {
+    return { status: 'payment_not_held' as const };
+  }
+
+  const trimmedReason = input.reason.trim();
+  if (!trimmedReason) {
+    return { status: 'invalid_reason' as const };
+  }
+
+  if (trimmedReason.length > 500) {
+    return { status: 'invalid_reason' as const };
   }
 
   const existingOpenDispute = await db.dispute.findFirst({
@@ -1147,7 +1344,7 @@ export const createBookingDispute = async (input: {
     data: {
       bookingId: booking.id,
       raisedById: input.raisedById,
-      reason: input.reason.trim(),
+      reason: trimmedReason,
       status: DisputeStatus.OPEN,
     },
   });

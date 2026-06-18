@@ -10593,6 +10593,29 @@ footer h4 {
   }
 }
 
+.customer-profile-page {
+  display: grid;
+  min-height: calc(100vh - 120px);
+  place-items: center;
+}
+
+.customer-profile-card {
+  width: min(100%, 520px);
+  padding: 32px 24px;
+}
+
+.customer-profile-form label {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.book-offering-dialog textarea {
+  width: 100%;
+  min-height: 88px;
+  resize: vertical;
+}
+
 .bundo-loading-screen,
 .bundo-loading-page {
   display: grid;

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { LeaveReviewDialog } from '../components/LeaveReviewDialog';
 import { PromptDialog } from '../components/PromptDialog';
+import { RescheduleBookingDialog } from '../components/RescheduleBookingDialog';
 import { api } from '../lib/api';
 import { formatMessageTime, money } from '../lib/formatting';
 import {
@@ -9,17 +10,16 @@ import {
   bookingContactName,
   bookingDate,
   bookingGuidePrice,
-  bookingInputValue,
   bookingLocation,
   bookingPayableAmount,
   MIN_PAYMENT_AMOUNT_NGN,
   parseAgreedAmountInput,
-  parseBookingInput,
   paymentLabel,
   statusLabel,
 } from '../lib/bookingDisplay';
 import {
   canLeaveReview,
+  canPayBooking,
   canStartOrCompleteBooking,
   isBookingPaymentSecured,
 } from '../lib/bookingPayment';
@@ -274,12 +274,13 @@ export function BookingsPage({
   }
 
   const [reviewBooking, setReviewBooking] = useState<Booking | null>(null);
-  const [reschedulePrompt, setReschedulePrompt] = useState<null | {
+  const [rescheduleBooking, setRescheduleBooking] = useState<Booking | null>(null);
+  const [paymentPrompt, setPaymentPrompt] = useState<null | {
     booking: Booking;
-    step: 'datetime' | 'note';
-    scheduledAt?: string;
+    step: 'amount' | 'confirm';
+    amount?: number;
   }>(null);
-  const [paymentPrompt, setPaymentPrompt] = useState<Booking | null>(null);
+  const [disputeBooking, setDisputeBooking] = useState<Booking | null>(null);
 
   async function submitReview(input: { rating: number; comment: string }) {
     if (!reviewBooking) return;
@@ -330,61 +331,28 @@ export function BookingsPage({
     await refresh();
   }
 
-  async function submitPaymentAmount(raw: string) {
-    if (!paymentPrompt) {
-      return;
-    }
-
-    const amount = parseAgreedAmountInput(raw);
-    if (!amount || amount < MIN_PAYMENT_AMOUNT_NGN) {
-      throw new Error(
-        `Enter a valid amount in naira (minimum ₦${MIN_PAYMENT_AMOUNT_NGN.toLocaleString('en-NG')}).`
-      );
-    }
-
-    await startPayment(paymentPrompt.id, amount);
-  }
-
-  async function openDispute(bookingId: string) {
+  async function openDispute(bookingId: string, reason: string) {
     await api(`/bookings/${bookingId}/dispute`, {
       method: 'POST',
       token,
-      body: JSON.stringify({
-        reason: 'Customer requested admin review from the bookings page',
-      }),
+      body: JSON.stringify({ reason }),
     });
+    setDisputeBooking(null);
     await refresh();
   }
 
-  function startReschedule(booking: Booking) {
-    setReschedulePrompt({ booking, step: 'datetime' });
-  }
+  async function submitReschedule(input: { scheduledAt: string; note?: string }) {
+    if (!rescheduleBooking) return;
 
-  async function submitReschedule(input: string) {
-    if (!reschedulePrompt) return;
-
-    if (reschedulePrompt.step === 'datetime') {
-      const parsed = parseBookingInput(input);
-      if (!parsed) {
-        throw new Error('Please enter a valid date and time like 2026-05-15 14:30');
-      }
-      setReschedulePrompt({
-        booking: reschedulePrompt.booking,
-        step: 'note',
-        scheduledAt: parsed.toISOString(),
-      });
-      return;
-    }
-
-    await api(`/bookings/${reschedulePrompt.booking.id}/reschedule`, {
+    await api(`/bookings/${rescheduleBooking.id}/reschedule`, {
       method: 'PATCH',
       token,
       body: JSON.stringify({
-        scheduledAt: reschedulePrompt.scheduledAt,
-        note: input || reschedulePrompt.booking.note,
+        scheduledAt: input.scheduledAt,
+        ...(input.note ? { note: input.note } : {}),
       }),
     });
-    setReschedulePrompt(null);
+    setRescheduleBooking(null);
     await refresh();
   }
 
@@ -418,38 +386,97 @@ export function BookingsPage({
       />
     )}
     <PromptDialog
-      open={paymentPrompt !== null}
+      open={paymentPrompt?.step === 'amount'}
       title="Confirm payment amount"
       message={
-        paymentPrompt && bookingGuidePrice(paymentPrompt) !== null
-          ? `The listing price (${money(bookingGuidePrice(paymentPrompt)!)}) is a guide. Enter the amount you agreed on with ${paymentPrompt.artisan?.displayName || 'your artisan'} (minimum ₦${MIN_PAYMENT_AMOUNT_NGN.toLocaleString('en-NG')}).`
+        paymentPrompt?.booking && bookingGuidePrice(paymentPrompt.booking) !== null
+          ? `The listing price (${money(bookingGuidePrice(paymentPrompt.booking)!)}) is a guide. Enter the amount you agreed on with ${paymentPrompt.booking.artisan?.displayName || 'your artisan'} (minimum ₦${MIN_PAYMENT_AMOUNT_NGN.toLocaleString('en-NG')}).`
           : `Enter the amount you agreed on with your artisan (minimum ₦${MIN_PAYMENT_AMOUNT_NGN.toLocaleString('en-NG')}).`
       }
       label="Amount to pay (₦)"
-      defaultValue={paymentPrompt ? agreedAmountInputValue(paymentPrompt) : ''}
+      defaultValue={paymentPrompt?.booking ? agreedAmountInputValue(paymentPrompt.booking) : ''}
       inputType="number"
-      confirmLabel="Continue to Paystack"
+      confirmLabel="Review payment"
       busy={busy}
       onCancel={() => setPaymentPrompt(null)}
-      onConfirm={(value) => runAction(() => submitPaymentAmount(value), 'Payment checkout opened')}
+      onConfirm={(value) =>
+        runAction(async () => {
+          if (!paymentPrompt) {
+            return;
+          }
+
+          const amount = parseAgreedAmountInput(value);
+          if (!amount || amount < MIN_PAYMENT_AMOUNT_NGN) {
+            throw new Error(
+              `Enter a valid amount in naira (minimum ₦${MIN_PAYMENT_AMOUNT_NGN.toLocaleString('en-NG')}).`
+            );
+          }
+
+          setPaymentPrompt({
+            booking: paymentPrompt.booking,
+            step: 'confirm',
+            amount,
+          });
+        }, '')
+      }
     />
     <PromptDialog
-      open={reschedulePrompt !== null}
-      title={reschedulePrompt?.step === 'note' ? 'Reschedule note' : 'Reschedule booking'}
+      open={paymentPrompt?.step === 'confirm'}
+      title="Proceed to Paystack?"
       message={
-        reschedulePrompt?.step === 'datetime'
-          ? 'Enter the new date and time (YYYY-MM-DD HH:MM).'
-          : 'Optional note for the artisan.'
+        paymentPrompt?.amount
+          ? `You are about to pay ${money(paymentPrompt.amount)} securely via Paystack for ${paymentPrompt.booking.offering?.title || 'this service'}.`
+          : 'Confirm payment to continue.'
       }
-      label={reschedulePrompt?.step === 'datetime' ? 'Date and time' : 'Note'}
-      defaultValue={
-        reschedulePrompt?.step === 'datetime'
-          ? bookingInputValue(reschedulePrompt.booking.scheduledAt)
-          : reschedulePrompt?.booking.note || ''
-      }
+      label="Type PAY to confirm"
+      confirmLabel="Pay now"
       busy={busy}
-      onCancel={() => setReschedulePrompt(null)}
-      onConfirm={(value) => runAction(() => submitReschedule(value), 'Booking rescheduled')}
+      onCancel={() =>
+        setPaymentPrompt((current) =>
+          current ? { booking: current.booking, step: 'amount', amount: current.amount } : null
+        )
+      }
+      onConfirm={(value) => {
+        if (!paymentPrompt?.amount) {
+          throw new Error('Enter PAY to confirm.');
+        }
+
+        if (value.trim().toUpperCase() !== 'PAY') {
+          throw new Error('Type PAY to confirm this payment.');
+        }
+
+        return runAction(
+          () => startPayment(paymentPrompt.booking.id, paymentPrompt.amount!),
+          'Payment checkout opened'
+        );
+      }}
+    />
+    <PromptDialog
+      open={disputeBooking !== null}
+      title="Raise a dispute"
+      message="Describe the issue so our team can review. Disputes are available after payment is secured."
+      label="What went wrong?"
+      confirmLabel="Submit dispute"
+      busy={busy}
+      onCancel={() => setDisputeBooking(null)}
+      onConfirm={(value) => {
+        if (!disputeBooking) {
+          return;
+        }
+
+        if (!value.trim()) {
+          throw new Error('Describe the issue before submitting.');
+        }
+
+        return runAction(() => openDispute(disputeBooking.id, value.trim()), 'Dispute opened');
+      }}
+    />
+    <RescheduleBookingDialog
+      open={rescheduleBooking !== null}
+      booking={rescheduleBooking}
+      busy={busy}
+      onClose={() => setRescheduleBooking(null)}
+      onSubmit={(input) => runAction(() => submitReschedule(input), 'Booking rescheduled')}
     />
     <section className="bookings-page">
       <div className="bookings-toolbar">
@@ -507,10 +534,7 @@ export function BookingsPage({
           const paymentStatus = booking.payment?.status;
           const latestDispute = booking.disputes?.[0];
           const paymentSecured = isBookingPaymentSecured(paymentStatus);
-          const canPay =
-            mode === 'customer' &&
-            !['CANCELLED', 'DECLINED', 'COMPLETED'].includes(booking.status) &&
-            !paymentSecured;
+          const canPay = mode === 'customer' && canPayBooking(booking);
           const awaitingPaymentToStart =
             mode === 'customer' &&
             booking.status === 'ACCEPTED' &&
@@ -589,15 +613,25 @@ export function BookingsPage({
                   <button
                     className="primary-action"
                     disabled={busy}
-                    onClick={() => setPaymentPrompt(booking)}
+                    onClick={() => setPaymentPrompt({ booking, step: 'amount' })}
                   >
                     Pay securely
                   </button>
+                )}
+                {mode === 'customer' && booking.status === 'REQUESTED' && !paymentSecured && (
+                  <p className="booking-payment-notice" role="status">
+                    Payment opens after your artisan accepts the booking.
+                  </p>
                 )}
                 {paymentStatus === 'PAID_HELD' && (
                   <button className="secondary-button" disabled>
                     Payment secured
                   </button>
+                )}
+                {mode === 'customer' && paymentStatus === 'REFUND_REQUESTED' && (
+                  <p className="booking-payment-notice" role="status">
+                    Your cancellation refund is pending admin review. We will notify you once it is processed.
+                  </p>
                 )}
                 {paymentStatus === 'RELEASED' && (
                   <button className="secondary-button" disabled>
@@ -613,7 +647,7 @@ export function BookingsPage({
                   <button
                     className="secondary-button"
                     disabled={busy}
-                    onClick={() => startReschedule(booking)}
+                    onClick={() => setRescheduleBooking(booking)}
                   >
                     Reschedule
                   </button>
@@ -629,7 +663,7 @@ export function BookingsPage({
                   <button
                     className="secondary-button"
                     disabled={busy}
-                    onClick={() => runAction(() => openDispute(booking.id), 'Dispute opened')}
+                    onClick={() => setDisputeBooking(booking)}
                   >
                     Raise dispute
                   </button>

@@ -6,6 +6,7 @@ import {
   documentNumberLabel,
   documentNumberPlaceholder,
   validateKycForm,
+  type KycDocumentType,
 } from '../../lib/kycValidation';
 import { nigeriaStates } from '../../lib/geo';
 import { uploadKycImage } from '../../lib/kycUpload';
@@ -52,6 +53,7 @@ export function ArtisanKycSection({
   profileCity?: string | null;
 }) {
   const [kycSubmission, setKycSubmission] = useState<ArtisanKycSubmission | null>(null);
+  const [documentType, setDocumentType] = useState<KycDocumentType>('NIN');
 
   useEffect(() => {
     let mounted = true;
@@ -59,6 +61,9 @@ export function ArtisanKycSection({
       .then((response) => {
         if (mounted) {
           setKycSubmission(response.submission);
+          if (response.submission?.documentType) {
+            setDocumentType(response.submission.documentType as KycDocumentType);
+          }
         }
       })
       .catch(() => {
@@ -197,7 +202,12 @@ export function ArtisanKycSection({
       </label>
       <label>
         Document type
-        <select name="documentType" defaultValue={kycSubmission?.documentType || 'NIN'} required>
+        <select
+          name="documentType"
+          value={documentType}
+          onChange={(event) => setDocumentType(event.target.value as KycDocumentType)}
+          required
+        >
           <option value="NIN">NIN (recommended)</option>
           <option value="BVN">BVN</option>
           <option value="DRIVERS_LICENSE">Driver&apos;s license</option>
@@ -209,12 +219,12 @@ export function ArtisanKycSection({
         <input
           name="documentNumber"
           defaultValue={kycSubmission?.documentNumber || ''}
-          placeholder={documentNumberPlaceholder('NIN')}
-          inputMode="numeric"
+          placeholder={documentNumberPlaceholder(documentType)}
+          inputMode={documentType === 'NIN' || documentType === 'BVN' ? 'numeric' : 'text'}
           autoComplete="off"
           required
         />
-        <small className="muted">{documentNumberLabel('NIN')} — numbers only, no spaces.</small>
+        <small className="muted">{documentNumberLabel(documentType)}</small>
       </label>
       <KycImageUploadField
         label="Document photo"

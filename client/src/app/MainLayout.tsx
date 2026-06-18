@@ -18,6 +18,7 @@ import { ArtisanAppHeader } from '../features/artisan/ArtisanAppHeader';
 import { BookingSuccessDialog } from '../features/booking/BookingSuccessDialog';
 import { SignedInTopbarNav } from './SignedInTopbarNav';
 import { ARTISAN_ONBOARDING_PATH, isArtisanApplicantSession } from '../lib/artisanApplication';
+import { CUSTOMER_PROFILE_PATH, isCustomerProfileComplete } from '../lib/customerProfile';
 import { useAppRoot } from './appRootContext';
 
 export function MainLayout() {
@@ -31,6 +32,27 @@ export function MainLayout() {
   useEffect(() => {
     closeMobileNav();
   }, [ctx.location.pathname, ctx.location.search]);
+
+  useEffect(() => {
+    if (!ctx.isAuthed || !ctx.me || ctx.me.role !== 'CUSTOMER') {
+      return;
+    }
+
+    if (isArtisanApplicantSession(ctx.me.firebaseUid)) {
+      return;
+    }
+
+    if (isCustomerProfileComplete(ctx.me)) {
+      return;
+    }
+
+    const allowedPaths = [CUSTOMER_PROFILE_PATH, '/verify-email', '/terms', '/privacy'];
+    if (allowedPaths.some((path) => ctx.location.pathname.startsWith(path))) {
+      return;
+    }
+
+    ctx.navigate(CUSTOMER_PROFILE_PATH, { replace: true });
+  }, [ctx.isAuthed, ctx.me, ctx.location.pathname, ctx.navigate]);
 
   useEffect(() => {
     if (!ctx.notice) return;
@@ -233,6 +255,8 @@ export function MainLayout() {
                   isArtisanApplicantSession(nextUser.firebaseUid)
                 ) {
                   ctx.navigate(ARTISAN_ONBOARDING_PATH);
+                } else if (nextUser.role === 'CUSTOMER' && !isCustomerProfileComplete(nextUser)) {
+                  ctx.navigate(CUSTOMER_PROFILE_PATH);
                 } else if (nextUser.role === 'CUSTOMER') {
                   ctx.navigate('/');
                 }

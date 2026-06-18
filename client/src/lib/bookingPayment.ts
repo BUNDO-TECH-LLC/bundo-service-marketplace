@@ -22,3 +22,15 @@ export function canStartOrCompleteBooking(booking: Pick<Booking, 'status' | 'pay
 export function canLeaveReview(booking: Pick<Booking, 'status' | 'payment' | 'review'>) {
   return booking.status === 'COMPLETED' && isBookingPaymentSecured(booking.payment?.status) && !booking.review;
 }
+
+export function canPayBooking(booking: Pick<Booking, 'status' | 'payment'>) {
+  if (['CANCELLED', 'DECLINED', 'COMPLETED'].includes(booking.status)) {
+    return false;
+  }
+
+  if (isBookingPaymentSecured(booking.payment?.status)) {
+    return false;
+  }
+
+  return booking.status === 'ACCEPTED' || booking.status === 'ONGOING';
+}

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { Role } from '@prisma/client';
 import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
+import { requireVerifiedEmail } from '../../middlewares/requireVerifiedEmail';
 import { requireRole } from '../../middlewares/requireRole';
 import { asyncHandler } from '../../middlewares/errorHandler';
 import {
@@ -55,6 +56,7 @@ router.get(
 router.post(
   '/payments/initialize',
   verifyFirebaseToken,
+  requireVerifiedEmail,
   requireRole(Role.CUSTOMER),
   asyncHandler(async (req, res) => {
     const { bookingId, amount } = req.body;

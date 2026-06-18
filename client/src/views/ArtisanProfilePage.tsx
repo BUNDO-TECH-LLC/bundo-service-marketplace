@@ -1,10 +1,15 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useAppRoot } from '../app/appRootContext';
 import { api } from '../lib/api';
 import { money } from '../lib/formatting';
-import { userDisplayName } from '../lib/userDisplayName';
+import {
+  buildTimeOptionsForDate,
+  formatAvailabilityHint,
+  todayDateInputValue,
+  validateBookingDateTime,
+} from '../lib/bookingSchedule';
 import type { ActionRunner, BookingSuccessState } from '../appTypes';
-import type { Artisan, Booking, Review, Role } from '../types';
+import type { Artisan, AvailabilitySlot, Booking, Review, Role } from '../types';
 import { EmptyState } from '../components/EmptyState';
 import { ProfilePortfolioGallery } from '../components/ProfilePortfolioGallery';
 
@@ -37,8 +42,12 @@ export function ArtisanProfilePage({
   const firstOffering = offerings[0];
   const [offeringId, setOfferingId] = useState(firstOffering?.id || '');
   const [date, setDate] = useState('');
-  const [timeSlot, setTimeSlot] = useState('09:00');
+  const [timeSlot, setTimeSlot] = useState('');
+  const [note, setNote] = useState('');
+  const [bookingError, setBookingError] = useState('');
+  const [slots, setSlots] = useState<AvailabilitySlot[]>(artisan.availabilitySlots || []);
   const selectedOffering = offerings.find((offering) => offering.id === offeringId) || firstOffering;
+  const timeOptions = buildTimeOptionsForDate(date, slots);
   const initials = artisan.displayName
     .split(' ')
     .map((part) => part[0])
@@ -49,13 +58,33 @@ export function ArtisanProfilePage({
     ? new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric' }).format(new Date(artisan.createdAt))
     : 'Recently';
 
+  useEffect(() => {
+    void api<{ slots: AvailabilitySlot[] }>(`/artisans/${artisan.id}/availability-slots`)
+      .then((response) => setSlots(response.slots))
+      .catch(() => setSlots(artisan.availabilitySlots || []));
+  }, [artisan.id, artisan.availabilitySlots]);
+
+  useEffect(() => {
+    if (timeSlot && !timeOptions.includes(timeSlot)) {
+      setTimeSlot(timeOptions[0] || '');
+    }
+  }, [date, timeOptions, timeSlot]);
+
   async function createBooking(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!isAuthed) {
       promptCustomerLogin();
       return;
     }
-    if (!canBookAsCustomer || !selectedOffering || !date) return;
+    if (!canBookAsCustomer || !selectedOffering || !date || !timeSlot) return;
+
+    const validationError = validateBookingDateTime(date, timeSlot, slots);
+    if (validationError) {
+      setBookingError(validationError);
+      return;
+    }
+
+    setBookingError('');
 
     const response = await api<{ booking: Booking }>('/bookings', {
       method: 'POST',
@@ -63,6 +92,7 @@ export function ArtisanProfilePage({
       body: JSON.stringify({
         offeringId: selectedOffering.id,
         scheduledAt: new Date(`${date}T${timeSlot}:00`).toISOString(),
+        ...(note.trim() ? { note: note.trim() } : {}),
       }),
     });
     await reloadPrivate();
@@ -155,29 +185,19 @@ export function ArtisanProfilePage({
             <h2>Reviews</h2>
             <div className="review-list">
               {reviews.length === 0 && <EmptyState title="No reviews yet" body="Completed customer reviews will appear here." />}
-              {reviews.map((review) => {
-                const reviewer = userDisplayName(null, {
-                  firebaseUid: review.customerId,
-                  email: review.customer?.email || null,
-                  phone: review.customer?.phone || null,
-                  role: null,
-                  status: 'ACTIVE',
-                });
-
-                return (
-                  <article className="review-card" key={review.id}>
-                    <div className="review-head">
-                      <span className="review-avatar">{reviewer.slice(0, 1).toUpperCase()}</span>
-                      <div>
-                        <strong>{reviewer}</strong>
-                        <small>{new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric' }).format(new Date(review.createdAt))}</small>
-                      </div>
+              {reviews.map((review) => (
+                <article className="review-card" key={review.id}>
+                  <div className="review-head">
+                    <span className="review-avatar">C</span>
+                    <div>
+                      <strong>Bundo customer</strong>
+                      <small>{new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric' }).format(new Date(review.createdAt))}</small>
                     </div>
-                    <p className="rating-dots">{Array.from({ length: 5 }).map((_, index) => <span key={index} className={index < review.rating ? 'active' : ''} />)}</p>
-                    <p>{review.comment || 'Reliable service from this Bundo professional.'}</p>
-                  </article>
-                );
-              })}
+                  </div>
+                  <p className="rating-dots">{Array.from({ length: 5 }).map((_, index) => <span key={index} className={index < review.rating ? 'active' : ''} />)}</p>
+                  <p>{review.comment || 'Reliable service from this Bundo professional.'}</p>
+                </article>
+              ))}
             </div>
           </section>
         </div>
@@ -193,18 +213,53 @@ export function ArtisanProfilePage({
                 ))}
               </select>
             </label>
+            <p className="muted">{formatAvailabilityHint(slots)}</p>
             <label>
               Date
-              <input value={date} onChange={(event) => setDate(event.target.value)} type="date" required />
+              <input
+                value={date}
+                onChange={(event) => {
+                  setDate(event.target.value);
+                  setBookingError('');
+                }}
+                type="date"
+                min={todayDateInputValue()}
+                required
+              />
             </label>
             <label>
               Time slot
-              <select value={timeSlot} onChange={(event) => setTimeSlot(event.target.value)}>
-                <option value="09:00">Morning (9am - 12pm)</option>
-                <option value="13:00">Afternoon (1pm - 4pm)</option>
-                <option value="17:00">Evening (5pm - 7pm)</option>
+              <select
+                value={timeSlot}
+                onChange={(event) => {
+                  setTimeSlot(event.target.value);
+                  setBookingError('');
+                }}
+                required
+                disabled={!date || timeOptions.length === 0}
+              >
+                <option value="">
+                  {!date ? 'Select a date first' : timeOptions.length ? 'Select a time' : 'No slots this day'}
+                </option>
+                {timeOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
               </select>
             </label>
+            <label>
+              Note for artisan (optional)
+              <textarea
+                value={note}
+                maxLength={500}
+                rows={3}
+                placeholder="Share job details or access instructions."
+                onChange={(event) => setNote(event.target.value)}
+              />
+            </label>
+
+            {bookingError && <p className="auth-field-error">{bookingError}</p>}
 
             <div className="booking-total">
               <span>Guide price</span>
@@ -217,22 +272,11 @@ export function ArtisanProfilePage({
               After you book, chat with {artisan.displayName.split(' ')[0]} from My bookings.
             </p>
 
-            <button disabled={busy || !selectedOffering || !date || (isAuthed && role !== 'CUSTOMER')}>
-              Book now
+            <button disabled={busy || !selectedOffering || !date || !timeSlot || (isAuthed && role !== 'CUSTOMER')}>
+              {busy ? 'Booking...' : 'Request booking'}
             </button>
           </form>
-
-          <div className="profile-stats">
-            <span>
-              Reviews <strong>{artisan.ratingCount > 0 ? artisan.ratingCount : 'None yet'}</strong>
-            </span>
-            <span>
-              Services listed <strong>{offerings.length}</strong>
-            </span>
-            <span>
-              Member since <strong>{joined}</strong>
-            </span>
-          </div>
+          <p className="muted">Member since {joined}</p>
         </aside>
       </section>
     </main>

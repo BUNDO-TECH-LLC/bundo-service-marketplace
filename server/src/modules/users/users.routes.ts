@@ -3,10 +3,12 @@ import rateLimit from 'express-rate-limit';
 import { Role } from '@prisma/client';
 import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
 import { asyncHandler } from '../../middlewares/errorHandler';
-import { ConflictError, NotFoundError, ValidationError } from '../../utils/errors';
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../utils/errors';
 import { throwOnServiceStatus } from '../../utils/resultErrors';
 import {
+  completeCustomerProfile,
   deleteUserAccount,
+  serializeUser,
   updateUserFcmToken,
   updateUserNotificationPreferences,
   updateUserPhone,
@@ -170,6 +172,39 @@ router.patch(
 );
 
 router.patch(
+  '/profile',
+  verifyFirebaseToken,
+  asyncHandler(async (req, res) => {
+    const { phone, state, area, address } = req.body;
+
+    if (typeof phone !== 'string') {
+      throw new ValidationError('phone is required');
+    }
+
+    if (typeof state !== 'string') {
+      throw new ValidationError('state is required');
+    }
+
+    const result = await completeCustomerProfile((req as any).user.firebaseUid, {
+      phone,
+      state,
+      ...(typeof area === 'string' ? { area } : {}),
+      ...(typeof address === 'string' ? { address } : {}),
+    });
+
+    throwOnServiceStatus(result.status, {
+      missing_user: new NotFoundError('User'),
+      not_customer: new ForbiddenError('Only customer accounts use this profile form.'),
+    });
+
+    res.json({
+      message: 'Profile saved',
+      user: serializeUser(result.user!),
+    });
+  })
+);
+
+router.patch(
   '/notification-preferences',
   verifyFirebaseToken,
   asyncHandler(async (req, res) => {
@@ -221,6 +256,18 @@ router.delete(
     throwOnServiceStatus(result.status, {
       missing_user: new NotFoundError('User'),
       locked_role: new ConflictError('Admin accounts cannot be deleted from the app.', 'LOCKED_ROLE'),
+      active_bookings: new ConflictError(
+        'Finish or cancel your active bookings before deleting your account.',
+        'ACTIVE_BOOKINGS'
+      ),
+      held_payments: new ConflictError(
+        'Resolve held payments before deleting your account. Contact support if you need help.',
+        'HELD_PAYMENTS'
+      ),
+      open_disputes: new ConflictError(
+        'Resolve open disputes before deleting your account.',
+        'OPEN_DISPUTES'
+      ),
     });
 
     res.json({ message: 'Account deleted' });

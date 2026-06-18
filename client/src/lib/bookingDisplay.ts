@@ -11,6 +11,7 @@ export function statusLabel(status: Booking['status']) {
 
 export function paymentLabel(status?: PaymentStatus) {
   if (!status) return 'unpaid';
+  if (status === 'REFUND_REQUESTED') return 'refund pending review';
   return status.toLowerCase().replace(/_/g, ' ');
 }
 

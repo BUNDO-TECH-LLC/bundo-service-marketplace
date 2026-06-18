@@ -217,6 +217,17 @@ export function AdminBookingsPanel({
     await refresh();
   }
 
+  async function approveCancellationRefund(paymentId: string) {
+    await api(`/admin/payments/${paymentId}/approve-cancellation-refund`, {
+      method: 'POST',
+      token,
+      body: JSON.stringify({
+        resolution: 'Cancellation refund approved from admin jobs panel',
+      }),
+    });
+    await refresh();
+  }
+
   async function confirmAppointment(bookingId: string) {
     await updateStatus(bookingId, 'ACCEPTED');
   }
@@ -403,6 +414,9 @@ export function AdminBookingsPanel({
                     )}
                     {processingPayout && (
                       <span className="booking-status ongoing">Payout processing</span>
+                    )}
+                    {paymentStatus === 'REFUND_REQUESTED' && (
+                      <span className="booking-status appointment">Refund awaiting approval</span>
                     )}
                   </div>
                 </div>
@@ -618,6 +632,21 @@ export function AdminBookingsPanel({
                         Cancel job
                       </button>
                     )}
+                  {paymentStatus === 'REFUND_REQUESTED' && booking.payment?.id && (
+                    <button
+                      type="button"
+                      className="primary-action"
+                      disabled={busy}
+                      onClick={() =>
+                        runAction(
+                          () => approveCancellationRefund(booking.payment!.id),
+                          'Cancellation refund approved'
+                        )
+                      }
+                    >
+                      Approve cancellation refund
+                    </button>
+                  )}
                   {canRelease && (
                     <button
                       type="button"

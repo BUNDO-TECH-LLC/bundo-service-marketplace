@@ -18,3 +18,17 @@ export function assertAcceptableImageFile(file: File) {
     throw new Error('Please choose a JPG, PNG, or other image file.');
   }
 }
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+export function validateImageFileForPick(file: File, maxBytes = MAX_IMAGE_BYTES) {
+  if (!isAcceptableImageFile(file)) {
+    return 'Please choose a JPG, PNG, or other image file.';
+  }
+
+  if (file.size > maxBytes) {
+    return `Image must be ${Math.round(maxBytes / (1024 * 1024))}MB or smaller.`;
+  }
+
+  return null;
+}

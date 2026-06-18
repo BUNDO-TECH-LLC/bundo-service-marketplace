@@ -12,7 +12,7 @@ export function LeaveReviewDialog({
   onClose: () => void;
   onSubmit: (input: { rating: number; comment: string }) => Promise<void>;
 }) {
-  const [rating, setRating] = useState(5);
+  const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const artisanName = booking.artisan?.displayName || booking.offering?.artisan?.displayName || 'your artisan';
   const serviceName = booking.offering?.title || 'this service';
@@ -67,7 +67,7 @@ export function LeaveReviewDialog({
         </label>
 
         <div className="booking-success-actions">
-          <button type="submit" disabled={busy}>
+          <button type="submit" disabled={busy || rating < 1}>
             Submit review
           </button>
           <button type="button" className="secondary-button" disabled={busy} onClick={onClose}>

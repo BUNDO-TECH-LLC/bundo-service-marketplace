@@ -46,6 +46,7 @@ enum PaymentStatus {
   UNPAID
   PAYMENT_PENDING
   PAID_HELD
+  REFUND_REQUESTED
   PARTIALLY_RELEASED
   RELEASED
   REFUNDED
@@ -100,6 +101,10 @@ model User {
   phone              String?        @unique
   role               Role?
   status             UserStatus     @default(ACTIVE)
+  state              String?
+  area               String?
+  address            String?
+  profileCompletedAt DateTime?      @map("profile_completed_at")
   fcmToken           String?        @map("fcm_token")
   notificationPreferences Json?     @map("notification_preferences")
   createdAt          DateTime       @default(now()) @map("created_at")

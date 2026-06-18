@@ -14,6 +14,7 @@ import {
   finalizePayoutTransferOtp,
   getSupportedPayoutBanks,
   previewPayoutAccount,
+  approveCancellationRefund,
   releaseBookingPayment,
   resolveBookingDispute,
 } from '../payments/payments.service';
@@ -714,6 +715,45 @@ router.post('/payouts/:id/finalize-otp', asyncHandler(async (req, res) => {
     message: 'Payout authorized and processing',
     payment: result.payment,
     payout: result.payout,
+  });
+}));
+
+router.post('/payments/:id/approve-cancellation-refund', asyncHandler(async (req, res) => {
+  const { resolution } = req.body;
+
+  const result = await approveCancellationRefund({
+    paymentId: String(req.params.id),
+    adminId: (req as any).user.firebaseUid,
+    ...(typeof resolution === 'string' ? { resolution } : {}),
+  });
+
+  if (result.status === 'paystack_not_configured') {
+    throw httpError(503, 'Paystack is not configured');
+  }
+
+  if (result.status === 'missing_payment') {
+    throw httpError(404, 'Payment not found');
+  }
+
+  if (result.status === 'not_refund_requested') {
+    throw httpError(409, 'This payment is not waiting for cancellation refund approval');
+  }
+
+  if (result.status === 'booking_not_cancelled') {
+    throw httpError(409, 'Cancellation refunds can only be approved for cancelled bookings');
+  }
+
+  if (result.status === 'refund_after_release') {
+    throw httpError(
+      409,
+      'A payout has already been released to the artisan, so this booking can no longer be refunded.'
+    );
+  }
+
+  res.json({
+    message: 'Cancellation refund approved and processed',
+    payment: result.payment,
+    refundReference: result.refundReference,
   });
 }));
 

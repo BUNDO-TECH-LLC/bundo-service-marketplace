@@ -34,8 +34,8 @@ export default function MarketplacePage() {
       async () => {
         await ctx.loadPublicData(ctx.selectedState, ctx.searchTerm, {
           categoryId: ctx.selectedCategoryId,
-          minPrice: '',
-          maxPrice: '',
+          minPrice: ctx.priceMin,
+          maxPrice: ctx.priceMax,
           sort: ctx.marketplaceSort,
         });
       },
@@ -81,6 +81,10 @@ export default function MarketplacePage() {
         searchTerm={ctx.searchTerm}
         selectedCategoryId={ctx.selectedCategoryId}
         sort={ctx.marketplaceSort}
+        priceMin={ctx.priceMin}
+        priceMax={ctx.priceMax}
+        onPriceMinChange={ctx.setPriceMin}
+        onPriceMaxChange={ctx.setPriceMax}
         onSelectedStateChange={ctx.setSelectedState}
         onSearchTermChange={ctx.setSearchTerm}
         onCategoryChange={ctx.setSelectedCategoryId}

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { BookingStatus, Role } from '@prisma/client';
 import { verifyFirebaseToken } from '../../middlewares/verifyFirebaseToken';
+import { requireVerifiedEmail } from '../../middlewares/requireVerifiedEmail';
 import { requireRole } from '../../middlewares/requireRole';
 import { asyncHandler } from '../../middlewares/errorHandler';
 import {
@@ -31,6 +32,7 @@ const router = Router();
 router.post(
   '/',
   verifyFirebaseToken,
+  requireVerifiedEmail,
   requireRole(Role.CUSTOMER),
   asyncHandler(async (req, res) => {
     try {
@@ -40,18 +42,14 @@ router.post(
         throw new ValidationError('offeringId is required');
       }
 
-      let scheduledDate: Date | undefined;
+      if (!scheduledAt || typeof scheduledAt !== 'string') {
+        throw new ValidationError('scheduledAt is required');
+      }
 
-      if (scheduledAt !== undefined) {
-        if (typeof scheduledAt !== 'string') {
-          throw new ValidationError('scheduledAt must be a date string');
-        }
+      const scheduledDate = new Date(scheduledAt);
 
-        scheduledDate = new Date(scheduledAt);
-
-        if (Number.isNaN(scheduledDate.getTime())) {
-          throw new ValidationError('scheduledAt must be a valid date');
-        }
+      if (Number.isNaN(scheduledDate.getTime())) {
+        throw new ValidationError('scheduledAt must be a valid date');
       }
 
       if (note !== undefined && typeof note !== 'string') {
@@ -61,7 +59,7 @@ router.post(
       const booking = await createBooking({
         customerId: (req as any).user.firebaseUid,
         offeringId,
-        ...(scheduledDate !== undefined ? { scheduledAt: scheduledDate } : {}),
+        scheduledAt: scheduledDate,
         ...(typeof note === 'string' ? { note } : {}),
       });
 
@@ -208,6 +206,15 @@ router.post(
     throwOnServiceStatus(result.status, {
       missing_booking: new NotFoundError('Booking'),
       forbidden: new ForbiddenError('You can only dispute your own booking'),
+      not_disputable: new ConflictError(
+        'Disputes can only be opened after your booking is accepted and payment is held.',
+        'DISPUTE_NOT_ALLOWED'
+      ),
+      payment_not_held: new ConflictError(
+        'Payment must be secured before opening a dispute.',
+        'DISPUTE_PAYMENT_REQUIRED'
+      ),
+      invalid_reason: new ValidationError('Describe the issue in 500 characters or fewer.'),
       already_open: new ConflictError('There is already an open dispute for this booking', 'DISPUTE_ALREADY_OPEN'),
     });
 

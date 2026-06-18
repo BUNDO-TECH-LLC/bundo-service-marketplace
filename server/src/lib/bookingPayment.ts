@@ -29,3 +29,24 @@ export function bookingPaymentRequiredForStatus(
 
   return !isBookingPaymentSecured(payment);
 }
+
+const paymentInitStatuses: BookingStatus[] = [BookingStatus.ACCEPTED, BookingStatus.ONGOING];
+
+export function bookingStatusAllowsPaymentInit(status: BookingStatus) {
+  return paymentInitStatuses.includes(status);
+}
+
+const refundablePaymentStatuses: PaymentStatus[] = [
+  PaymentStatus.PAID_HELD,
+  PaymentStatus.PAYMENT_PENDING,
+];
+
+export function isBookingPaymentRefundableOnCancel(
+  payment?: { status: PaymentStatus } | null
+) {
+  if (!payment) {
+    return false;
+  }
+
+  return refundablePaymentStatuses.includes(payment.status);
+}

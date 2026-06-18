@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ActionRunner } from '../appTypes';
+import { validateImageFileForPick } from '../lib/imageFile';
 
 export function KycImageUploadField({
   label,
@@ -35,6 +36,16 @@ export function KycImageUploadField({
           onChange={(event) => {
             const file = event.target.files?.[0];
             if (!file) return;
+
+            const validationError = validateImageFileForPick(file);
+            if (validationError) {
+              void runAction(async () => {
+                throw new Error(validationError);
+              }, '');
+              event.currentTarget.value = '';
+              return;
+            }
+
             void runAction(async () => {
               const url = await onUpload(file);
               setUploadedUrl(url);

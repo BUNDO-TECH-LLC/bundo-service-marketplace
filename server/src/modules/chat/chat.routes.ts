@@ -20,6 +20,10 @@ import {
 const router = Router();
 
 function validateMessagePayload(body: unknown, imageUrl: unknown, imageCloudinaryId: unknown) {
+  if (body !== undefined && typeof body === 'string' && body.trim().length > 2000) {
+    return 'body must be 2000 characters or fewer';
+  }
+
   if (body !== undefined && (typeof body !== 'string' || !body.trim())) {
     return 'body must be a non-empty string when provided';
   }

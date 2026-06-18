@@ -10,6 +10,7 @@ export type PaymentStatus =
   | 'UNPAID'
   | 'PAYMENT_PENDING'
   | 'PAID_HELD'
+  | 'REFUND_REQUESTED'
   | 'PARTIALLY_RELEASED'
   | 'RELEASED'
   | 'REFUNDED'
@@ -43,6 +44,11 @@ export type ApiUser = {
   phone: string | null;
   role: Role | null;
   status: 'ACTIVE' | 'BANNED';
+  state?: string | null;
+  area?: string | null;
+  address?: string | null;
+  profileCompletedAt?: string | null;
+  profileComplete?: boolean;
   notificationPreferences?: NotificationPreferences;
 };
 

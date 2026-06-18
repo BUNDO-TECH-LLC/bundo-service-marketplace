@@ -14,6 +14,7 @@ import { userDisplayName } from '../lib/userDisplayName';
 import type { ActionRunner, BookingSuccessState } from '../appTypes';
 import type { ApiUser, Artisan, Booking, Category, Offering } from '../types';
 import { EmptyState } from '../components/EmptyState';
+import { BookOfferingDialog } from '../components/BookOfferingDialog';
 
 export function LoggedInHome({
   me,
@@ -57,14 +58,19 @@ export function LoggedInHome({
   const featuredArtisan = offerings.find((offering) => offering.artisan)?.artisan ?? artisans[0];
   const popularCategories = listPopularCatalogCategories(categories, DASHBOARD_POPULAR_CATEGORY_LIMIT);
   const [activeOfferingAction, setActiveOfferingAction] = useState<string | null>(null);
+  const [bookingOffering, setBookingOffering] = useState<Offering | null>(null);
 
   async function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await onSearch();
   }
 
-  async function bookRecommendedOffering(offering: Offering) {
-    const actionKey = `book:${offering.id}`;
+  async function submitBooking(input: { scheduledAt: string; note?: string }) {
+    if (!bookingOffering) {
+      return;
+    }
+
+    const actionKey = `book:${bookingOffering.id}`;
     setActiveOfferingAction(actionKey);
 
     try {
@@ -73,14 +79,17 @@ export function LoggedInHome({
           method: 'POST',
           token,
           body: JSON.stringify({
-            offeringId: offering.id,
+            offeringId: bookingOffering.id,
+            scheduledAt: input.scheduledAt,
+            ...(input.note ? { note: input.note } : {}),
           }),
         });
         await reloadPrivate();
+        setBookingOffering(null);
         onBookingSuccess({
           bookingId: response.booking.id,
-          serviceTitle: offering.title,
-          artisanName: offering.artisan?.displayName || 'this artisan',
+          serviceTitle: bookingOffering.title,
+          artisanName: bookingOffering.artisan?.displayName || 'this artisan',
         });
       }, 'Booking requested');
     } finally {
@@ -204,7 +213,7 @@ export function LoggedInHome({
                 <button
                   className="primary-button"
                   disabled={me.role !== 'CUSTOMER' || isBookingThisOffering}
-                  onClick={() => void bookRecommendedOffering(offering)}
+                  onClick={() => setBookingOffering(offering)}
                 >
                   {isBookingThisOffering ? 'Booking...' : 'Book'}
                 </button>
@@ -222,6 +231,14 @@ export function LoggedInHome({
           })}
         </div>
       </section>
+
+      <BookOfferingDialog
+        open={bookingOffering !== null}
+        offering={bookingOffering}
+        busy={busy}
+        onClose={() => setBookingOffering(null)}
+        onSubmit={submitBooking}
+      />
     </main>
   );
 }

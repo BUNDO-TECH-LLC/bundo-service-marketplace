@@ -7,6 +7,7 @@ import { auth } from '../lib/firebase';
 import { hasPushConfig } from '../lib/messaging';
 import { resolveApiSession } from '../lib/resolveApiSession';
 import { clearStoredRoute, isAuthPathname, isPublicBrowsePathname } from '../lib/appRouting';
+import { onboardingRedirectPath } from '../lib/customerProfile';
 import { readStoredRoute, storedRouteToPath } from '../lib/workspaceRoute';
 import type { PushStatus } from '../appTypes';
 import type { ApiUser } from '../types';
@@ -226,6 +227,12 @@ export function useAppAuth({
             if (!isStale()) {
               navigateRef.current({ pathname: legacyTarget, search: '' }, { replace: true });
             }
+            return;
+          }
+
+          const onboardingTarget = onboardingRedirectPath(session.user, path);
+          if (onboardingTarget && !isStale()) {
+            navigateRef.current(onboardingTarget, { replace: true });
             return;
           }
 

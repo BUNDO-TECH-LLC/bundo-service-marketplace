@@ -4,8 +4,9 @@ import { artisanVerificationPhase } from '../../../lib/artisanVerification';
 import { locationErrorMessage, readBrowserLocation } from '../../../lib/geolocation';
 import { inferNigeriaState } from '../../../lib/inferNigeriaState';
 import { uploadKycImage } from '../../../lib/kycUpload';
-import { validateKycForm } from '../../../lib/kycValidation';
+import { validateKycForm, validateLegalName } from '../../../lib/kycValidation';
 import { uploadPortfolioImage } from '../../../lib/portfolioUpload';
+import { validateImageFileForPick } from '../../../lib/imageFile';
 import type {
   Artisan,
   ArtisanKycSubmission,
@@ -195,6 +196,11 @@ export function useArtisanLanding({
   }
 
   async function saveBasicInfo() {
+    const nameCheck = validateLegalName(setup.fullName);
+    if (!nameCheck.ok) {
+      throw new Error(nameCheck.message);
+    }
+
     await api('/artisans/profile', {
       method: profile ? 'PATCH' : 'POST',
       token,
@@ -261,6 +267,11 @@ export function useArtisanLanding({
   }
 
   async function uploadPortfolioFile(file: File, displayOrder: number) {
+    const validationError = validateImageFileForPick(file);
+    if (validationError) {
+      throw new Error(validationError);
+    }
+
     setUploadingPortfolio(true);
     try {
       await ensureArtisanProfileForUpload();

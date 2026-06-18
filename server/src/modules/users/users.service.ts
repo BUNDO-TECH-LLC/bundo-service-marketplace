@@ -1,4 +1,4 @@
-import { Prisma, Role, UserStatus } from '@prisma/client';
+import { BookingStatus, DisputeStatus, PaymentStatus, Prisma, Role, UserStatus } from '@prisma/client';
 import db from '../../db/client';
 import {
   defaultNotificationPreferences,
@@ -254,6 +254,57 @@ export const deleteUserAccount = async (firebaseUid: string) => {
     return { status: 'locked_role' as const };
   }
 
+  const activeBooking = await db.booking.count({
+    where: {
+      OR: [
+        {
+          customerId: firebaseUid,
+          status: { in: [BookingStatus.REQUESTED, BookingStatus.ACCEPTED, BookingStatus.ONGOING] },
+        },
+        {
+          artisan: { userId: firebaseUid },
+          status: { in: [BookingStatus.REQUESTED, BookingStatus.ACCEPTED, BookingStatus.ONGOING] },
+        },
+      ],
+    },
+  });
+
+  if (activeBooking > 0) {
+    return { status: 'active_bookings' as const };
+  }
+
+  const heldPayment = await db.payment.count({
+    where: {
+      OR: [
+        {
+          customerId: firebaseUid,
+          status: { in: [PaymentStatus.PAID_HELD, PaymentStatus.REFUND_REQUESTED] },
+        },
+        {
+          artisan: { userId: firebaseUid },
+          status: { in: [PaymentStatus.PAID_HELD, PaymentStatus.REFUND_REQUESTED] },
+        },
+      ],
+    },
+  });
+
+  if (heldPayment > 0) {
+    return { status: 'held_payments' as const };
+  }
+
+  const openDispute = await db.dispute.count({
+    where: {
+      status: { in: [DisputeStatus.OPEN, DisputeStatus.UNDER_REVIEW] },
+      booking: {
+        OR: [{ customerId: firebaseUid }, { artisan: { userId: firebaseUid } }],
+      },
+    },
+  });
+
+  if (openDispute > 0) {
+    return { status: 'open_disputes' as const };
+  }
+
   const anonymizedEmail = `deleted+${firebaseUid}@bundo.invalid`;
 
   await db.user.update({
@@ -262,6 +313,10 @@ export const deleteUserAccount = async (firebaseUid: string) => {
       status: UserStatus.BANNED,
       email: anonymizedEmail,
       phone: null,
+      state: null,
+      area: null,
+      address: null,
+      profileCompletedAt: null,
       fcmToken: null,
       notificationPreferences: Prisma.JsonNull,
     },
@@ -272,12 +327,90 @@ export const deleteUserAccount = async (firebaseUid: string) => {
   return { status: 'deleted' as const };
 };
 
+export function isCustomerProfileComplete(user: {
+  role: Role | null;
+  profileCompletedAt?: Date | null;
+}) {
+  if (user.role !== Role.CUSTOMER) {
+    return true;
+  }
+
+  return Boolean(user.profileCompletedAt);
+}
+
+export const completeCustomerProfile = async (
+  firebaseUid: string,
+  input: {
+    phone: string;
+    state: string;
+    area?: string;
+    address?: string;
+  }
+) => {
+  const user = await db.user.findUnique({ where: { firebaseUid } });
+
+  if (!user) {
+    return { status: 'missing_user' as const };
+  }
+
+  if (user.role !== Role.CUSTOMER) {
+    return { status: 'not_customer' as const };
+  }
+
+  const normalizedPhone = normalizePhoneInput(input.phone);
+  const state = input.state.trim();
+  const area = input.area?.trim() || null;
+  const address = input.address?.trim() || null;
+
+  if (!state) {
+    throw new ValidationError('Select your state.');
+  }
+
+  if (area && area.length > 80) {
+    throw new ValidationError('Area name is too long.');
+  }
+
+  if (address && address.length > 200) {
+    throw new ValidationError('Address is too long.');
+  }
+
+  try {
+    const updated = await db.user.update({
+      where: { firebaseUid },
+      data: {
+        phone: normalizedPhone,
+        state,
+        area,
+        address,
+        profileCompletedAt: new Date(),
+      },
+    });
+
+    invalidateCachedAuthUser(firebaseUid);
+
+    return { status: 'updated' as const, user: updated };
+  } catch (error) {
+    if (isUniqueConstraintError(error)) {
+      throw new ConflictError(
+        'This phone number is already linked to another Bundo account.',
+        'PHONE_IN_USE'
+      );
+    }
+
+    throw error;
+  }
+};
+
 export function serializeUser(user: {
   firebaseUid: string;
   email: string | null;
   phone: string | null;
   role: Role | null;
   status: string;
+  state?: string | null;
+  area?: string | null;
+  address?: string | null;
+  profileCompletedAt?: Date | null;
   notificationPreferences?: unknown | null;
 }) {
   return {
@@ -286,6 +419,11 @@ export function serializeUser(user: {
     phone: user.phone,
     role: user.role,
     status: user.status,
+    state: user.state ?? null,
+    area: user.area ?? null,
+    address: user.address ?? null,
+    profileCompletedAt: user.profileCompletedAt?.toISOString() ?? null,
+    profileComplete: isCustomerProfileComplete(user),
     notificationPreferences: getUserNotificationPreferences(user),
   };
 }

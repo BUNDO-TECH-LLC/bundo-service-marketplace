@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { validateAvailabilitySlotTimes } from '../../lib/bookingSchedule';
 import { asyncHandler } from '../../middlewares/errorHandler';
 import { BadGatewayError, httpError } from '../../utils/errors';
 import { Prisma, Role } from '@prisma/client';
@@ -379,6 +380,12 @@ router.post(
       throw httpError(400, 'endTime is required');
     }
 
+    try {
+      validateAvailabilitySlotTimes(startTime, endTime);
+    } catch (error) {
+      throw httpError(400, error instanceof Error ? error.message : 'Invalid availability times');
+    }
+
     const slot = await addAvailabilitySlot((req as any).user.firebaseUid, {
       dayOfWeek,
       startTime,
@@ -672,6 +679,14 @@ router.patch(
 
     if (!Object.keys(data).length) {
       throw httpError(400, 'No availability fields provided');
+    }
+
+    if (data.startTime && data.endTime) {
+      try {
+        validateAvailabilitySlotTimes(data.startTime, data.endTime);
+      } catch (error) {
+        throw httpError(400, error instanceof Error ? error.message : 'Invalid availability times');
+      }
     }
 
     const result = await updateAvailabilitySlotForArtisan({

@@ -2,6 +2,7 @@ import { BookingStatus, NotificationType, Prisma, Role, UserStatus, VerifyStatus
 import db from '../../db/client';
 import { appendBookingLifecycleMessage } from '../../lib/bookingConversations';
 import { bookingPaymentRequiredForStatus } from '../../lib/bookingPayment';
+import { bookingFitsAvailability, validateBookingSchedule } from '../../lib/bookingSchedule';
 import {
   bookingStatusNotificationCopy,
   canTransitionBookingStatus,
@@ -10,35 +11,8 @@ import { Pagination, paginationArgs } from '../../utils/pagination';
 import { getArtisanProfileByUserId } from '../artisans/artisans.service';
 import { workspaceBookingLink } from '../../lib/appLinks';
 import { createNotifications } from '../notifications/notifications.service';
-
-function toMinutes(value: string) {
-  const [hours = 0, minutes = 0] = value.split(':').map(Number);
-  return hours * 60 + minutes;
-}
-
-function bookingFitsAvailability(
-  scheduledAt: Date,
-  slots: Array<{ dayOfWeek: number; startTime: string; endTime: string; isActive: boolean }>
-) {
-  const activeSlots = slots.filter((slot) => slot.isActive);
-
-  if (!activeSlots.length) {
-    return true;
-  }
-
-  const dayOfWeek = scheduledAt.getDay();
-  const minuteOfDay = scheduledAt.getHours() * 60 + scheduledAt.getMinutes();
-
-  return activeSlots.some((slot) => {
-    if (slot.dayOfWeek !== dayOfWeek) {
-      return false;
-    }
-
-    const start = toMinutes(slot.startTime);
-    const end = toMinutes(slot.endTime);
-    return minuteOfDay >= start && minuteOfDay < end;
-  });
-}
+import { refundBookingPaymentOnCancel } from '../payments/payments.service';
+import { ValidationError } from '../../utils/errors';
 
 function bookingThreadMessage(input: {
   serviceTitle?: string | null;
@@ -65,7 +39,7 @@ function bookingThreadMessage(input: {
 export const createBooking = async (input: {
   customerId: string;
   offeringId: string;
-  scheduledAt?: Date;
+  scheduledAt: Date;
   note?: string;
 }) => {
   const offering = await db.offering.findUnique({
@@ -75,6 +49,10 @@ export const createBooking = async (input: {
         include: {
           user: {
             select: { status: true },
+          },
+          availabilitySlots: {
+            where: { isActive: true },
+            orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }],
           },
         },
       },
@@ -92,14 +70,25 @@ export const createBooking = async (input: {
     return null;
   }
 
+  if (offering.artisan.userId === input.customerId) {
+    throw new ValidationError('You cannot book your own service.');
+  }
+
+  validateBookingSchedule(input.scheduledAt, offering.artisan.availabilitySlots);
+
+  const trimmedNote = input.note?.trim();
+  if (trimmedNote && trimmedNote.length > 500) {
+    throw new ValidationError('Booking note must be 500 characters or fewer.');
+  }
+
   const booking = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const createdBooking = await tx.booking.create({
       data: {
         customerId: input.customerId,
         artisanId: offering.artisanId,
         offeringId: offering.id,
-        ...(input.scheduledAt !== undefined ? { scheduledAt: input.scheduledAt } : {}),
-        ...(input.note !== undefined ? { note: input.note } : {}),
+        scheduledAt: input.scheduledAt,
+        ...(trimmedNote ? { note: trimmedNote } : {}),
       },
       include: {
         artisan: true,
@@ -414,6 +403,8 @@ export const cancelBookingForCustomer = async (input: {
     },
   });
 
+  await refundBookingPaymentOnCancel(updated.id);
+
   if (updated.artisan?.userId) {
     await createNotifications([
       {
@@ -509,6 +500,10 @@ export const updateBookingStatusForArtisan = async (input: {
     },
   });
 
+  if (input.status === BookingStatus.CANCELLED) {
+    await refundBookingPaymentOnCancel(updated.id);
+  }
+
   const notification = bookingStatusNotificationCopy({
     status: input.status,
     serviceTitle: updated.offering?.title,
@@ -588,22 +583,28 @@ export const rescheduleBooking = async (input: {
     return { status: 'not_reschedulable' as const };
   }
 
+  if (!booking.artisan) {
+    return { status: 'missing_artisan' as const };
+  }
+
   if (input.scheduledAt.getTime() <= Date.now()) {
     return { status: 'invalid_schedule' as const };
   }
 
-  if (
-    booking.artisan &&
-    !bookingFitsAvailability(input.scheduledAt, booking.artisan.availabilitySlots)
-  ) {
+  if (!bookingFitsAvailability(input.scheduledAt, booking.artisan.availabilitySlots)) {
     return { status: 'outside_availability' as const };
+  }
+
+  const trimmedNote = input.note?.trim();
+  if (trimmedNote && trimmedNote.length > 500) {
+    return { status: 'invalid_note' as const };
   }
 
   const updated = await db.booking.update({
     where: { id: input.bookingId },
     data: {
       scheduledAt: input.scheduledAt,
-      note: input.note !== undefined ? input.note : booking.note,
+      note: trimmedNote !== undefined ? trimmedNote || null : booking.note,
     },
     include: {
       customerUser: {

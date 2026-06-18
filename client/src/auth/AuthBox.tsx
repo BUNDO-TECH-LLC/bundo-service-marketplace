@@ -189,8 +189,7 @@ export function AuthBox({
       options.phoneOverride !== undefined
         ? options.phoneOverride || undefined
         : phone.trim() || rememberedPhone || undefined;
-    const phoneToApply =
-      authMode === 'signup' ? resolvedPhone : undefined;
+    const phoneToApply = undefined;
     const resolvedRole = roleOverride || resolveSignupIntent(firebaseAuthUser.email, preferredRole);
     const artisanIntent = resolvedRole === 'ARTISAN';
     const intendedRole = resolvedRole === 'CUSTOMER' ? ('CUSTOMER' as const) : undefined;
@@ -403,12 +402,6 @@ export function AuthBox({
       return;
     }
 
-    if (mode === 'signup' && !phone.trim()) {
-      onNotice('Enter your phone number (include country code, e.g. +234…).');
-      setSubmitting(false);
-      return;
-    }
-
     if (mode === 'signup' && password.length < 8) {
       onNotice('Password must be at least 8 characters.');
       setSubmitting(false);
@@ -424,12 +417,9 @@ export function AuthBox({
     if (mode === 'signup') {
       setSubmitting(true);
       onNotice('Checking your details...');
-      const [emailAvailable, phoneAvailable] = await Promise.all([
-        validateSignupEmailField(),
-        validateSignupPhoneField(),
-      ]);
+      const emailAvailable = await validateSignupEmailField();
 
-      if (!emailAvailable || !phoneAvailable) {
+      if (!emailAvailable) {
         setSubmitting(false);
         return;
       }
@@ -1189,26 +1179,6 @@ export function AuthBox({
                     />
                     {emailError && <span className="auth-field-error">{emailError}</span>}
               </label>
-                  {mode === 'signup' && (
-                    <label>
-                      Phone number
-                      <input
-                        value={phone}
-                        onChange={(event) => {
-                          setPhone(event.target.value);
-                          if (phoneError) {
-                            setPhoneError('');
-                          }
-                        }}
-                        placeholder="+2348012345678"
-                        type="tel"
-                        autoComplete="tel"
-                        aria-invalid={phoneError ? 'true' : undefined}
-                        required
-                      />
-                      {phoneError && <span className="auth-field-error">{phoneError}</span>}
-                    </label>
-                  )}
                   {mode !== 'reset' && (
                     <label>
                       Password

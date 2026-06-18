@@ -9,6 +9,10 @@ export function MarketplaceFilters({
   searchTerm,
   selectedCategoryId,
   sort,
+  priceMin,
+  priceMax,
+  onPriceMinChange,
+  onPriceMaxChange,
   onSelectedStateChange,
   onSearchTermChange,
   onCategoryChange,
@@ -23,6 +27,10 @@ export function MarketplaceFilters({
   searchTerm: string;
   selectedCategoryId: string;
   sort: MarketplaceSort;
+  priceMin: string;
+  priceMax: string;
+  onPriceMinChange: (value: string) => void;
+  onPriceMaxChange: (value: string) => void;
   onSelectedStateChange: (value: string) => void;
   onSearchTermChange: (value: string) => void;
   onCategoryChange: (value: string) => void;
@@ -71,6 +79,28 @@ export function MarketplaceFilters({
             value={searchTerm}
             onChange={(event) => onSearchTermChange(event.target.value)}
             placeholder="Lekki, artisan, service"
+          />
+        </label>
+        <label>
+          Min price (₦)
+          <input
+            type="number"
+            min={0}
+            inputMode="numeric"
+            value={priceMin}
+            onChange={(event) => onPriceMinChange(event.target.value)}
+            placeholder="500"
+          />
+        </label>
+        <label>
+          Max price (₦)
+          <input
+            type="number"
+            min={0}
+            inputMode="numeric"
+            value={priceMax}
+            onChange={(event) => onPriceMaxChange(event.target.value)}
+            placeholder="50000"
           />
         </label>
         <label>

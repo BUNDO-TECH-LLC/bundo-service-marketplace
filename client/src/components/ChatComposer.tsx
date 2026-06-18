@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { validateImageFileForPick } from '../lib/imageFile';
 
 export type ChatComposerPayload = {
   body: string;
@@ -24,6 +25,7 @@ export function ChatComposer({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState('');
   const [preview, setPreview] = useState<{ url: string; file: File } | null>(null);
+  const [fileError, setFileError] = useState('');
 
   useEffect(() => {
     return () => {
@@ -48,6 +50,15 @@ export function ChatComposer({
     if (!file) {
       return;
     }
+
+    const validationError = validateImageFileForPick(file);
+    if (validationError) {
+      setFileError(validationError);
+      event.target.value = '';
+      return;
+    }
+
+    setFileError('');
 
     if (preview?.url) {
       URL.revokeObjectURL(preview.url);
@@ -102,6 +113,8 @@ export function ChatComposer({
         </div>
       )}
 
+      {fileError && <p className="auth-field-error">{fileError}</p>}
+
       <div className="chat-composer">
         <input
           ref={fileInputRef}
@@ -128,6 +141,7 @@ export function ChatComposer({
           value={text}
           placeholder={placeholder}
           rows={1}
+          maxLength={2000}
           disabled={busy}
           aria-label={placeholder}
           onChange={(event) => setText(event.target.value)}

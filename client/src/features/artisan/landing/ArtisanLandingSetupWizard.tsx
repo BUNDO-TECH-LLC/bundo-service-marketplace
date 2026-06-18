@@ -52,7 +52,12 @@ export function ArtisanLandingSetupWizard({ landing }: { landing: ArtisanLanding
                 key={stepItem.id}
                 type="button"
                 className={number <= step ? 'active' : ''}
-                onClick={() => setStep(number)}
+                onClick={() => {
+                  if (number < step) {
+                    setStep(number);
+                  }
+                }}
+                disabled={number > step}
                 aria-current={number === step ? 'step' : undefined}
               >
                 <span className="artisan-stepper-num">{number}</span>

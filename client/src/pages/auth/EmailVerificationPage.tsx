@@ -6,6 +6,7 @@ import { ApiError } from '../../lib/api';
 import { EmailInboxHint } from '../../components/EmailInboxHint';
 import { sendBundoEmailVerification } from '../../lib/authEmailVerification';
 import { ARTISAN_ONBOARDING_PATH, markArtisanApplicant } from '../../lib/artisanApplication';
+import { CUSTOMER_PROFILE_PATH, isCustomerProfileComplete } from '../../lib/customerProfile';
 import { buildAuthDrawerSearch } from '../../lib/authDrawerPrompt';
 import { readPendingSignupPhone, resolveSignupIntent } from '../../lib/authSignupStorage';
 import { finalizeAuthSession } from '../../lib/authSessionFlow';
@@ -147,6 +148,11 @@ export function EmailVerificationPage() {
     if (signupIntent === 'ARTISAN') {
       markArtisanApplicant(session.user.firebaseUid);
       navigate(ARTISAN_ONBOARDING_PATH, { replace: true });
+      return;
+    }
+
+    if (!isCustomerProfileComplete(session.user)) {
+      navigate(CUSTOMER_PROFILE_PATH, { replace: true });
       return;
     }
 

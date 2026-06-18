@@ -42,6 +42,11 @@ export const createReview = async (input: {
     return { status: 'duplicate_review' as const };
   }
 
+  const trimmedComment = input.comment?.trim();
+  if (trimmedComment && trimmedComment.length > 1000) {
+    return { status: 'comment_too_long' as const };
+  }
+
   const result = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const review = await tx.review.create({
       data: {
@@ -49,7 +54,7 @@ export const createReview = async (input: {
         customerId: input.customerId,
         artisanId: booking.artisanId,
         rating: input.rating,
-        ...(input.comment !== undefined ? { comment: input.comment } : {}),
+        ...(trimmedComment ? { comment: trimmedComment } : {}),
       },
       include: {
         customer: {
@@ -107,8 +112,6 @@ export const getReviewsForArtisan = async (artisanId: string) => {
       customer: {
         select: {
           firebaseUid: true,
-          email: true,
-          phone: true,
         },
       },
       booking: {

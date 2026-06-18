@@ -14,6 +14,7 @@ const HelpPage = lazy(() => import('../pages/HelpPage'));
 const ArtisanProfileRoute = lazy(() => import('../pages/ArtisanProfileRoute'));
 const ArtisanOnboardingPage = lazy(() => import('../pages/ArtisanOnboardingPage'));
 const ArtisanOnboardingWelcomePage = lazy(() => import('../pages/ArtisanOnboardingWelcomePage'));
+const CustomerProfilePage = lazy(() => import('../pages/CustomerProfilePage'));
 const LoadingPage = lazy(() => import('../pages/LoadingPage'));
 
 function PageFallback() {
@@ -51,6 +52,7 @@ export function AppRoutes() {
           <Route path="artisans/:artisanId" element={<ArtisanProfileRoute />} />
           <Route path="artisan/onboarding/welcome" element={<ArtisanOnboardingWelcomePage />} />
           <Route path="artisan/onboarding" element={<ArtisanOnboardingPage />} />
+          <Route path="onboarding/profile" element={<CustomerProfilePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
