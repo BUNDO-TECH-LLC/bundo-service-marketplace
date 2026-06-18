@@ -12,6 +12,7 @@ import {
   getPayoutAccountForArtisanUser,
 } from '../payments/payments.service';
 import { setUserOnboardingIntent } from '../users/users.service';
+import { getPagination, paginationMeta } from '../../utils/pagination';
 import {
   addAvailabilitySlot,
   addPortfolioImage,
