@@ -160,7 +160,7 @@ export default function WorkspacePage() {
       {me && workspaceSection === 'bookings' && (
         <BookingsPage
           bookings={ctx.bookings}
-          mode={artisanWorkspace ? 'artisan' : 'customer'}
+          mode={me.role === 'ARTISAN' ? 'artisan' : 'customer'}
           token={ctx.token}
           busy={ctx.busy}
           runAction={ctx.withNotice}

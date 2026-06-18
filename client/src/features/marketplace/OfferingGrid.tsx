@@ -4,6 +4,7 @@ import { useAppRoot } from '../../app/appRootContext';
 import { BookOfferingDialog } from '../../components/BookOfferingDialog';
 import { EmptyState } from '../../components/EmptyState';
 import { api } from '../../lib/api';
+import { completeBookingRequest } from '../../lib/bookingSuccess';
 import { money } from '../../lib/formatting';
 import type { Booking, Offering, Role } from '../../types';
 
@@ -57,14 +58,15 @@ export function OfferingGrid({
           ...(input.note ? { note: input.note } : {}),
         }),
       });
-      await reloadPrivate();
       setBookingOffering(null);
-      onBookingSuccess({
-        bookingId: response.booking.id,
+      await completeBookingRequest({
+        booking: response.booking,
         serviceTitle: bookingOffering.title,
         artisanName: bookingOffering.artisan?.displayName || 'this artisan',
+        onBookingSuccess,
+        reloadPrivate,
       });
-    }, 'Booking requested');
+    }, '');
   }
 
   return (

@@ -5,7 +5,7 @@ import type { AuthDrawerPrompt } from '../lib/authDrawerPrompt';
 import { parseAuthDrawerPrompt, stripAuthDrawerParams } from '../lib/authDrawerPrompt';
 import { AuthBox } from '../auth/AuthBox';
 import { BundoLoadingScreen } from '../components/BundoLoadingScreen';
-import { buildAppPath } from '../lib/appPaths';
+import { buildAppPath, buildCustomerBookingsPath } from '../lib/appPaths';
 import { needsPublicMarketplaceData } from '../lib/appRouting';
 import { locationErrorMessage } from '../lib/geolocation';
 import { nextHelpOpenState } from '../lib/helpNavigation';
@@ -328,6 +328,10 @@ export function MainLayout() {
           onGoToMessages={() => {
             ctx.setBookingSuccess(null);
             ctx.navigate(buildAppPath({ view: 'workspace', workspaceSection: 'messages' }));
+          }}
+          onViewBookings={() => {
+            ctx.setBookingSuccess(null);
+            ctx.navigate(buildCustomerBookingsPath('REQUESTED'));
           }}
         />
       )}

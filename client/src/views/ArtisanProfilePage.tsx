@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useAppRoot } from '../app/appRootContext';
 import { api } from '../lib/api';
+import { completeBookingRequest } from '../lib/bookingSuccess';
 import { money } from '../lib/formatting';
 import {
   buildTimeOptionsForDate,
@@ -95,11 +96,12 @@ export function ArtisanProfilePage({
         ...(note.trim() ? { note: note.trim() } : {}),
       }),
     });
-    await reloadPrivate();
-    onBookingSuccess({
-      bookingId: response.booking.id,
+    await completeBookingRequest({
+      booking: response.booking,
       serviceTitle: selectedOffering.title,
       artisanName: artisan.displayName,
+      onBookingSuccess,
+      reloadPrivate,
     });
   }
 
@@ -204,7 +206,7 @@ export function ArtisanProfilePage({
 
         <aside className="booking-card" id="profile-booking-card">
           <h2>Book {artisan.displayName.split(' ')[0]}</h2>
-          <form onSubmit={(event) => runAction(() => createBooking(event), 'Booking requested')}>
+          <form onSubmit={(event) => runAction(() => createBooking(event), '')}>
             <label>
               Select service
               <select value={offeringId} onChange={(event) => setOfferingId(event.target.value)} required>

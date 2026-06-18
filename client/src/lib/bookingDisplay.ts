@@ -4,8 +4,9 @@ import type { Booking, Conversation, PaymentStatus, Role } from '../types';
 export const MIN_PAYMENT_AMOUNT_NGN = 500;
 
 export function statusLabel(status: Booking['status']) {
+  if (status === 'REQUESTED') return 'pending';
   if (status === 'ONGOING') return 'in progress';
-  if (status === 'ACCEPTED') return 'appointment';
+  if (status === 'ACCEPTED') return 'accepted';
   return status.toLowerCase().replace(/_/g, ' ');
 }
 

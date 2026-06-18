@@ -1,4 +1,5 @@
 import type { AdminSection, View, WorkspaceSection } from '../appTypes';
+import type { Booking } from '../types';
 
 export const VALID_WORKSPACE_SECTIONS: WorkspaceSection[] = [
   'overview',
@@ -68,6 +69,14 @@ export function buildAppPath(input: {
 
 export function buildArtisanBookingPath(bookingId: string): string {
   return `/workspace/bookings?job=${encodeURIComponent(bookingId)}`;
+}
+
+export function buildCustomerBookingsPath(status?: Booking['status']): string {
+  if (!status) {
+    return '/workspace/bookings';
+  }
+
+  return `/workspace/bookings?status=${encodeURIComponent(status)}`;
 }
 
 function isWorkspaceSection(value: string): value is WorkspaceSection {

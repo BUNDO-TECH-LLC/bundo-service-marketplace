@@ -11,6 +11,7 @@ import { money } from '../lib/formatting';
 import { formatStarDisplay } from '../lib/ratingDisplay';
 import { nigeriaStates } from '../lib/geo';
 import { userDisplayName } from '../lib/userDisplayName';
+import { completeBookingRequest } from '../lib/bookingSuccess';
 import type { ActionRunner, BookingSuccessState } from '../appTypes';
 import type { ApiUser, Artisan, Booking, Category, Offering } from '../types';
 import { EmptyState } from '../components/EmptyState';
@@ -84,14 +85,15 @@ export function LoggedInHome({
             ...(input.note ? { note: input.note } : {}),
           }),
         });
-        await reloadPrivate();
         setBookingOffering(null);
-        onBookingSuccess({
-          bookingId: response.booking.id,
+        await completeBookingRequest({
+          booking: response.booking,
           serviceTitle: bookingOffering.title,
           artisanName: bookingOffering.artisan?.displayName || 'this artisan',
+          onBookingSuccess,
+          reloadPrivate,
         });
-      }, 'Booking requested');
+      }, '');
     } finally {
       setActiveOfferingAction(null);
     }

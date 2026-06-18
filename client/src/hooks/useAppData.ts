@@ -198,7 +198,7 @@ export function useAppData(filters: MarketplaceFilterState, options?: UseAppData
 
     if (user.role === 'CUSTOMER') {
       const [bookingRes, conversationRes, notificationRes] = await Promise.all([
-        api<{ bookings: Booking[] }>('/bookings/customer?page=1&limit=10', { token: authToken }).catch(() => ({
+        api<{ bookings: Booking[] }>('/bookings/customer?page=1&limit=50', { token: authToken }).catch(() => ({
           bookings: [],
         })),
         api<{ conversations: Conversation[] }>('/conversations', { token: authToken }).catch((err) =>

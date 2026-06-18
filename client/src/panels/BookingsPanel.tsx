@@ -25,6 +25,24 @@ import {
 } from '../lib/bookingPayment';
 import type { ActionRunner } from '../appTypes';
 import type { Booking } from '../types';
+
+const BOOKING_STATUS_FILTERS = new Set<Booking['status']>([
+  'REQUESTED',
+  'ACCEPTED',
+  'ONGOING',
+  'COMPLETED',
+  'DECLINED',
+  'CANCELLED',
+]);
+
+function filterFromSearchParam(value: string | null): 'ALL' | Booking['status'] {
+  if (!value) {
+    return 'ALL';
+  }
+
+  const normalized = value.toUpperCase() as Booking['status'];
+  return BOOKING_STATUS_FILTERS.has(normalized) ? normalized : 'ALL';
+}
 import { EmptyState } from '../components/EmptyState';
 
 export function BookingsSummary({ bookings, title = 'My bookings' }: { bookings: Booking[]; title?: string }) {
@@ -235,7 +253,8 @@ export function BookingsPage({
   openMessages: () => void;
 }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [filter, setFilter] = useState<'ALL' | Booking['status']>('ALL');
+  const statusFromUrl = searchParams.get('status');
+  const [filter, setFilter] = useState<'ALL' | Booking['status']>(() => filterFromSearchParam(statusFromUrl));
   const tabs: Array<{ label: string; value: 'ALL' | Booking['status'] }> = [
     { label: 'All', value: 'ALL' },
     { label: 'Pending', value: 'REQUESTED' },
@@ -247,6 +266,14 @@ export function BookingsPage({
   const jobIdFromUrl = searchParams.get('job');
   const [selectedArtisanBookingId, setSelectedArtisanBookingId] = useState<string | null>(() => jobIdFromUrl);
   const selectedArtisanBooking = bookings.find((booking) => booking.id === selectedArtisanBookingId) || null;
+
+  useEffect(() => {
+    if (mode !== 'customer') {
+      return;
+    }
+
+    setFilter(filterFromSearchParam(statusFromUrl));
+  }, [mode, statusFromUrl]);
 
   useEffect(() => {
     if (mode !== 'artisan') {
@@ -492,7 +519,14 @@ export function BookingsPage({
           <button
             key={tab.value}
             className={filter === tab.value ? 'active' : ''}
-            onClick={() => setFilter(tab.value)}
+            onClick={() => {
+              setFilter(tab.value);
+              if (tab.value === 'ALL') {
+                setSearchParams({}, { replace: true });
+                return;
+              }
+              setSearchParams({ status: tab.value }, { replace: true });
+            }}
           >
             {tab.label}
           </button>
