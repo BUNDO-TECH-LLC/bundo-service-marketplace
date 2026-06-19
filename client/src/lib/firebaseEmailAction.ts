@@ -22,9 +22,14 @@ export async function completeFirebaseEmailAction(auth: Auth, search: string) {
   }
 
   await applyActionCode(auth, action.oobCode);
-  await auth.currentUser?.reload();
 
-  return { handled: true as const, verified: Boolean(auth.currentUser?.emailVerified) };
+  if (auth.currentUser) {
+    await auth.currentUser.reload();
+    return { handled: true as const, verified: auth.currentUser.emailVerified };
+  }
+
+  // Link opened without a session — applyActionCode succeeding means the email is verified.
+  return { handled: true as const, verified: true };
 }
 
 export function stripFirebaseEmailActionParams(search: string) {
