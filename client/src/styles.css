@@ -10862,6 +10862,140 @@ footer h4 {
   resize: vertical;
 }
 
+.book-offering-backdrop {
+  padding: 20px 16px;
+}
+
+.book-offering-dialog {
+  display: grid;
+  gap: 16px;
+  width: min(100%, 440px);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 18px;
+  border: 1px solid #d7d2ce;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgb(15 18 24 / 18%);
+}
+
+.book-offering-dialog-card {
+  display: grid;
+  gap: 16px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #ece8e4;
+}
+
+.book-offering-dialog-card .recommended-card-head h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.book-offering-dialog-lead {
+  margin: 0;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.book-offering-dialog-availability {
+  margin: -8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.book-offering-dialog-fields {
+  display: grid;
+  gap: 14px;
+}
+
+.book-offering-dialog-fields label {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.book-offering-dialog-optional {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.book-offering-dialog-fields input,
+.book-offering-dialog-fields select,
+.book-offering-dialog-fields textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #d7d2ce;
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: var(--ink);
+  background: #fff;
+  font: inherit;
+  box-shadow: 0 8px 26px rgb(15 18 24 / 4%);
+}
+
+.book-offering-dialog-fields input:focus,
+.book-offering-dialog-fields select:focus,
+.book-offering-dialog-fields textarea:focus {
+  outline: 2px solid rgb(239 129 45 / 22%);
+  border-color: var(--accent);
+}
+
+.book-offering-dialog-error {
+  margin: 0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--color-danger-dark, #9b1c1c);
+  background: var(--color-danger-wash, #fdecec);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.book-offering-dialog-actions {
+  display: grid;
+  gap: 4px;
+}
+
+.book-offering-dialog-submit {
+  width: 100%;
+  border-radius: 8px;
+  background: #111;
+}
+
+.book-offering-dialog-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.book-offering-dialog-cancel {
+  justify-self: start;
+  margin-top: 0;
+}
+
+@media (max-width: 480px) {
+  .book-offering-dialog {
+    width: 100%;
+    max-height: calc(100dvh - 24px);
+    padding: 16px;
+  }
+
+  .book-offering-dialog-card .recommended-meta {
+    grid-template-columns: auto 1fr;
+  }
+
+  .book-offering-dialog-card .recommended-meta strong {
+    grid-column: 1 / -1;
+    font-size: 18px;
+  }
+}
+
 .bundo-loading-screen,
 .bundo-loading-page {
   display: grid;

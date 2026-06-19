@@ -7,6 +7,7 @@ import {
   validateBookingDateTime,
 } from '../lib/bookingSchedule';
 import { money } from '../lib/formatting';
+import { formatStarDisplay } from '../lib/ratingDisplay';
 import type { AvailabilitySlot, Offering } from '../types';
 
 export function BookOfferingDialog({
@@ -55,7 +56,10 @@ export function BookOfferingDialog({
     return null;
   }
 
-  const artisanName = offering.artisan?.displayName || 'this artisan';
+  const artisan = offering.artisan;
+  const artisanName = artisan?.displayName || 'Approved artisan';
+  const avgRating = artisan?.avgRating || 0;
+  const ratingCount = artisan?.ratingCount || 0;
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -73,80 +77,110 @@ export function BookOfferingDialog({
   }
 
   return (
-    <div className="prompt-dialog-backdrop" role="presentation" onClick={onClose}>
+    <div className="prompt-dialog-backdrop book-offering-backdrop" role="presentation" onClick={onClose}>
       <form
-        className="prompt-dialog book-offering-dialog"
+        className="book-offering-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="book-offering-title"
         onClick={(event) => event.stopPropagation()}
         onSubmit={(event) => void handleSubmit(event)}
       >
-        <h2 id="book-offering-title">Book {offering.title}</h2>
-        <p className="prompt-dialog-message">
+        <div className="book-offering-dialog-card">
+          <div className="recommended-card-head">
+            <span className="recommended-avatar" aria-hidden="true">
+              {artisanName.slice(0, 1).toUpperCase()}
+            </span>
+            <div>
+              <h2 id="book-offering-title">{artisanName}</h2>
+              <p>{artisan?.area || artisan?.city || 'Nearby'}</p>
+            </div>
+            <small>{artisan?.city || 'Bundo'}</small>
+          </div>
+
+          <div className="recommended-tags">
+            <span>{offering.category?.name || 'Service'}</span>
+            <span>{offering.title}</span>
+          </div>
+
+          <div className="recommended-meta">
+            <span className="rating">{formatStarDisplay(avgRating)}</span>
+            <span>
+              {avgRating.toFixed(1)}({ratingCount})
+            </span>
+            <strong>
+              From {money(offering.priceFrom)}
+              {offering.priceTo ? ` – ${money(offering.priceTo)}` : ''}
+            </strong>
+          </div>
+        </div>
+
+        <p className="book-offering-dialog-lead">
           Choose when you need {artisanName}. Final price is agreed before payment.
         </p>
-        <p className="muted">{formatAvailabilityHint(slots)}</p>
-        <p className="booking-guide-price">
-          Guide price: {money(offering.priceFrom)}
-          {offering.priceTo ? ` – ${money(offering.priceTo)}` : ''}
-        </p>
+        <p className="book-offering-dialog-availability">{formatAvailabilityHint(slots)}</p>
 
-        <label>
-          Date
-          <input
-            type="date"
-            value={date}
-            min={todayDateInputValue()}
-            onChange={(event) => {
-              setDate(event.target.value);
-              setError('');
-            }}
-            required
-          />
-        </label>
+        <div className="book-offering-dialog-fields">
+          <label>
+            Date
+            <input
+              type="date"
+              value={date}
+              min={todayDateInputValue()}
+              onChange={(event) => {
+                setDate(event.target.value);
+                setError('');
+              }}
+              required
+            />
+          </label>
 
-        <label>
-          Time
-          <select
-            value={time}
-            onChange={(event) => {
-              setTime(event.target.value);
-              setError('');
-            }}
-            required
-            disabled={!date || timeOptions.length === 0}
-          >
-            <option value="">
-              {!date ? 'Select a date first' : timeOptions.length ? 'Select a time' : 'No slots this day'}
-            </option>
-            {timeOptions.map((option) => (
-              <option key={option} value={option}>
-                {option}
+          <label>
+            Time
+            <select
+              value={time}
+              onChange={(event) => {
+                setTime(event.target.value);
+                setError('');
+              }}
+              required
+              disabled={!date || timeOptions.length === 0}
+            >
+              <option value="">
+                {!date ? 'Select a date first' : timeOptions.length ? 'Select a time' : 'No slots this day'}
               </option>
-            ))}
-          </select>
-        </label>
+              {timeOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label>
-          Note for artisan (optional)
-          <textarea
-            value={note}
-            maxLength={500}
-            rows={3}
-            placeholder="Share access details, preferred contact time, or job specifics."
-            onChange={(event) => setNote(event.target.value)}
-          />
-        </label>
+          <label>
+            Note for artisan <span className="book-offering-dialog-optional">(optional)</span>
+            <textarea
+              value={note}
+              maxLength={500}
+              rows={3}
+              placeholder="Share access details, preferred contact time, or job specifics."
+              onChange={(event) => setNote(event.target.value)}
+            />
+          </label>
+        </div>
 
-        {error && <p className="auth-field-error">{error}</p>}
+        {error && <p className="book-offering-dialog-error">{error}</p>}
 
-        <div className="prompt-dialog-actions">
-          <button type="button" className="secondary-button" disabled={busy} onClick={onClose}>
-            Cancel
-          </button>
-          <button type="submit" disabled={busy || !date || !time}>
+        <div className="book-offering-dialog-actions">
+          <button
+            type="submit"
+            className="primary-button book-offering-dialog-submit"
+            disabled={busy || !date || !time}
+          >
             {busy ? 'Booking…' : 'Request booking'}
+          </button>
+          <button type="button" className="text-button book-offering-dialog-cancel" disabled={busy} onClick={onClose}>
+            Cancel
           </button>
         </div>
       </form>
