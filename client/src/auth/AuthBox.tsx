@@ -156,6 +156,9 @@ export function AuthBox({
   const [lastName, setLastName] = useState('');
   const [emailError, setEmailError] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [confirmPasswordError, setConfirmPasswordError] = useState('');
+  const [formError, setFormError] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -330,12 +333,15 @@ export function AuthBox({
 
   async function validateSignupEmailField() {
     if (!validateEmailField()) {
+      const message = emailError || 'Enter a valid email address.';
+      setFormError(message);
       return false;
     }
 
     const deliverability = await checkEmailDeliverability(email, { purpose: 'signup' });
     if (!deliverability.ok) {
       setEmailError(deliverability.message);
+      setFormError(deliverability.message);
       onNotice(deliverability.message);
       return false;
     }
@@ -349,6 +355,7 @@ export function AuthBox({
     const status = await checkEmailAccountStatus(email);
     if (!status.ok) {
       setEmailError(status.message);
+      setFormError(status.message);
       onNotice(status.message);
       return true;
     }
@@ -364,6 +371,7 @@ export function AuthBox({
     setPreferredRole(null);
     saveSessionSignupIntent(null);
     setEmailError(message);
+    setFormError(message);
     setMode('signup');
     setAuthStep('role');
     onNotice(message);
@@ -407,20 +415,85 @@ export function AuthBox({
     return Boolean(created && lastSignIn && created !== lastSignIn);
   }
 
+  function clearAuthFieldErrors() {
+    setEmailError('');
+    setPhoneError('');
+    setPasswordError('');
+    setConfirmPasswordError('');
+    setFormError('');
+  }
+
+  function authErrorCode(error: unknown) {
+    return error && typeof error === 'object' && 'code' in error
+      ? String((error as { code?: string }).code)
+      : '';
+  }
+
   function showAuthFieldError(error: unknown, authMode: typeof mode) {
     const message = formatAuthFlowError(error, authMode === 'signup' ? 'signup' : 'login');
+    setFormError(message);
     onNotice(message);
 
+    const code = authErrorCode(error);
+    const lower = message.toLowerCase();
+
     if (
-      authMode === 'signup' &&
-      (message.toLowerCase().includes('email') || message.toLowerCase().includes('account already exists'))
+      code === 'auth/email-already-in-use' ||
+      code === 'auth/account-exists-with-different-credential' ||
+      lower.includes('account already exists') ||
+      lower.includes('sign in instead')
     ) {
       setEmailError(message);
     }
 
-    if (authMode === 'signup' && message.toLowerCase().includes('phone')) {
+    if (
+      authMode === 'login' &&
+      (code === 'auth/wrong-password' ||
+        code === 'auth/invalid-credential' ||
+        code === 'auth/user-not-found')
+    ) {
+      setPasswordError(message);
+    }
+
+    if (code === 'auth/weak-password' || (authMode === 'signup' && lower.includes('password'))) {
+      setPasswordError(message);
+    }
+
+    if (authMode === 'signup' && lower.includes('phone')) {
       setPhoneError(message);
     }
+  }
+
+  function validateSignupPasswordFields(): string | null {
+    if (password.length < 8) {
+      const message = 'Password must be at least 8 characters.';
+      setPasswordError(message);
+      return message;
+    }
+
+    if (password !== confirmPassword) {
+      const message = 'Passwords do not match. Retype them to confirm.';
+      setConfirmPasswordError(message);
+      return message;
+    }
+
+    setPasswordError('');
+    setConfirmPasswordError('');
+    return null;
+  }
+
+  function validateConfirmPasswordOnBlur() {
+    if (!confirmPassword.trim()) {
+      setConfirmPasswordError('');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setConfirmPasswordError('Passwords do not match.');
+      return;
+    }
+
+    setConfirmPasswordError('');
   }
 
   async function resetPassword(event: FormEvent) {
@@ -452,14 +525,26 @@ export function AuthBox({
       return;
     }
 
+    clearAuthFieldErrors();
+
     if (mode === 'signup' && !preferredRole) {
       setAuthStep('role');
+      setFormError('Choose how you want to use Bundo first.');
       onNotice('Choose how you want to use Bundo first.');
       return;
     }
 
     if (!validateEmailField()) {
-      onNotice(emailError || 'Enter a valid email address.');
+      const message = emailError || 'Enter a valid email address.';
+      setFormError(message);
+      onNotice(message);
+      return;
+    }
+
+    if (mode === 'login' && !password) {
+      const message = 'Enter your password.';
+      setPasswordError(message);
+      setFormError(message);
       return;
     }
 
@@ -474,21 +559,19 @@ export function AuthBox({
     }
 
     if (mode === 'signup' && (!firstName.trim() || !lastName.trim())) {
-      onNotice('Enter your first and last name.');
-      setSubmitting(false);
+      const message = 'Enter your first and last name.';
+      setFormError(message);
+      onNotice(message);
       return;
     }
 
-    if (mode === 'signup' && password.length < 8) {
-      onNotice('Password must be at least 8 characters.');
-      setSubmitting(false);
-      return;
-    }
-
-    if (mode === 'signup' && password !== confirmPassword) {
-      onNotice('Passwords do not match. Please retype them and try again.');
-      setSubmitting(false);
-      return;
+    if (mode === 'signup') {
+      const passwordIssue = validateSignupPasswordFields();
+      if (passwordIssue) {
+        setFormError(passwordIssue);
+        onNotice(passwordIssue);
+        return;
+      }
     }
 
     if (mode === 'signup') {
@@ -503,7 +586,6 @@ export function AuthBox({
     }
 
     setSubmitting(true);
-    onNotice('');
     beginManualAuthFlow();
     try {
       const credential =
@@ -660,6 +742,7 @@ export function AuthBox({
 
   function openLogin(prefillEmail?: string) {
     onOpenAuth?.();
+    clearAuthFieldErrors();
     setPreferredRole(null);
     setConfirmPassword('');
     setPhone('');
@@ -677,6 +760,7 @@ export function AuthBox({
 
   function openSignup(role: SignupRole | null = null) {
     onOpenAuth?.();
+    clearAuthFieldErrors();
     setPreferredRole(role);
     saveSessionSignupIntent(role);
     if (role === 'ARTISAN') {
@@ -1238,6 +1322,11 @@ export function AuthBox({
                 )}
 
                 <form className="auth-form" onSubmit={mode === 'reset' ? resetPassword : submit}>
+                  {formError && (
+                    <p className="auth-form-error" role="alert">
+                      {formError}
+                    </p>
+                  )}
                   {mode === 'signup' && (
                     <div className="auth-name-grid">
                       <label>
@@ -1273,6 +1362,9 @@ export function AuthBox({
                         if (emailError) {
                           validateEmailField(event.target.value);
                         }
+                        if (formError) {
+                          setFormError('');
+                        }
                       }}
                       onBlur={() => {
                         if (email.trim()) {
@@ -1292,12 +1384,22 @@ export function AuthBox({
                       Password
                       <PasswordInput
                         value={password}
-                        onChange={setPassword}
+                        onChange={(value) => {
+                          setPassword(value);
+                          if (passwordError) {
+                            setPasswordError('');
+                          }
+                          if (formError) {
+                            setFormError('');
+                          }
+                        }}
                         placeholder="Your password"
                         autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                         minLength={mode === 'signup' ? 8 : 6}
                         required
+                        inputClassName={passwordError ? 'auth-input-invalid' : undefined}
                       />
+                      {passwordError && <span className="auth-field-error">{passwordError}</span>}
                     </label>
                   )}
                   {mode === 'signup' && (
@@ -1305,12 +1407,25 @@ export function AuthBox({
                       Verify password
                       <PasswordInput
                         value={confirmPassword}
-                        onChange={setConfirmPassword}
+                        onChange={(value) => {
+                          setConfirmPassword(value);
+                          if (confirmPasswordError) {
+                            setConfirmPasswordError('');
+                          }
+                          if (formError) {
+                            setFormError('');
+                          }
+                        }}
+                        onBlur={validateConfirmPasswordOnBlur}
                         placeholder="Retype your password"
                         autoComplete="new-password"
                         minLength={8}
                         required
+                        inputClassName={confirmPasswordError ? 'auth-input-invalid' : undefined}
                       />
+                      {confirmPasswordError && (
+                        <span className="auth-field-error">{confirmPasswordError}</span>
+                      )}
                     </label>
                   )}
               <button type="submit" disabled={!firebaseReady || submitting}>

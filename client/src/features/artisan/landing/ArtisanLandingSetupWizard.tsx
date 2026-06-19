@@ -127,7 +127,7 @@ export function ArtisanLandingSetupWizard({ landing }: { landing: ArtisanLanding
                   runAction(submitKycVerification, 'Verification submitted — awaiting approval')
                 }
               >
-                Submit verification
+                {busy ? 'Submitting verification…' : 'Submit verification'}
               </button>
             </>
           ) : (

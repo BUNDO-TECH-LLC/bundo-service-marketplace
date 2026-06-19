@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { ImageFilePickerField } from '../../../components/ImageFilePickerField';
 import { formatNinInput } from '../../../lib/kycValidation';
-import { MAX_IMAGE_BYTES, validateImageFileForPick } from '../../../lib/imageFile';
+import { MAX_IMAGE_BYTES } from '../../../lib/imageFile';
 import type { ArtisanLandingModel } from './artisanLandingTypes';
 
 export function ArtisanLandingStepVerify({ landing }: { landing: ArtisanLandingModel }) {
@@ -52,52 +53,25 @@ export function ArtisanLandingStepVerify({ landing }: { landing: ArtisanLandingM
         </small>
       </label>
 
-      <label>
-        NIN slip or ID photo<span>*</span>
-        <input
-          type="file"
-          accept="image/*"
-          capture="environment"
-          disabled={busy}
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (!file) return;
-
-            const validationError = validateImageFileForPick(file);
-            if (validationError) {
-              setUploadError(validationError);
-              setKycDocumentFile(null);
-              event.currentTarget.value = '';
-              return;
-            }
-
-            setUploadError('');
-            setKycDocumentFile(file);
-            event.currentTarget.value = '';
-          }}
-        />
-        <small className="muted">
-          Take a clear photo of your NIN slip or government ID (max {Math.round(MAX_IMAGE_BYTES / (1024 * 1024))}
-          MB).
-        </small>
-      </label>
-
-      {kycDocumentFile && <p className="muted">Selected: {kycDocumentFile.name}</p>}
-      {uploadError && (
-        <p className="form-error" role="alert">
-          {uploadError}{' '}
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() => {
-              setUploadError('');
-              setKycDocumentFile(null);
-            }}
-          >
-            Try again
-          </button>
-        </p>
-      )}
+      <ImageFilePickerField
+        label="Upload NIN slip or ID photo"
+        hint={`Choose from your gallery, files, or camera. Max ${Math.round(MAX_IMAGE_BYTES / (1024 * 1024))}MB.`}
+        busy={busy}
+        selectedFile={kycDocumentFile}
+        error={uploadError}
+        onPick={(file) => {
+          setUploadError('');
+          setKycDocumentFile(file);
+        }}
+        onError={(message) => {
+          setUploadError(message);
+          setKycDocumentFile(null);
+        }}
+        onClear={() => {
+          setUploadError('');
+          setKycDocumentFile(null);
+        }}
+      />
 
       <label className="terms-row">
         <input

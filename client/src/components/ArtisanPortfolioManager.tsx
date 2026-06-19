@@ -103,7 +103,7 @@ export function ArtisanPortfolioManager({
           ))}
 
           {remaining > 0 && (
-            <label className="portfolio-upload-tile">
+            <label className={`portfolio-upload-tile${uploadingPortfolio ? ' portfolio-upload-tile--busy' : ''}`}>
               <span className="media-upload-icon" aria-hidden="true" />
               <span className="portfolio-upload-label">Add photos</span>
               <span className="portfolio-upload-hint">
@@ -112,7 +112,6 @@ export function ArtisanPortfolioManager({
               <input
                 type="file"
                 accept="image/*"
-                capture={variant === 'onboarding' ? 'environment' : undefined}
                 multiple
                 disabled={busy || uploadingPortfolio}
                 onChange={(event) => {
@@ -182,7 +181,7 @@ function ProfilePhotoPreview({
   return (
     <div className="media-profile-preview">
       <img src={url} alt="Your profile photo" />
-      <label className="media-upload-dropzone media-upload-dropzone--compact">
+      <label className={`media-upload-dropzone media-upload-dropzone--compact${uploadingPortfolio ? ' media-upload-dropzone--busy' : ''}`}>
         <span className="media-upload-icon" aria-hidden="true" />
         <span className="media-upload-title">Change photo</span>
         <span className="media-upload-hint">JPG or PNG · Max 5MB</span>
@@ -214,7 +213,7 @@ function ProfilePhotoEmpty({
   uploadPortfolioFile: (file: File, displayOrder: number) => Promise<void>;
 }) {
   return (
-    <label className="media-upload-dropzone media-upload-dropzone--profile">
+      <label className={`media-upload-dropzone media-upload-dropzone--profile${uploadingPortfolio ? ' media-upload-dropzone--busy' : ''}`}>
       <span className="media-upload-icon" aria-hidden="true" />
       <span className="media-upload-title">Add profile photo</span>
       <span className="media-upload-hint">JPG or PNG · Max 5MB · Square works best</span>

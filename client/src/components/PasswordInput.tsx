@@ -4,6 +4,7 @@ import { PasswordVisibilityToggle } from './PasswordVisibilityToggle';
 type PasswordInputProps = {
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
   placeholder?: string;
   autoComplete?: string;
   minLength?: number;
@@ -16,6 +17,7 @@ type PasswordInputProps = {
 export function PasswordInput({
   value,
   onChange,
+  onBlur,
   placeholder,
   autoComplete,
   minLength,
@@ -36,6 +38,7 @@ export function PasswordInput({
         className={inputClassName}
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        onBlur={onBlur}
         placeholder={placeholder}
         type={visible ? 'text' : 'password'}
         autoComplete={autoComplete}

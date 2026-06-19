@@ -1356,6 +1356,61 @@ canvas {
   color: var(--color-ink);
 }
 
+.auth-form input.auth-input-invalid {
+  border-color: var(--color-danger-dark);
+  box-shadow: 0 0 0 1px rgb(155 28 28 / 12%);
+}
+
+.image-file-picker {
+  display: grid;
+  gap: 10px;
+}
+
+.image-file-picker-label {
+  font-weight: 700;
+}
+
+.image-file-picker-preview {
+  display: grid;
+  gap: 10px;
+}
+
+.image-file-picker-preview img {
+  width: min(100%, 280px);
+  max-height: 200px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+
+.image-file-picker-preview-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.media-upload-dropzone--busy,
+.portfolio-upload-tile--busy {
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.portfolio-upload-tile--busy::after {
+  content: 'Uploading…';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  color: var(--accent-dark);
+  background: rgb(255 248 243 / 88%);
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .auth-form button {
   padding: 13px 18px;
   color: var(--color-white);
