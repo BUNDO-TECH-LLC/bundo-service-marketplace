@@ -12,7 +12,6 @@ import {
   clearPendingSignupRole,
   clearSessionSignupIntent,
   readPendingSignupRole,
-  readSessionSignupIntent,
 } from './authSignupStorage';
 import { auth } from './firebase';
 import { resolveApiSession } from './resolveApiSession';
@@ -126,9 +125,7 @@ export async function finalizeAuthSession(
   clearPendingSignupPhone(firebaseUser.email);
   clearPendingSignupIntent(firebaseUser.email);
 
-  const keepArtisanSignupIntent =
-    intendedRole === 'ARTISAN' || readSessionSignupIntent() === 'ARTISAN';
-  if (!keepArtisanSignupIntent) {
+  if (intendedRole !== 'ARTISAN') {
     clearSessionSignupIntent();
   }
 

@@ -8,6 +8,7 @@ import {
   isArtisanApplicant,
   markArtisanApplicantSubmitted,
 } from './artisanApplication';
+import { savePendingVerificationRole, saveSessionSignupIntent } from './authSignupStorage';
 
 const customer = (overrides: Partial<ApiUser> = {}): ApiUser => ({
   firebaseUid: 'uid-1',
@@ -66,5 +67,40 @@ describe('artisan applicant routing', () => {
 
   it('does not treat approved artisans as applicants', () => {
     expect(isArtisanApplicant(customer({ role: 'ARTISAN' }))).toBe(false);
+  });
+
+  it('ignores stale artisan session flags when signup intent is customer', () => {
+    const localStorage = new Map<string, string>();
+    const sessionStorage = new Map<string, string>();
+    vi.stubGlobal('window', {
+      localStorage: {
+        getItem: (key: string) => localStorage.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          localStorage.set(key, value);
+        },
+        removeItem: (key: string) => {
+          localStorage.delete(key);
+        },
+      },
+      sessionStorage: {
+        getItem: (key: string) => sessionStorage.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          sessionStorage.set(key, value);
+        },
+        removeItem: (key: string) => {
+          sessionStorage.delete(key);
+        },
+      },
+    });
+
+    sessionStorage.set('bundo:artisan-applicant', '1');
+    saveSessionSignupIntent('CUSTOMER');
+    savePendingVerificationRole('client@example.com', 'CUSTOMER');
+
+    expect(
+      isArtisanApplicant(customer({ email: 'client@example.com' }), { email: 'client@example.com' })
+    ).toBe(false);
+
+    vi.unstubAllGlobals();
   });
 });

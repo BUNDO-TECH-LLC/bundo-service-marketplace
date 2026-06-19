@@ -5,10 +5,15 @@ import { AuthLayout } from '../../layouts/AuthLayout';
 import { ApiError } from '../../lib/api';
 import { EmailInboxHint } from '../../components/EmailInboxHint';
 import { resendBundoEmailVerification } from '../../lib/verificationEmailResend';
-import { ARTISAN_ONBOARDING_PATH, markArtisanApplicant } from '../../lib/artisanApplication';
+import { ARTISAN_ONBOARDING_PATH, clearArtisanApplicantOnServer, markArtisanApplicant } from '../../lib/artisanApplication';
 import { CUSTOMER_PROFILE_PATH, isCustomerProfileComplete } from '../../lib/customerProfile';
 import { buildAuthDrawerSearch } from '../../lib/authDrawerPrompt';
-import { readPendingSignupPhone, resolveSignupIntent } from '../../lib/authSignupStorage';
+import {
+  clearPendingVerificationRole,
+  readPendingSignupPhone,
+  readPendingVerificationRole,
+  resolveSignupIntent,
+} from '../../lib/authSignupStorage';
 import { finalizeAuthSession } from '../../lib/authSessionFlow';
 import {
   completeFirebaseEmailAction,
@@ -134,13 +139,19 @@ export function EmailVerificationPage() {
     const pendingPhone =
       state.phone || readPendingSignupPhone(auth.currentUser.email) || undefined;
     const signupIntent =
-      state.accountKind || resolveSignupIntent(auth.currentUser.email) || undefined;
+      state.accountKind ||
+      readPendingVerificationRole(auth.currentUser.email) ||
+      resolveSignupIntent(auth.currentUser.email) ||
+      undefined;
 
     const { session } = await finalizeAuthSession(auth.currentUser, {
       mode: 'signup',
       phone: pendingPhone,
       forceTokenRefresh: true,
+      intendedRole: signupIntent === 'CUSTOMER' ? 'CUSTOMER' : undefined,
     });
+
+    clearPendingVerificationRole(auth.currentUser.email);
 
     ctx.acknowledgeSession(session.token, session.user);
     await ctx.loadPrivateData(session.token, session.user).catch(() => undefined);
@@ -152,12 +163,16 @@ export function EmailVerificationPage() {
       return;
     }
 
-    if (!isCustomerProfileComplete(session.user)) {
+    const cleared = await clearArtisanApplicantOnServer(session.token, session.user.firebaseUid);
+    const nextUser = cleared || session.user;
+    ctx.acknowledgeSession(session.token, nextUser);
+
+    if (!isCustomerProfileComplete(nextUser)) {
       navigate(CUSTOMER_PROFILE_PATH, { replace: true });
       return;
     }
 
-    navigate(destinationForRole(session.user.role) || '/workspace/overview', { replace: true });
+    navigate(destinationForRole(nextUser.role) || '/workspace/overview', { replace: true });
   } catch (error) {
     setMessage(
       error instanceof ApiError

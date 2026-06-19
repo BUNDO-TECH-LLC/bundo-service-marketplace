@@ -4,6 +4,7 @@ import type { User } from 'firebase/auth';
 const pendingSignupRoleStorageKey = 'bundo:pending-signup-role';
 const pendingSignupPhoneStorageKey = 'bundo:pending-signup-phone';
 const pendingSignupIntentStorageKey = 'bundo:pending-signup-intent';
+const pendingVerificationRoleStorageKey = 'bundo:pending-verification-role';
 const sessionSignupIntentStorageKey = 'bundo:session-signup-intent';
 const googleRedirectIntentStorageKey = 'bundo:google-redirect-intent';
 const GOOGLE_REDIRECT_INTENT_TTL_MS = 10 * 60_000;
@@ -26,6 +27,10 @@ function pendingSignupPhoneKey(emailAddress: string) {
 
 function pendingSignupIntentKey(emailAddress: string) {
   return `${pendingSignupIntentStorageKey}:${emailAddress.trim().toLowerCase()}`;
+}
+
+function pendingVerificationRoleKey(emailAddress: string) {
+  return `${pendingVerificationRoleStorageKey}:${emailAddress.trim().toLowerCase()}`;
 }
 
 export function savePendingSignupRole(emailAddress: string | null, role: SignupRole | null) {
@@ -94,16 +99,42 @@ export function clearPendingSignupIntent(emailAddress: string | null) {
   window.localStorage.removeItem(pendingSignupIntentKey(emailAddress));
 }
 
+/** Persists chosen signup role until email verification completes (survives email-link navigation). */
+export function savePendingVerificationRole(emailAddress: string | null, role: SignupRole | null) {
+  if (!emailAddress || !role) return;
+  window.localStorage.setItem(pendingVerificationRoleKey(emailAddress), role);
+}
+
+export function readPendingVerificationRole(emailAddress: string | null): SignupRole | null {
+  if (!emailAddress) return null;
+  const stored = window.localStorage.getItem(pendingVerificationRoleKey(emailAddress));
+  return stored === 'CUSTOMER' || stored === 'ARTISAN' ? stored : null;
+}
+
+export function clearPendingVerificationRole(emailAddress: string | null) {
+  if (!emailAddress) return;
+  window.localStorage.removeItem(pendingVerificationRoleKey(emailAddress));
+}
+
 export function resolveSignupIntent(
   emailAddress: string | null,
   sessionIntent: SignupRole | null = null
 ): SignupRole | null {
-  return (
-    readPendingSignupIntent(emailAddress) ||
-    sessionIntent ||
-    readSessionSignupIntent() ||
-    null
-  );
+  const verificationRole = readPendingVerificationRole(emailAddress);
+  if (verificationRole) {
+    return verificationRole;
+  }
+
+  if (sessionIntent) {
+    return sessionIntent;
+  }
+
+  const emailIntent = readPendingSignupIntent(emailAddress);
+  if (emailIntent) {
+    return emailIntent;
+  }
+
+  return readSessionSignupIntent();
 }
 
 export function saveGoogleRedirectIntent(input: Omit<GoogleRedirectIntent, 'createdAt'>) {

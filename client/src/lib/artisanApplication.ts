@@ -1,5 +1,9 @@
 import { api } from './api';
-import { readSessionSignupIntent, resolveSignupIntent } from './authSignupStorage';
+import {
+  readPendingVerificationRole,
+  readSessionSignupIntent,
+  resolveSignupIntent,
+} from './authSignupStorage';
 import type { ApiUser } from '../types';
 
 const ARTISAN_APPLICANT_SESSION_KEY = 'bundo:artisan-applicant';
@@ -24,7 +28,19 @@ type ArtisanApplicantOptions = {
   email?: string | null;
 };
 
+function hasExplicitCustomerSignupIntent(email?: string | null) {
+  if (readSessionSignupIntent() === 'CUSTOMER') {
+    return true;
+  }
+
+  return Boolean(email && readPendingVerificationRole(email) === 'CUSTOMER');
+}
+
 function hasPendingArtisanSignupIntent(email?: string | null) {
+  if (hasExplicitCustomerSignupIntent(email)) {
+    return false;
+  }
+
   if (readSessionSignupIntent() === 'ARTISAN') {
     return true;
   }
@@ -49,9 +65,15 @@ export function isArtisanApplicant(
     return false;
   }
 
+  const email = options.email ?? user?.email;
+
   if (user?.role === 'CUSTOMER') {
     if (user.onboardingIntent === 'ARTISAN') {
       return true;
+    }
+
+    if (hasExplicitCustomerSignupIntent(email)) {
+      return false;
     }
 
     if (isArtisanApplicantSession(user.firebaseUid)) {
@@ -59,11 +81,15 @@ export function isArtisanApplicant(
     }
   }
 
+  if (hasExplicitCustomerSignupIntent(email)) {
+    return false;
+  }
+
   if (isArtisanApplicantSession()) {
     return true;
   }
 
-  return hasPendingArtisanSignupIntent(options.email ?? user?.email);
+  return hasPendingArtisanSignupIntent(email);
 }
 
 export function hasArtisanApplicantSubmittedVerification(firebaseUid?: string | null) {
@@ -147,6 +173,21 @@ export async function ensureArtisanApplicantOnServer(token: string, firebaseUid?
 export async function markArtisanApplicant(token: string, firebaseUid?: string | null) {
   try {
     return await ensureArtisanApplicantOnServer(token, firebaseUid);
+  } catch {
+    return null;
+  }
+}
+
+export async function clearArtisanApplicantOnServer(token: string, firebaseUid?: string | null) {
+  clearArtisanApplicant(firebaseUid);
+
+  try {
+    const response = await api<{ user: ApiUser }>('/users/onboarding-intent', {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify({ intent: null }),
+    });
+    return response.user;
   } catch {
     return null;
   }

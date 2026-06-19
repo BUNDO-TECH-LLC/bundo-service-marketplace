@@ -10,7 +10,7 @@ import {
 import { api } from '../lib/api';
 import { auth, firebaseReady } from '../lib/firebase';
 import { SIGN_IN_UNAVAILABLE_WITH_EMAIL } from '../lib/productionMessages';
-import { ARTISAN_ONBOARDING_PATH, artisanApplicantHomePath, markArtisanApplicant, stageArtisanApplicantIntent } from '../lib/artisanApplication';
+import { ARTISAN_ONBOARDING_PATH, artisanApplicantHomePath, clearArtisanApplicant, clearArtisanApplicantOnServer, markArtisanApplicant, stageArtisanApplicantIntent } from '../lib/artisanApplication';
 import type { AuthDrawerPrompt } from '../lib/authDrawerPrompt';
 import {
   checkEmailAccountStatus,
@@ -31,6 +31,7 @@ import {
   savePendingSignupIntent,
   savePendingSignupPhone,
   savePendingSignupRole,
+  savePendingVerificationRole,
   saveSessionSignupIntent,
 } from '../lib/authSignupStorage';
 import {
@@ -197,6 +198,8 @@ export function AuthBox({
 
     if (artisanIntent) {
       stageArtisanApplicantIntent();
+    } else {
+      clearArtisanApplicant(firebaseAuthUser.uid);
     }
 
     const { session } = await finalizeAuthSession(firebaseAuthUser, {
@@ -212,6 +215,11 @@ export function AuthBox({
       if (updated) {
         nextUser = updated;
         clearSessionSignupIntent();
+      }
+    } else if (resolvedRole === 'CUSTOMER' && session.user.onboardingIntent === 'ARTISAN') {
+      const updated = await clearArtisanApplicantOnServer(session.token, session.user.firebaseUid);
+      if (updated) {
+        nextUser = updated;
       }
     }
 
@@ -254,8 +262,13 @@ export function AuthBox({
       saveSessionSignupIntent('ARTISAN');
       savePendingSignupIntent(user.email, 'ARTISAN');
       savePendingSignupRole(user.email, 'ARTISAN');
+      savePendingVerificationRole(user.email, 'ARTISAN');
     } else if (preferredRole === 'CUSTOMER') {
+      saveSessionSignupIntent('CUSTOMER');
       savePendingSignupRole(user.email, 'CUSTOMER');
+      savePendingSignupIntent(user.email, 'CUSTOMER');
+      savePendingVerificationRole(user.email, 'CUSTOMER');
+      clearArtisanApplicant(user.uid);
     }
     savePendingSignupPhone(user.email, phone.trim() || null);
 
@@ -580,6 +593,8 @@ export function AuthBox({
     saveSessionSignupIntent(role);
     if (role === 'ARTISAN') {
       stageArtisanApplicantIntent();
+    } else {
+      clearArtisanApplicant(pendingAuthUser?.uid ?? firebaseUser?.uid ?? me?.firebaseUid);
     }
     if (email.trim()) {
       savePendingSignupRole(email.trim(), role);
@@ -617,6 +632,8 @@ export function AuthBox({
     saveSessionSignupIntent(role);
     if (role === 'ARTISAN') {
       stageArtisanApplicantIntent();
+    } else if (role === 'CUSTOMER') {
+      clearArtisanApplicant(firebaseUser?.uid ?? me?.firebaseUid);
     }
     setConfirmPassword('');
     setEmailError('');
