@@ -61,6 +61,8 @@ import {
   IconSettings,
 } from '../components/TopbarNavIcons';
 import { ProfileAccountMenu } from '../components/ProfileAccountMenu';
+import { BundoLoadingMark } from '../components/BundoLoadingMark';
+import { useAppRoot } from '../app/appRootContext';
 import { useElementById } from '../hooks/useElementById';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 
@@ -114,6 +116,15 @@ function AuthDrawer({
   );
 }
 
+function AuthDrawerSyncState({ message }: { message: string }) {
+  return (
+    <div className="auth-drawer-sync" role="status" aria-live="polite" aria-busy="true">
+      <BundoLoadingMark variant="indeterminate" />
+      <p>{message}</p>
+    </div>
+  );
+}
+
 export function AuthBox({
   firebaseUser,
   me,
@@ -139,6 +150,7 @@ export function AuthBox({
   onOpenAuth?: () => void;
   onNavigatePath?: (path: string) => void;
 }) {
+  const { manualAuthInProgress, setManualAuthInProgress } = useAppRoot();
   const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -157,6 +169,35 @@ export function AuthBox({
   const [pendingAuthUser, setPendingAuthUser] = useState<User | null>(null);
   const processedGoogleRedirectRef = useRef(false);
   const recoveredGoogleRedirectUserRef = useRef(false);
+
+  function beginManualAuthFlow() {
+    setManualAuthInProgress(true);
+    setDrawerOpen(true);
+  }
+
+  function endManualAuthFlow() {
+    setManualAuthInProgress(false);
+  }
+
+  const drawerSyncing = manualAuthInProgress;
+  const authDrawerOpen = drawerOpen || manualAuthInProgress;
+
+  function closeAuthDrawer() {
+    if (drawerSyncing) {
+      return;
+    }
+    setDrawerOpen(false);
+  }
+
+  function drawerSyncMessage() {
+    if (googleSubmitting) {
+      return 'Finishing Google sign-in…';
+    }
+    if (mode === 'signup') {
+      return 'Creating your account…';
+    }
+    return 'Signing you in…';
+  }
 
   const narrowViewport = useMediaQuery('(max-width: 768px)');
   const topbarPanelEl = useElementById(
@@ -186,6 +227,9 @@ export function AuthBox({
     forceTokenRefresh = false,
     options: { phoneOverride?: string | null } = {}
   ) {
+    beginManualAuthFlow();
+
+    try {
     const rememberedPhone = readPendingSignupPhone(firebaseAuthUser.email);
     const resolvedPhone =
       options.phoneOverride !== undefined
@@ -254,6 +298,9 @@ export function AuthBox({
     setAuthStep('account');
     if (!artisanIntent) {
       clearSessionSignupIntent();
+    }
+    } finally {
+      endManualAuthFlow();
     }
   }
 
@@ -457,6 +504,7 @@ export function AuthBox({
 
     setSubmitting(true);
     onNotice('');
+    beginManualAuthFlow();
     try {
       const credential =
         mode === 'login'
@@ -504,6 +552,7 @@ export function AuthBox({
       showAuthFieldError(error, mode);
     } finally {
       setSubmitting(false);
+      endManualAuthFlow();
     }
   }
 
@@ -691,6 +740,7 @@ export function AuthBox({
         setMode(authMode);
         setPreferredRole(role);
         setAuthStep(authMode === 'signup' && !role ? 'role' : 'account');
+        beginManualAuthFlow();
         setSubmitting(true);
         setGoogleSubmitting(true);
         onNotice('Finishing Google sign-in...');
@@ -714,6 +764,7 @@ export function AuthBox({
         if (!cancelled) {
           setSubmitting(false);
           setGoogleSubmitting(false);
+          endManualAuthFlow();
         }
       }
     })();
@@ -744,6 +795,7 @@ export function AuthBox({
         setMode(authMode);
         setPreferredRole(role);
         setAuthStep(authMode === 'signup' && !role ? 'role' : 'account');
+        beginManualAuthFlow();
         setSubmitting(true);
         setGoogleSubmitting(true);
         onNotice('Finishing Google sign-in...');
@@ -764,6 +816,7 @@ export function AuthBox({
         if (!cancelled) {
           setSubmitting(false);
           setGoogleSubmitting(false);
+          endManualAuthFlow();
         }
       }
     })();
@@ -810,13 +863,18 @@ export function AuthBox({
   }, [authDrawerPrompt, firebaseUser, me, onAuthDrawerPromptHandled, onOpenAuth, onNavigate, onNotice]);
 
   if (firebaseUser && !me) {
-    return (
-      <div className="auth-entry">
-        <button type="button" disabled>
-          Signing in...
-        </button>
-      </div>
-    );
+    if (manualAuthInProgress) {
+      return (
+        <AuthDrawer open onClose={closeAuthDrawer} ariaLabel="Authentication panel">
+          <div className="drawer-head">
+            <img className="drawer-logo" src={bundoLogo} alt="Bundo logo" />
+          </div>
+          <AuthDrawerSyncState message={drawerSyncMessage()} />
+        </AuthDrawer>
+      );
+    }
+
+    return null;
   }
 
   if (firebaseUser && me && !me.role) {
@@ -1061,14 +1119,20 @@ export function AuthBox({
         Sign up
       </button>
 
-      <AuthDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} ariaLabel="Authentication panel">
+      <AuthDrawer open={authDrawerOpen} onClose={closeAuthDrawer} ariaLabel="Authentication panel">
             <div className="drawer-head">
               <img className="drawer-logo" src={bundoLogo} alt="Bundo logo" />
-              <button type="button" onClick={() => setDrawerOpen(false)}>
-                Close
-              </button>
+              {!drawerSyncing && (
+                <button type="button" onClick={closeAuthDrawer}>
+                  Close
+                </button>
+              )}
             </div>
 
+            {drawerSyncing ? (
+              <AuthDrawerSyncState message={drawerSyncMessage()} />
+            ) : (
+              <>
             {!firebaseReady && (
               <p className="auth-form-error">
                 {SIGN_IN_UNAVAILABLE_WITH_EMAIL}
@@ -1276,6 +1340,8 @@ export function AuthBox({
                 <button type="button" className="mode-switch" onClick={switchMode}>
                   {mode === 'login' || mode === 'reset' ? 'New here? Sign up' : 'Already have an account? Login'}
                 </button>
+              </>
+            )}
               </>
             )}
       </AuthDrawer>

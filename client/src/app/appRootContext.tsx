@@ -83,6 +83,9 @@ export type AppRootValue = {
   setPaymentSuccess: (value: PaymentSuccessState | null) => void;
   busy: boolean;
   isAuthed: boolean;
+  authChecked: boolean;
+  manualAuthInProgress: boolean;
+  setManualAuthInProgress: (value: boolean) => void;
   isAppBootstrapping: boolean;
   usesArtisanSetupHeader: boolean;
   usesArtisanWorkspaceHeader: boolean;

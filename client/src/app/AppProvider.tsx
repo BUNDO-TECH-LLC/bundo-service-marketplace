@@ -47,6 +47,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const appData = useAppData(filterState, { notifyConversationError: (msg) => setNotice(msg) });
   const [bookingSuccess, setBookingSuccess] = useState<BookingSuccessState | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState<PaymentSuccessState | null>(null);
+  const [manualAuthInProgress, setManualAuthInProgress] = useState(false);
   const processedPaymentReferenceRef = useRef<string | null>(null);
 
   const completePaymentReturn = useCallback(async (reference: string, authToken: string, user: ApiUser) => {
@@ -134,10 +135,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const isAuthed = Boolean(auth.firebaseUser && auth.token);
   const onAuthScreen = isAuthPathname(location.pathname);
+  const isAuthSyncing = Boolean(auth.firebaseUser) && (!auth.token || !auth.me);
   const isRestoringAuthedRoute =
     isAuthed && Boolean(auth.me?.role) && !auth.routeHydrated && !onAuthScreen;
-  // Only block the shell while restoring a signed-in session — not on the initial Firebase check.
-  const isAppBootstrapping = isRestoringAuthedRoute;
+  const isAppBootstrapping =
+    !onAuthScreen &&
+    !manualAuthInProgress &&
+    (!auth.authChecked || isAuthSyncing || isRestoringAuthedRoute);
   const onArtisanOnboardingRoute = location.pathname.startsWith('/artisan/onboarding');
   const usesArtisanSetupHeader =
     isAuthed &&
@@ -276,6 +280,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setPaymentSuccess,
     busy,
     isAuthed,
+    authChecked: auth.authChecked,
+    manualAuthInProgress,
+    setManualAuthInProgress,
     isAppBootstrapping,
     usesArtisanSetupHeader,
     usesArtisanWorkspaceHeader,
@@ -309,6 +316,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     auth.firebaseUser,
     auth.token,
     auth.me,
+    auth.authChecked,
+    manualAuthInProgress,
     auth.pushStatus,
     auth.pushToken,
     auth.routeHydrated,
