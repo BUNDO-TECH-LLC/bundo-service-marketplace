@@ -7,7 +7,8 @@ export type View =
   | 'admin'
   | 'help'
   | 'artisan-profile'
-  | 'artisan-onboarding';
+  | 'artisan-onboarding'
+  | 'customer-onboarding';
 export type WorkspaceSection =
   | 'overview'
   | 'bookings'

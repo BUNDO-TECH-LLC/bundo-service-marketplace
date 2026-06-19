@@ -62,6 +62,8 @@ export function buildAppPath(input: {
       return '/marketplace';
     case 'artisan-onboarding':
       return '/artisan/onboarding';
+    case 'customer-onboarding':
+      return '/onboarding/profile';
     default:
       return '/';
   }
@@ -196,6 +198,16 @@ export function parseAppPath(pathname: string): ParsedAppRoute | null {
   if (raw === '/artisan/onboarding') {
     return {
       view: 'artisan-onboarding',
+      workspaceSection: 'overview',
+      adminSection: 'overview',
+      helpTopicId: null,
+      artisanId: null,
+    };
+  }
+
+  if (raw === '/onboarding/profile') {
+    return {
+      view: 'customer-onboarding',
       workspaceSection: 'overview',
       adminSection: 'overview',
       helpTopicId: null,

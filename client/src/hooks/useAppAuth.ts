@@ -8,7 +8,7 @@ import { hasPushConfig } from '../lib/messaging';
 import { resolveApiSession } from '../lib/resolveApiSession';
 import { clearStoredRoute, isAuthPathname, isPublicBrowsePathname } from '../lib/appRouting';
 import { ARTISAN_ONBOARDING_PATH, artisanApplicantHomePath, isArtisanApplicant } from '../lib/artisanApplication';
-import { onboardingRedirectPath } from '../lib/customerProfile';
+import { onboardingRedirectPath, isCustomerProfileComplete, isCustomerProfileOnboardingPathname } from '../lib/customerProfile';
 import { readStoredRoute, storedRouteToPath } from '../lib/workspaceRoute';
 import type { PushStatus } from '../appTypes';
 import type { ApiUser } from '../types';
@@ -241,6 +241,14 @@ export function useAppAuth({
               clearStoredRoute();
             }
             navigateRef.current(onboardingTarget, { replace: true });
+            return;
+          }
+
+          if (
+            session.user.role === 'CUSTOMER' &&
+            isCustomerProfileOnboardingPathname(path) &&
+            !isCustomerProfileComplete(session.user)
+          ) {
             return;
           }
 

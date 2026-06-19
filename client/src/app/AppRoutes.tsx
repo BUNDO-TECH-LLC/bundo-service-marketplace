@@ -4,6 +4,7 @@ import { BundoLoadingScreen } from '../components/BundoLoadingScreen';
 import { AuthDrawerRedirect } from '../pages/auth/AuthDrawerRedirect';
 import { EmailVerificationPage } from '../pages/auth/EmailVerificationPage';
 import { PrivacyPage, TermsPage } from '../pages/LegalPage';
+import CustomerProfilePage from '../pages/CustomerProfilePage';
 import { MainLayout } from './MainLayout';
 
 const HomePage = lazy(() => import('../pages/HomePage'));
@@ -14,7 +15,6 @@ const HelpPage = lazy(() => import('../pages/HelpPage'));
 const ArtisanProfileRoute = lazy(() => import('../pages/ArtisanProfileRoute'));
 const ArtisanOnboardingPage = lazy(() => import('../pages/ArtisanOnboardingPage'));
 const ArtisanOnboardingWelcomePage = lazy(() => import('../pages/ArtisanOnboardingWelcomePage'));
-const CustomerProfilePage = lazy(() => import('../pages/CustomerProfilePage'));
 const LoadingPage = lazy(() => import('../pages/LoadingPage'));
 
 function PageFallback() {

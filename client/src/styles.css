@@ -10849,20 +10849,11 @@ footer h4 {
 }
 
 .customer-profile-page {
-  display: grid;
-  min-height: calc(100vh - 120px);
-  place-items: center;
-}
-
-.customer-profile-card {
-  width: min(100%, 520px);
-  padding: 32px 24px;
-}
-
-.customer-profile-form label {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 16px;
+  background: linear-gradient(
+    180deg,
+    var(--color-page, #fff) 0%,
+    var(--accent-wash, var(--color-accent-wash, #fff9f4)) 100%
+  );
 }
 
 .book-offering-dialog textarea {

@@ -15,6 +15,18 @@ const CUSTOMER_ONBOARDING_ALLOWED_PREFIXES = [
   '/privacy',
 ];
 
+export function isCustomerOnboardingPathname(pathname: string) {
+  const path = pathname.replace(/\/+$/, '') || '/';
+  return CUSTOMER_ONBOARDING_ALLOWED_PREFIXES.some(
+    (prefix) => path === prefix || path.startsWith(`${prefix}/`)
+  );
+}
+
+export function isCustomerProfileOnboardingPathname(pathname: string) {
+  const path = pathname.replace(/\/+$/, '') || '/';
+  return path === CUSTOMER_PROFILE_PATH || path.startsWith(`${CUSTOMER_PROFILE_PATH}/`);
+}
+
 export function isCustomerProfileComplete(user: ApiUser | null | undefined) {
   if (!user || user.role !== 'CUSTOMER') {
     return true;

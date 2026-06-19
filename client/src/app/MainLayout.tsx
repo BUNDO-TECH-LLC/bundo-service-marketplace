@@ -267,7 +267,7 @@ export function MainLayout() {
                     { replace: true }
                   );
                 } else if (nextUser.role === 'CUSTOMER' && !isCustomerProfileComplete(nextUser)) {
-                  ctx.navigate(CUSTOMER_PROFILE_PATH);
+                  ctx.navigate(CUSTOMER_PROFILE_PATH, { replace: true });
                 } else if (nextUser.role === 'CUSTOMER') {
                   ctx.navigate('/');
                 }

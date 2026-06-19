@@ -3,6 +3,7 @@ import type { ApiUser } from '../types';
 import {
   CUSTOMER_PROFILE_PATH,
   isCustomerProfileComplete,
+  isCustomerProfileOnboardingPathname,
   onboardingRedirectPath,
 } from './customerProfile';
 import { ARTISAN_ONBOARDING_PATH } from './artisanApplication';
@@ -65,5 +66,11 @@ describe('customer onboarding redirects', () => {
     expect(
       onboardingRedirectPath(customer({ role: 'ARTISAN', profileComplete: true }), '/')
     ).toBe(ARTISAN_ONBOARDING_PATH);
+  });
+
+  it('recognizes the customer profile onboarding route', () => {
+    expect(isCustomerProfileOnboardingPathname('/onboarding/profile')).toBe(true);
+    expect(isCustomerProfileOnboardingPathname('/onboarding/profile/')).toBe(true);
+    expect(isCustomerProfileOnboardingPathname('/marketplace')).toBe(false);
   });
 });

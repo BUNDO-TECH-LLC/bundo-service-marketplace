@@ -6,6 +6,7 @@ import { buildAppPath, parseAppPath } from '../lib/appPaths';
 import { isAuthPathname } from '../lib/appRouting';
 import { auth } from '../lib/firebase';
 import { ARTISAN_ONBOARDING_PATH, isArtisanApplicant, hasArtisanApplicantSubmittedVerification } from '../lib/artisanApplication';
+import { isCustomerProfileOnboardingPathname } from '../lib/customerProfile';
 import { routeStorageKey } from '../lib/workspaceRoute';
 import type { AdminSection, View, WorkspaceSection } from '../appTypes';
 import type { ApiUser, Artisan, Review } from '../types';
@@ -53,6 +54,11 @@ export function useAppRouteSync({
 
     const path = location.pathname.replace(/\/+$/, '') || '/';
     if (path === '/terms' || path === '/privacy') {
+      return;
+    }
+
+    if (isCustomerProfileOnboardingPathname(path)) {
+      setView('customer-onboarding');
       return;
     }
 
