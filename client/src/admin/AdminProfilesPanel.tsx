@@ -1,14 +1,15 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { EmptyState } from '../components/EmptyState';
 import type { ActionRunner, AdminArtisanRecord, AdminUserRecord } from '../appTypes';
 import { AdminPortfolioGallery } from '../components/AdminPortfolioGallery';
 import { Pagination } from '../components/Pagination';
 import { useAdminList } from '../hooks/useAdminList';
+import type { AdminProfilesFilter, AdminVerifyFilter } from './adminNavigation';
 import type { Artisan, Role } from '../types';
 
-type ProfileFilter = 'all' | 'customer' | 'artisan' | 'admin';
-type VerifyFilter = 'all' | Artisan['verifyStatus'];
+type ProfileFilter = AdminProfilesFilter;
+type VerifyFilter = AdminVerifyFilter;
 
 const profileFilters: Array<{ id: ProfileFilter; label: string; statKey?: keyof ProfileStats }> = [
   { id: 'all', label: 'All accounts', statKey: 'users' },
@@ -50,16 +51,31 @@ export function AdminProfilesPanel({
   runAction,
   refresh,
   stats,
+  navigationIntent,
 }: {
   token: string;
   busy: boolean;
   runAction: ActionRunner;
   refresh: () => Promise<void>;
   stats: ProfileStats | null;
+  navigationIntent?: { token: number; intent: { profiles?: { profileFilter?: ProfileFilter; verifyFilter?: VerifyFilter } } } | null;
 }) {
   const [profileFilter, setProfileFilter] = useState<ProfileFilter>('all');
   const [verifyFilter, setVerifyFilter] = useState<VerifyFilter>('all');
   const [expandedArtisanId, setExpandedArtisanId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const profilesIntent = navigationIntent?.intent.profiles;
+    if (!profilesIntent) return;
+
+    if (profilesIntent.profileFilter) {
+      setProfileFilter(profilesIntent.profileFilter);
+    }
+    if (profilesIntent.verifyFilter) {
+      setVerifyFilter(profilesIntent.verifyFilter);
+    }
+    setExpandedArtisanId(null);
+  }, [navigationIntent?.token, navigationIntent?.intent.profiles]);
 
   const isArtisanView = profileFilter === 'artisan';
 

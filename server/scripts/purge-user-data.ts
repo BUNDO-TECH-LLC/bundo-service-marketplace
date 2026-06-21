@@ -1,22 +1,24 @@
 /**
- * One-time pre-launch purge of user-generated marketplace data.
+ * Purge test users while keeping operator accounts and live marketplace listings.
  *
- * Keeps service categories and one or more admin accounts. Does not touch
- * migrations or schema.
+ * Keeps:
+ *   - One or more admin accounts (--keep-admin-email / --keep-admin-uid)
+ *   - Approved artisans with at least one offering (default; use --no-keep-listed-artisans to skip)
+ *   - Service categories
+ *
+ * Clears bookings, messages, payments, and other transactional data for a clean retest.
  *
  * Usage:
- *   PURGE_CONFIRM=YES npm run db:purge -- --keep-admin-email=you@bundo.ng
- *   PURGE_CONFIRM=YES npm run db:purge -- --keep-admin-uid=<firebase-uid>
  *   PURGE_CONFIRM=YES npm run db:purge -- --keep-admin-email=you@bundo.ng --firebase
+ *   PURGE_CONFIRM=YES npm run db:purge -- --keep-admin-email=you@bundo.ng --no-keep-listed-artisans --firebase
  *
  * After running:
  *   npm run db:seed
- *   Delete remaining test users in Firebase Console if you skipped --firebase
  */
 
 import 'dotenv/config';
 import { getAuth } from 'firebase-admin/auth';
-import { PrismaClient, Role } from '@prisma/client';
+import { PrismaClient, Prisma, Role, VerifyStatus } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import { buildPoolConfig } from '../src/db/poolConfig';
@@ -29,6 +31,7 @@ function readArgs(argv: string[]) {
   const keepAdminUids: string[] = [];
   const keepAdminEmails: string[] = [];
   let purgeFirebase = false;
+  let keepListedArtisans = true;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -38,6 +41,16 @@ function readArgs(argv: string[]) {
 
     if (arg === '--firebase') {
       purgeFirebase = true;
+      continue;
+    }
+
+    if (arg === '--keep-listed-artisans') {
+      keepListedArtisans = true;
+      continue;
+    }
+
+    if (arg === '--no-keep-listed-artisans') {
+      keepListedArtisans = false;
       continue;
     }
 
@@ -75,7 +88,7 @@ function readArgs(argv: string[]) {
     }
   }
 
-  return { keepAdminUids, keepAdminEmails, purgeFirebase };
+  return { keepAdminUids, keepAdminEmails, purgeFirebase, keepListedArtisans };
 }
 
 async function resolveKeepAdminUids(
@@ -105,6 +118,32 @@ async function resolveKeepAdminUids(
   }
 
   return [...new Set(resolved)];
+}
+
+async function resolveListedApprovedArtisanUids(db: PrismaClient) {
+  const artisans = await db.user.findMany({
+    where: {
+      artisanProfile: {
+        verifyStatus: VerifyStatus.APPROVED,
+        offerings: { some: {} },
+      },
+    },
+    select: {
+      firebaseUid: true,
+      email: true,
+      role: true,
+      artisanProfile: {
+        select: {
+          id: true,
+          displayName: true,
+          _count: { select: { offerings: true } },
+        },
+      },
+    },
+    orderBy: { email: 'asc' },
+  });
+
+  return artisans;
 }
 
 async function deleteFirebaseUsersExcept(keepUids: Set<string>) {
@@ -141,8 +180,86 @@ async function deleteFirebaseUsersExcept(keepUids: Set<string>) {
   console.log(`Firebase Auth: deleted ${deleted} users, kept ${kept}.`);
 }
 
+type DbTx = Prisma.TransactionClient;
+
+async function purgeAllMarketplaceData(tx: DbTx) {
+  await tx.chatUserReport.deleteMany();
+  await tx.message.deleteMany();
+  await tx.adminNote.deleteMany();
+  await tx.notification.deleteMany();
+  await tx.ledgerEntry.deleteMany();
+  await tx.dispute.deleteMany();
+  await tx.payout.deleteMany();
+  await tx.payment.deleteMany();
+  await tx.review.deleteMany();
+  await tx.booking.deleteMany();
+  await tx.artisanKycSubmission.deleteMany();
+  await tx.portfolioImage.deleteMany();
+  await tx.availabilitySlot.deleteMany();
+  await tx.offering.deleteMany();
+  await tx.providerPayoutAccount.deleteMany();
+  await tx.conversation.deleteMany();
+  await tx.artisanProfile.deleteMany();
+}
+
+async function purgeRetainingListings(
+  tx: DbTx,
+  keepUids: string[],
+  keepArtisanProfileIds: string[]
+) {
+  await tx.chatUserReport.deleteMany();
+  await tx.message.deleteMany();
+  await tx.adminNote.deleteMany();
+  await tx.notification.deleteMany();
+  await tx.ledgerEntry.deleteMany();
+  await tx.dispute.deleteMany();
+  await tx.payout.deleteMany();
+  await tx.payment.deleteMany();
+  await tx.review.deleteMany();
+  await tx.booking.deleteMany();
+  await tx.conversation.deleteMany();
+
+  if (keepArtisanProfileIds.length === 0) {
+    await tx.artisanKycSubmission.deleteMany();
+    await tx.portfolioImage.deleteMany();
+    await tx.availabilitySlot.deleteMany();
+    await tx.offering.deleteMany();
+    await tx.providerPayoutAccount.deleteMany();
+    await tx.artisanProfile.deleteMany();
+  } else {
+    await tx.artisanKycSubmission.deleteMany({
+      where: { artisanId: { notIn: keepArtisanProfileIds } },
+    });
+    await tx.portfolioImage.deleteMany({
+      where: { artisanId: { notIn: keepArtisanProfileIds } },
+    });
+    await tx.availabilitySlot.deleteMany({
+      where: { artisanId: { notIn: keepArtisanProfileIds } },
+    });
+    await tx.offering.deleteMany({
+      where: { artisanId: { notIn: keepArtisanProfileIds } },
+    });
+    await tx.providerPayoutAccount.deleteMany({
+      where: { artisanId: { notIn: keepArtisanProfileIds } },
+    });
+    await tx.artisanProfile.updateMany({
+      where: { id: { in: keepArtisanProfileIds } },
+      data: { avgRating: 0, ratingCount: 0 },
+    });
+    await tx.artisanProfile.deleteMany({
+      where: { userId: { notIn: keepUids } },
+    });
+  }
+
+  await tx.user.deleteMany({
+    where: { firebaseUid: { notIn: keepUids } },
+  });
+}
+
 async function main() {
-  const { keepAdminUids, keepAdminEmails, purgeFirebase } = readArgs(process.argv.slice(2));
+  const { keepAdminUids, keepAdminEmails, purgeFirebase, keepListedArtisans } = readArgs(
+    process.argv.slice(2)
+  );
 
   if (process.env[CONFIRM_ENV] !== REQUIRED_CONFIRM_VALUE) {
     throw new Error(
@@ -167,7 +284,6 @@ async function main() {
 
   try {
     const resolvedKeepAdminUids = await resolveKeepAdminUids(db, keepAdminUids, keepAdminEmails);
-    const keepSet = new Set(resolvedKeepAdminUids);
     const keptAdmins = await db.user.findMany({
       where: {
         firebaseUid: { in: resolvedKeepAdminUids },
@@ -185,9 +301,22 @@ async function main() {
       );
     }
 
+    const listedArtisans = keepListedArtisans ? await resolveListedApprovedArtisanUids(db) : [];
+    const keepUids = [
+      ...new Set([
+        ...resolvedKeepAdminUids,
+        ...listedArtisans.map((artisan) => artisan.firebaseUid),
+      ]),
+    ];
+    const keepArtisanProfileIds = listedArtisans
+      .map((artisan) => artisan.artisanProfile?.id)
+      .filter((id): id is string => Boolean(id));
+    const keepSet = new Set(keepUids);
+
     const counts = {
       users: await db.user.count(),
       artisanProfiles: await db.artisanProfile.count(),
+      offerings: await db.offering.count(),
       bookings: await db.booking.count(),
       payments: await db.payment.count(),
       conversations: await db.conversation.count(),
@@ -201,36 +330,39 @@ async function main() {
         .map((admin) => admin.email || admin.firebaseUid)
         .join(', ')}`
     );
-    console.log('Purging user-generated data…');
+
+    if (keepListedArtisans) {
+      if (listedArtisans.length === 0) {
+        console.log('Keeping 0 approved artisans with listings.');
+      } else {
+        console.log(`Keeping ${listedArtisans.length} approved artisan(s) with listings:`);
+        for (const artisan of listedArtisans) {
+          const offeringCount = artisan.artisanProfile?._count.offerings ?? 0;
+          const label = artisan.artisanProfile?.displayName || artisan.email || artisan.firebaseUid;
+          console.log(`  - ${label} (${artisan.email ?? 'no email'}) · ${offeringCount} offering(s)`);
+        }
+      }
+    } else {
+      console.log('Skipping approved artisan listings (--no-keep-listed-artisans).');
+    }
+
+    console.log('Purging test users and transactional data…');
 
     await db.$transaction(async (tx) => {
-      await tx.chatUserReport.deleteMany();
-      await tx.message.deleteMany();
-      await tx.adminNote.deleteMany();
-      await tx.notification.deleteMany();
-      await tx.ledgerEntry.deleteMany();
-      await tx.dispute.deleteMany();
-      await tx.payout.deleteMany();
-      await tx.payment.deleteMany();
-      await tx.review.deleteMany();
-      await tx.booking.deleteMany();
-      await tx.artisanKycSubmission.deleteMany();
-      await tx.portfolioImage.deleteMany();
-      await tx.availabilitySlot.deleteMany();
-      await tx.offering.deleteMany();
-      await tx.providerPayoutAccount.deleteMany();
-      await tx.conversation.deleteMany();
-      await tx.artisanProfile.deleteMany();
-      await tx.user.deleteMany({
-        where: {
-          firebaseUid: { notIn: resolvedKeepAdminUids },
-        },
-      });
+      if (keepListedArtisans) {
+        await purgeRetainingListings(tx, keepUids, keepArtisanProfileIds);
+      } else {
+        await purgeAllMarketplaceData(tx);
+        await tx.user.deleteMany({
+          where: { firebaseUid: { notIn: resolvedKeepAdminUids } },
+        });
+      }
     });
 
     const after = {
       users: await db.user.count(),
       artisanProfiles: await db.artisanProfile.count(),
+      offerings: await db.offering.count(),
       bookings: await db.booking.count(),
       payments: await db.payment.count(),
       conversations: await db.conversation.count(),
@@ -243,7 +375,7 @@ async function main() {
     if (purgeFirebase) {
       await deleteFirebaseUsersExcept(keepSet);
     } else {
-      console.log('Skipped Firebase Auth cleanup. Re-run with --firebase or delete test users manually.');
+      console.log('Skipped Firebase Auth cleanup. Re-run with --firebase to free test emails in Auth.');
     }
 
     console.log('Purge complete. Run `npm run db:seed` to sync service categories.');

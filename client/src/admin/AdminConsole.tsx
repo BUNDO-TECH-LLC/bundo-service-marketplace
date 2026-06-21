@@ -10,6 +10,7 @@ import { AdminLedgerPanel } from './AdminLedgerPanel';
 import { AdminProfilesPanel } from './AdminProfilesPanel';
 import { AdminReviewsPanel } from './AdminReviewsPanel';
 import { adminNavBadge } from './adminNavBadges';
+import type { AdminSectionIntent } from './adminNavigation';
 import bundoLogo from '../assets/BundoLogo.png';
 
 export function AdminConsole({
@@ -51,6 +52,10 @@ export function AdminConsole({
 }) {
   const [messagesFocusConversationId, setMessagesFocusConversationId] = useState<string | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [navigationIntent, setNavigationIntent] = useState<{
+    token: number;
+    intent: AdminSectionIntent;
+  } | null>(null);
 
   const sections: Array<{
     id: AdminSection;
@@ -73,6 +78,17 @@ export function AdminConsole({
 
   const goToSection = (next: AdminSection) => {
     closeMobileNav();
+    setNavigationIntent(null);
+    setSection(next);
+  };
+
+  const navigateToSection = (next: AdminSection, intent?: AdminSectionIntent) => {
+    closeMobileNav();
+    if (intent && Object.keys(intent).length > 0) {
+      setNavigationIntent({ token: Date.now(), intent });
+    } else {
+      setNavigationIntent(null);
+    }
     setSection(next);
   };
 
@@ -185,7 +201,9 @@ export function AdminConsole({
           </button>
         </header>
 
-        {section === 'overview' && <AdminOverviewPanel stats={stats} setSection={setSection} />}
+        {section === 'overview' && (
+          <AdminOverviewPanel stats={stats} navigateToSection={navigateToSection} />
+        )}
         {section === 'profiles' && (
           <AdminProfilesPanel
             token={token}
@@ -193,6 +211,7 @@ export function AdminConsole({
             runAction={runAction}
             refresh={refresh}
             stats={stats}
+            navigationIntent={navigationIntent}
           />
         )}
         {section === 'jobs' && (
@@ -205,6 +224,7 @@ export function AdminConsole({
             refresh={refresh}
             setSection={setSection}
             onOpenConversation={setMessagesFocusConversationId}
+            navigationIntent={navigationIntent}
           />
         )}
         {section === 'messages' && (
@@ -224,6 +244,7 @@ export function AdminConsole({
             busy={busy}
             runAction={runAction}
             refresh={refresh}
+            navigationIntent={navigationIntent}
           />
         )}
         {section === 'catalog' && (

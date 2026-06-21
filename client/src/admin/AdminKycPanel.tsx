@@ -1,13 +1,23 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { bookingDate } from '../lib/bookingDisplay';
 import type { ActionRunner } from '../appTypes';
-import type { ArtisanKycSubmission } from '../types';
-import { AdminPortfolioGallery } from '../components/AdminPortfolioGallery';
+import type { ArtisanKycSubmission, KycStatus } from '../types';
 import { EmptyState } from '../components/EmptyState';
 import { PromptDialog } from '../components/PromptDialog';
 import { Pagination } from '../components/Pagination';
 import { useAdminList } from '../hooks/useAdminList';
+import { AdminKycSubmissionDetailDialog } from './AdminKycSubmissionDetailDialog';
+
+type KycStatusFilter = 'all' | Exclude<KycStatus, 'NOT_SUBMITTED'>;
+
+const kycStatusFilters: Array<{ id: KycStatusFilter; label: string }> = [
+  { id: 'all', label: 'All' },
+  { id: 'PENDING', label: 'Pending' },
+  { id: 'CHANGES_REQUESTED', label: 'Changes requested' },
+  { id: 'APPROVED', label: 'Approved' },
+  { id: 'REJECTED', label: 'Rejected' },
+];
 
 function maskDocumentNumber(value: string) {
   const trimmed = value.trim();
@@ -18,21 +28,61 @@ function maskDocumentNumber(value: string) {
   return `•••• ${trimmed.slice(-4)}`;
 }
 
+function statusLabel(status: ArtisanKycSubmission['status']) {
+  return status.toLowerCase().replace(/_/g, ' ');
+}
+
+function statusClass(status: ArtisanKycSubmission['status']) {
+  return status.toLowerCase().replace(/_/g, '-');
+}
+
+function fileSummary(submission: ArtisanKycSubmission) {
+  const portfolioCount = submission.artisan?.portfolioImages?.length ?? 0;
+  const parts = ['ID document'];
+  if (submission.selfieImageUrl) {
+    parts.push('selfie');
+  }
+  if (portfolioCount > 0) {
+    parts.push(`${portfolioCount} portfolio`);
+  }
+  return parts.join(' · ');
+}
+
 export function AdminKycPanel({
   token,
   busy,
   runAction,
   refresh,
+  navigationIntent,
 }: {
   token: string;
   busy: boolean;
   runAction: ActionRunner;
   refresh: () => Promise<void>;
+  navigationIntent?: {
+    token: number;
+    intent: { verification?: { status?: Exclude<KycStatus, 'NOT_SUBMITTED'> } };
+  } | null;
 }) {
   const [reviewPrompt, setReviewPrompt] = useState<null | {
     submissionId: string;
     status: 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED';
   }>(null);
+  const [activeSubmissionId, setActiveSubmissionId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<KycStatusFilter>('all');
+
+  useEffect(() => {
+    const verificationIntent = navigationIntent?.intent.verification;
+    if (!verificationIntent?.status) return;
+    setStatusFilter(verificationIntent.status);
+    setActiveSubmissionId(null);
+  }, [navigationIntent?.token, navigationIntent?.intent.verification]);
+
+  const statusParams = useMemo(
+    () => (statusFilter === 'all' ? undefined : { status: statusFilter }),
+    [statusFilter]
+  );
+
   const {
     items: submissions,
     total,
@@ -45,8 +95,11 @@ export function AdminKycPanel({
     token,
     path: '/admin/kyc-submissions',
     limit: 12,
+    extraParams: statusParams,
     select: (response) => (response.submissions as ArtisanKycSubmission[]) ?? [],
   });
+
+  const activeSubmission = submissions.find((item) => item.id === activeSubmissionId) ?? null;
 
   async function submitReview(note: string) {
     if (!reviewPrompt) return;
@@ -59,140 +112,161 @@ export function AdminKycPanel({
       }),
     });
     setReviewPrompt(null);
+    setActiveSubmissionId(null);
     await reload();
     await refresh();
   }
 
+  function openReview(
+    submission: ArtisanKycSubmission,
+    status: 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED'
+  ) {
+    setActiveSubmissionId(null);
+    setReviewPrompt({ submissionId: submission.id, status });
+  }
+
   return (
     <section className="admin-panel admin-kyc-panel">
-      <p className="admin-panel-lead muted">
-        Review identity submissions before approving artisans and releasing payouts.
-      </p>
+      <article className="admin-surface">
+        <div className="admin-surface-head">
+          <div>
+            <p className="eyebrow">Verification queue</p>
+            <h3>KYC submissions</h3>
+            <p className="admin-panel-lead muted">
+              Review identity submissions before approving artisans and releasing payouts. Open a row to
+              inspect documents and portfolio photos.
+            </p>
+          </div>
+          <span className="admin-surface-count">{total}</span>
+        </div>
 
-      <PromptDialog
-        open={reviewPrompt !== null}
-        title={
-          reviewPrompt?.status === 'APPROVED'
-            ? 'Approve KYC'
-            : reviewPrompt?.status === 'REJECTED'
-              ? 'Reject KYC'
-              : 'Request KYC changes'
-        }
-        message="Add an optional note for the artisan."
-        label="Review note"
-        confirmLabel="Save"
-        required={false}
-        busy={busy}
-        onCancel={() => setReviewPrompt(null)}
-        onConfirm={(note) =>
-          runAction(
-            () => submitReview(note),
+        <div className="admin-kyc-filters" role="tablist" aria-label="KYC status filters">
+          {kycStatusFilters.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              aria-selected={statusFilter === item.id}
+              className={statusFilter === item.id ? 'active' : ''}
+              disabled={busy || loading}
+              onClick={() => {
+                setStatusFilter(item.id);
+                setActiveSubmissionId(null);
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        <PromptDialog
+          open={reviewPrompt !== null}
+          title={
             reviewPrompt?.status === 'APPROVED'
-              ? 'KYC approved'
+              ? 'Approve KYC'
               : reviewPrompt?.status === 'REJECTED'
-                ? 'KYC rejected'
-                : 'KYC returned for changes'
-          )
-        }
-      />
-
-      {loading && <p className="muted">Loading submissions…</p>}
-      {!loading && submissions.length === 0 && (
-        <EmptyState
-          title="No KYC submissions yet"
-          body="Artisan KYC submissions will appear here once providers start sending their identity details."
+                ? 'Reject KYC'
+                : 'Request KYC changes'
+          }
+          message="Add an optional note for the artisan."
+          label="Review note"
+          confirmLabel="Save"
+          required={false}
+          busy={busy}
+          onCancel={() => setReviewPrompt(null)}
+          onConfirm={(note) =>
+            runAction(
+              () => submitReview(note),
+              reviewPrompt?.status === 'APPROVED'
+                ? 'KYC approved'
+                : reviewPrompt?.status === 'REJECTED'
+                  ? 'KYC rejected'
+                  : 'KYC returned for changes'
+            )
+          }
         />
-      )}
 
-      <div className="admin-inline-table" role="list">
-        {submissions.map((submission) => (
-          <article className="admin-row admin-row--kyc" key={submission.id} role="listitem">
-            <div className="admin-row-grid admin-row-grid--kyc">
-              <div className="admin-row-primary">
-                <strong className="admin-row-title">{submission.legalName}</strong>
-                <p className="admin-row-sub">
-                  {submission.artisan?.displayName || submission.artisan?.user?.email || 'Artisan submission'}
-                </p>
-                <span className={`booking-status ${submission.status.toLowerCase().replace(/_/g, '-')}`}>
-                  {submission.status.toLowerCase().replace(/_/g, ' ')}
-                </span>
-              </div>
-              <dl className="admin-row-fields admin-row-fields--compact">
-                <div>
-                  <dt>Document</dt>
-                  <dd>{submission.documentType}</dd>
-                </div>
-                <div>
-                  <dt>Number</dt>
-                  <dd>{maskDocumentNumber(submission.documentNumber)}</dd>
-                </div>
-                <div>
-                  <dt>City</dt>
-                  <dd>{submission.city}</dd>
-                </div>
-                <div>
-                  <dt>Submitted</dt>
-                  <dd>{bookingDate(submission.submittedAt)}</dd>
-                </div>
-                <div className="admin-row-fields-wide">
-                  <dt>Address</dt>
-                  <dd>{submission.address}</dd>
-                </div>
-                <div>
-                  <dt>Document</dt>
-                  <dd>
-                    <a href={submission.documentImageUrl} target="_blank" rel="noreferrer">
-                      Open file
-                    </a>
-                  </dd>
-                </div>
-              </dl>
-            </div>
+        {activeSubmission ? (
+          <AdminKycSubmissionDetailDialog
+            submission={activeSubmission}
+            busy={busy}
+            onClose={() => setActiveSubmissionId(null)}
+            onApprove={() => openReview(activeSubmission, 'APPROVED')}
+            onRequestChanges={() => openReview(activeSubmission, 'CHANGES_REQUESTED')}
+            onReject={() => openReview(activeSubmission, 'REJECTED')}
+          />
+        ) : null}
 
-            <div className="admin-review-photos admin-review-photos--inline">
-              <p className="admin-row-photo-label">
-                Portfolio ({submission.artisan?.portfolioImages?.length ?? 0})
-              </p>
-              <AdminPortfolioGallery
-                images={submission.artisan?.portfolioImages ?? []}
-                artisanName={submission.artisan?.displayName}
-              />
-            </div>
+        {loading && <p className="muted">Loading submissions…</p>}
+        {!loading && submissions.length === 0 && (
+          <EmptyState
+            title="No KYC submissions yet"
+            body="Artisan KYC submissions will appear here once providers start sending their identity details."
+          />
+        )}
 
-            <div className="admin-row-actions admin-row-actions--inline">
-              <button
-                className="primary-action"
-                disabled={busy || submission.status === 'APPROVED'}
-                onClick={() =>
-                  setReviewPrompt({ submissionId: submission.id, status: 'APPROVED' })
-                }
-              >
-                Approve
-              </button>
-              <button
-                className="secondary-button"
-                disabled={busy || submission.status === 'CHANGES_REQUESTED'}
-                onClick={() =>
-                  setReviewPrompt({ submissionId: submission.id, status: 'CHANGES_REQUESTED' })
-                }
-              >
-                Request changes
-              </button>
-              <button
-                className="secondary-button"
-                disabled={busy || submission.status === 'REJECTED'}
-                onClick={() =>
-                  setReviewPrompt({ submissionId: submission.id, status: 'REJECTED' })
-                }
-              >
-                Reject
-              </button>
-            </div>
-          </article>
-        ))}
-      </div>
+        {!loading && submissions.length > 0 && (
+          <div className="admin-kyc-queue-wrap">
+            <ol className="admin-kyc-queue" start={(page - 1) * limit + 1}>
+              <li className="admin-kyc-queue-head" aria-hidden="true">
+                <span>#</span>
+                <span>Applicant</span>
+                <span>Status</span>
+                <span>Document</span>
+                <span>City</span>
+                <span>Submitted</span>
+                <span>Files</span>
+                <span>Action</span>
+              </li>
+              {submissions.map((submission, index) => {
+                const queueNumber = (page - 1) * limit + index + 1;
 
-      <Pagination page={page} limit={limit} total={total} busy={busy || loading} onPageChange={setPage} />
+                return (
+                  <li className="admin-kyc-queue-row" key={submission.id}>
+                    <span className="admin-kyc-queue-index" data-label="#">
+                      {queueNumber}
+                    </span>
+                    <div className="admin-kyc-queue-applicant" data-label="Applicant">
+                      <strong>{submission.legalName}</strong>
+                      <small>
+                        {submission.artisan?.displayName ||
+                          submission.artisan?.user?.email ||
+                          'Artisan submission'}
+                      </small>
+                    </div>
+                    <div data-label="Status">
+                      <span className={`booking-status ${statusClass(submission.status)}`}>
+                        {statusLabel(submission.status)}
+                      </span>
+                    </div>
+                    <div className="admin-kyc-queue-doc" data-label="Document">
+                      <strong>{submission.documentType}</strong>
+                      <small>{maskDocumentNumber(submission.documentNumber)}</small>
+                    </div>
+                    <span data-label="City">{submission.city}</span>
+                    <span data-label="Submitted">{bookingDate(submission.submittedAt)}</span>
+                    <span className="admin-kyc-queue-files" data-label="Files">
+                      {fileSummary(submission)}
+                    </span>
+                    <div data-label="Action">
+                      <button
+                        type="button"
+                        className="secondary-button admin-kyc-open-button"
+                        disabled={busy}
+                        onClick={() => setActiveSubmissionId(submission.id)}
+                      >
+                        Open
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        )}
+
+        <Pagination page={page} limit={limit} total={total} busy={busy || loading} onPageChange={setPage} />
+      </article>
     </section>
   );
 }

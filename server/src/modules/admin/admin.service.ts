@@ -319,9 +319,12 @@ export const getAdminArtisanById = async (id: string) => {
   });
 };
 
-export const getAdminKycSubmissions = async (pagination?: Pagination) => {
-  return db.artisanKycSubmission.findMany({
-    orderBy: [{ status: 'asc' }, { submittedAt: 'desc' }],
+export const getAdminKycSubmissions = async (
+  pagination?: Pagination,
+  filters?: { status?: Exclude<KycStatus, 'NOT_SUBMITTED'> }
+) => {
+  const query = {
+    orderBy: [{ status: 'asc' as const }, { submittedAt: 'desc' as const }],
     ...paginationArgs(pagination, 50),
     include: {
       artisan: {
@@ -336,16 +339,31 @@ export const getAdminKycSubmissions = async (pagination?: Pagination) => {
             },
           },
           portfolioImages: {
-            orderBy: { displayOrder: 'asc' },
+            orderBy: { displayOrder: 'asc' as const },
             take: 12,
           },
         },
       },
     },
-  });
+  };
+
+  if (filters?.status) {
+    return db.artisanKycSubmission.findMany({
+      where: { status: filters.status },
+      ...query,
+    });
+  }
+
+  return db.artisanKycSubmission.findMany(query);
 };
 
-export const countAdminKycSubmissions = async () => {
+export const countAdminKycSubmissions = async (
+  filters?: { status?: Exclude<KycStatus, 'NOT_SUBMITTED'> }
+) => {
+  if (filters?.status) {
+    return db.artisanKycSubmission.count({ where: { status: filters.status } });
+  }
+
   return db.artisanKycSubmission.count();
 };
 

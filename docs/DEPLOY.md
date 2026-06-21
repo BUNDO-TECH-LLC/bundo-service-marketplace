@@ -22,22 +22,28 @@ Or use Prisma Studio: `npm run db:studio` → `users` → set `role` to `ADMIN`.
 
 Secure that Firebase account with MFA before launch.
 
-## Pre-launch data purge (one-time)
+## Pre-launch / retest data purge
 
-Use this only **before public launch** when the database holds test accounts only (no real payments you must retain).
+Use when you need to **free test emails** while keeping your operator account and live marketplace listings.
 
-From `server/` against your production `DATABASE_URL`:
+From `server/` with production `DATABASE_URL` and Firebase env vars loaded:
 
 ```bash
 PURGE_CONFIRM=YES npm run db:purge -- --keep-admin-email=you@bundo.ng --firebase
 npm run db:seed
 ```
 
+**Keeps by default:**
+- Admin account(s) you specify
+- **Approved artisans with at least one offering** (listings stay on the marketplace)
+
+**Removes:**
+- All other users (customers, applicants, unlisted artisans)
+- Bookings, messages, payments, reviews, and other transactional data
+
+Add `--no-keep-listed-artisans` for the old behaviour (wipe all artisans/listings except admins).
+
 You can use `--keep-admin-uid=<firebase-uid>` instead of email if you prefer.
-
-Optional: run without `--firebase` first to wipe Postgres only, then add `--firebase` on a second run to clear Auth test users (requires server Firebase env vars on your machine).
-
-The script keeps categories and the admin UID(s) you specify. Cloudinary assets are not deleted — remove test folders manually in the Cloudinary console if needed.
 
 ## Paystack (live payments)
 

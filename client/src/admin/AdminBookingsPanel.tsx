@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import { PromptDialog } from '../components/PromptDialog';
 import { bookingDate, paymentLabel } from '../lib/bookingDisplay';
@@ -31,6 +31,57 @@ function moderatorLabel(user: AdminUserRecord) {
   return user.email || user.phone || user.firebaseUid.slice(0, 8);
 }
 
+function customerLabel(booking: Booking) {
+  return booking.customerUser?.email || booking.customerUser?.phone || 'Unknown';
+}
+
+function jobRowContext(booking: AdminBooking) {
+  const paymentStatus = booking.payment?.status;
+  const openDispute = booking.disputes?.find(
+    (dispute) => dispute.status === 'OPEN' || dispute.status === 'UNDER_REVIEW'
+  );
+  const paymentSecured = canStartOrCompleteBooking(booking);
+  const awaitingOtpPayout = booking.payouts?.find((payout) => payout.status === 'PENDING');
+  const processingPayout = booking.payouts?.find((payout) => payout.status === 'PROCESSING');
+  const releasableNow =
+    paymentStatus === 'PAID_HELD' ||
+    paymentStatus === 'PARTIALLY_RELEASED' ||
+    paymentStatus === 'PARTIALLY_REFUNDED';
+  const canReleaseOnDispute =
+    Boolean(openDispute) &&
+    (paymentStatus === 'PAID_HELD' ||
+      paymentStatus === 'PARTIALLY_RELEASED' ||
+      paymentStatus === 'PARTIALLY_REFUNDED');
+  const canRefundOnDispute =
+    Boolean(openDispute) &&
+    paymentStatus === 'PAID_HELD' &&
+    (booking.payment?.releasedAmount ?? 0) === 0;
+  const canRelease =
+    releasableNow &&
+    !['CANCELLED', 'DECLINED'].includes(booking.status) &&
+    !openDispute &&
+    !awaitingOtpPayout &&
+    !processingPayout;
+  const title = booking.offering?.title || booking.offering?.category?.name || 'Service booking';
+  const amount =
+    booking.payment?.amount ?? booking.agreedAmount ?? booking.offering?.priceFrom ?? 0;
+
+  return {
+    paymentStatus,
+    openDispute,
+    paymentSecured,
+    awaitingOtpPayout,
+    processingPayout,
+    canReleaseOnDispute,
+    canRefundOnDispute,
+    canRelease,
+    title,
+    amount,
+    isAppointment: booking.status === 'ACCEPTED',
+    conversationId: booking.conversationId,
+  };
+}
+
 export function AdminBookingsPanel({
   token,
   bookings,
@@ -40,6 +91,7 @@ export function AdminBookingsPanel({
   refresh,
   setSection,
   onOpenConversation,
+  navigationIntent,
 }: {
   token: string;
   bookings: Booking[];
@@ -49,6 +101,7 @@ export function AdminBookingsPanel({
   refresh: () => Promise<void>;
   setSection: (section: AdminSection) => void;
   onOpenConversation: (conversationId: string) => void;
+  navigationIntent?: { token: number; intent: { jobs?: { filter?: AdminJobFilter } } } | null;
 }) {
   const [filter, setFilter] = useState<AdminJobFilter>('all');
   const [moderatorFilter, setModeratorFilter] = useState<'all' | 'unassigned' | string>('all');
@@ -78,6 +131,14 @@ export function AdminBookingsPanel({
     setPage(1);
     setTotal(bookingsTotal ?? bookings.length);
   }, [bookings, bookingsTotal]);
+
+  useEffect(() => {
+    const jobsIntent = navigationIntent?.intent.jobs;
+    if (!jobsIntent?.filter) return;
+    setFilter(jobsIntent.filter);
+    setExpandedChatId(null);
+    setExpandedActionsId(null);
+  }, [navigationIntent?.token, navigationIntent?.intent.jobs]);
 
   // Load the moderator (admin) list directly so assignment always works,
   // regardless of which admin section was visited first.
@@ -274,13 +335,18 @@ export function AdminBookingsPanel({
 
   return (
     <section className="admin-jobs admin-panel">
-      <header className="admin-panel-head admin-panel-head--compact">
-        <div>
-          <p className="muted">
-            Showing {loadedCount} of {totalCount} jobs. Assign moderators, update status, chat, and resolve payouts.
-          </p>
+      <article className="admin-surface">
+        <div className="admin-surface-head">
+          <div>
+            <p className="eyebrow">Operations queue</p>
+            <h3>Jobs</h3>
+            <p className="admin-panel-lead muted">
+              Showing {loadedCount} of {totalCount} jobs. Scroll the table to review details, assign
+              moderators, and open actions without leaving the queue.
+            </p>
+          </div>
+          <span className="admin-surface-count">{visibleJobs.length}</span>
         </div>
-      </header>
 
       <div className="admin-job-filters" role="tablist" aria-label="Job filters">
         {filters.map((item) => (
@@ -346,348 +412,354 @@ export function AdminBookingsPanel({
         />
       )}
 
-      <div className="admin-inline-table" role="list">
-        {visibleJobs.map((booking) => {
-          const paymentStatus = booking.payment?.status;
-          const openDispute = booking.disputes?.find(
-            (dispute) =>
-              dispute.status === 'OPEN' || dispute.status === 'UNDER_REVIEW'
-          );
-          const paymentSecured = canStartOrCompleteBooking(booking);
-          const awaitingOtpPayout = booking.payouts?.find((payout) => payout.status === 'PENDING');
-          const processingPayout = booking.payouts?.find((payout) => payout.status === 'PROCESSING');
-          const releasableNow =
-            paymentStatus === 'PAID_HELD' ||
-            paymentStatus === 'PARTIALLY_RELEASED' ||
-            paymentStatus === 'PARTIALLY_REFUNDED';
-          const canReleaseOnDispute =
-            Boolean(openDispute) &&
-            (paymentStatus === 'PAID_HELD' ||
-              paymentStatus === 'PARTIALLY_RELEASED' ||
-              paymentStatus === 'PARTIALLY_REFUNDED');
-          const canRefundOnDispute =
-            Boolean(openDispute) &&
-            paymentStatus === 'PAID_HELD' &&
-            (booking.payment?.releasedAmount ?? 0) === 0;
-          const canRelease =
-            releasableNow &&
-            !['CANCELLED', 'DECLINED'].includes(booking.status) &&
-            !openDispute &&
-            !awaitingOtpPayout &&
-            !processingPayout;
-          const isAppointment = booking.status === 'ACCEPTED';
-          const chatOpen = expandedChatId === booking.id;
-          const actionsOpen = expandedActionsId === booking.id;
-          const conversationId = booking.conversationId;
-          const title =
-            booking.offering?.title || booking.offering?.category?.name || 'Service booking';
+      {visibleJobs.length > 0 && (
+        <div className="admin-jobs-table-wrap">
+          <table className="admin-jobs-table">
+            <thead>
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col">Service</th>
+                <th scope="col">Customer</th>
+                <th scope="col">Artisan</th>
+                <th scope="col">Scheduled</th>
+                <th scope="col">Location</th>
+                <th scope="col">Stage</th>
+                <th scope="col">Payment</th>
+                <th scope="col">Amount</th>
+                <th scope="col">Moderator</th>
+                <th scope="col">Access</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleJobs.map((booking, index) => {
+                const ctx = jobRowContext(booking);
+                const chatOpen = expandedChatId === booking.id;
+                const actionsOpen = expandedActionsId === booking.id;
 
-          return (
-            <article className="admin-row admin-row--job" key={booking.id} role="listitem">
-              {isAppointment && (
-                <p className="admin-row-banner" role="status">
-                  <strong>New appointment</strong> — coordinate in chat when ready.
-                </p>
-              )}
-
-              <div className="admin-row-grid">
-                <div className="admin-row-primary">
-                  <div className="admin-row-title-line">
-                    <span className="admin-row-id">#{booking.id.slice(0, 8)}</span>
-                    <strong className="admin-row-title">{title}</strong>
-                  </div>
-                  <p className="admin-row-sub">
-                    {booking.artisan?.displayName || 'Artisan'} · {bookingDate(booking.scheduledAt)}
-                  </p>
-                  <div className="admin-row-chips">
-                    <span className={`booking-status ${jobStageClass(booking.status)}`}>
-                      {jobStageLabel(booking.status)}
-                    </span>
-                    <span className={`payment-chip ${(paymentStatus || 'UNPAID').toLowerCase()}`}>
-                      {paymentLabel(paymentStatus)}
-                    </span>
-                    {openDispute && (
-                      <span className="booking-status cancelled">Dispute open</span>
-                    )}
-                    {awaitingOtpPayout && (
-                      <span className="booking-status appointment">Payout OTP required</span>
-                    )}
-                    {processingPayout && (
-                      <span className="booking-status ongoing">Payout processing</span>
-                    )}
-                    {paymentStatus === 'REFUND_REQUESTED' && (
-                      <span className="booking-status appointment">Refund awaiting approval</span>
-                    )}
-                  </div>
-                </div>
-
-                <dl className="admin-row-fields">
-                  <div>
-                    <dt>Customer</dt>
-                    <dd title={booking.customerUser?.email || undefined}>
-                      {booking.customerUser?.email || booking.customerUser?.phone || 'Unknown'}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Artisan</dt>
-                    <dd title={booking.artisan?.displayName || undefined}>
-                      {booking.artisan?.displayName || 'Unknown'}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Location</dt>
-                    <dd>{booking.artisan?.city || '—'}</dd>
-                  </div>
-                  <div>
-                    <dt>Amount</dt>
-                    <dd>
-                      {money(
-                        booking.payment?.amount ??
-                          booking.agreedAmount ??
-                          booking.offering?.priceFrom ??
-                          0
-                      )}
-                      {booking.payment && (
-                        <span className="admin-amount-split">
-                          Fee {money(booking.payment.platformFee)} · Artisan{' '}
-                          {money(booking.payment.providerEarning)}
-                          {(booking.payment.releasedAmount ?? 0) > 0 && (
-                            <> · Released {money(booking.payment.releasedAmount ?? 0)}</>
-                          )}
+                return (
+                  <Fragment key={booking.id}>
+                    <tr
+                      className={
+                        ctx.isAppointment ? 'admin-jobs-table-row admin-jobs-table-row--highlight' : 'admin-jobs-table-row'
+                      }
+                    >
+                      <td className="admin-jobs-table-index" data-label="#">
+                        {index + 1}
+                      </td>
+                      <td className="admin-jobs-table-service" data-label="Service">
+                        <strong title={ctx.title}>{ctx.title}</strong>
+                        <span className="admin-jobs-table-meta">#{booking.id.slice(0, 8)}</span>
+                        {booking.note?.trim() ? (
+                          <span className="admin-jobs-table-note" title={booking.note.trim()}>
+                            {booking.note.trim()}
+                          </span>
+                        ) : null}
+                        {ctx.isAppointment ? (
+                          <span className="admin-jobs-table-flag">New appointment</span>
+                        ) : null}
+                      </td>
+                      <td data-label="Customer" title={customerLabel(booking)}>
+                        {customerLabel(booking)}
+                      </td>
+                      <td data-label="Artisan" title={booking.artisan?.displayName || undefined}>
+                        {booking.artisan?.displayName || 'Unknown'}
+                      </td>
+                      <td className="admin-jobs-table-nowrap" data-label="Scheduled">
+                        {bookingDate(booking.scheduledAt)}
+                      </td>
+                      <td data-label="Location">{booking.artisan?.city || '—'}</td>
+                      <td data-label="Stage">
+                        <span className={`booking-status ${jobStageClass(booking.status)}`}>
+                          {jobStageLabel(booking.status)}
                         </span>
-                      )}
-                    </dd>
-                  </div>
-                  <div className="admin-row-fields-note">
-                    <dt>Note</dt>
-                    <dd title={booking.note?.trim() || undefined}>
-                      {booking.note?.trim() || '—'}
-                    </dd>
-                  </div>
-                </dl>
-
-                <label className="admin-row-moderator">
-                  <span>Moderator</span>
-                  <select
-                    value={booking.moderatorId || ''}
-                    disabled={busy}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      runAction(
-                        () => assignModerator(booking.id, value || null),
-                        value ? 'Moderator assigned' : 'Moderator cleared'
-                      );
-                    }}
-                  >
-                    <option value="">Unassigned</option>
-                    {adminModerators.map((admin) => (
-                      <option key={admin.firebaseUid} value={admin.firebaseUid}>
-                        {moderatorLabel(admin)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <div className="admin-row-toolbar">
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() =>
-                      setExpandedActionsId(actionsOpen ? null : booking.id)
-                    }
-                  >
-                    {actionsOpen ? 'Hide actions' : 'Actions'}
-                  </button>
-                  {conversationId && (
-                    <button
-                      type="button"
-                      className="text-button"
-                      onClick={() => setExpandedChatId(chatOpen ? null : booking.id)}
-                    >
-                      {chatOpen ? 'Hide chat' : 'Chat'}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {actionsOpen && (
-                <div className="admin-row-actions">
-                  {booking.status === 'REQUESTED' && (
-                    <button
-                      type="button"
-                      className="primary-action"
-                      disabled={busy}
-                      onClick={() =>
-                        runAction(
-                          () => confirmAppointment(booking.id),
-                          'Appointment confirmed'
-                        )
-                      }
-                    >
-                      Confirm
-                    </button>
-                  )}
-                  {!paymentSecured && ['ACCEPTED', 'ONGOING'].includes(booking.status) && (
-                    <p className="booking-payment-notice" role="status">
-                      Payment not secured — cannot progress this job.
-                    </p>
-                  )}
-                  {booking.status === 'ACCEPTED' && (
-                    <button
-                      type="button"
-                      className="primary-action"
-                      disabled={busy || !paymentSecured}
-                      onClick={() =>
-                        runAction(
-                          () => updateStatus(booking.id, 'ONGOING'),
-                          'Job marked in progress'
-                        )
-                      }
-                    >
-                      Start
-                    </button>
-                  )}
-                  {(booking.status === 'ACCEPTED' || booking.status === 'ONGOING') && (
-                    <button
-                      type="button"
-                      className="secondary-button"
-                      disabled={busy || !paymentSecured}
-                      onClick={() =>
-                        runAction(
-                          () => updateStatus(booking.id, 'COMPLETED'),
-                          'Job marked completed'
-                        )
-                      }
-                    >
-                      Complete
-                    </button>
-                  )}
-                  {conversationId && (
-                    <button
-                      type="button"
-                      className="text-button"
-                      onClick={() => {
-                        onOpenConversation(conversationId);
-                        setSection('messages');
-                      }}
-                    >
-                      Full support view
-                    </button>
-                  )}
-                  {openDispute && (
-                    <div className="admin-dispute-actions">
-                      <button
-                        type="button"
-                        className="secondary-button"
-                        disabled={busy}
-                        onClick={() => startDisputeResolution(openDispute.id, 'CLOSE')}
-                      >
-                        Close dispute
-                      </button>
-                      {canReleaseOnDispute && (
-                        <button
-                          type="button"
-                          className="primary-action"
+                      </td>
+                      <td data-label="Payment">
+                        <div className="admin-jobs-table-chips">
+                          <span
+                            className={`payment-chip ${(ctx.paymentStatus || 'UNPAID').toLowerCase()}`}
+                          >
+                            {paymentLabel(ctx.paymentStatus)}
+                          </span>
+                          {ctx.openDispute ? (
+                            <span className="booking-status cancelled">Dispute</span>
+                          ) : null}
+                          {ctx.awaitingOtpPayout ? (
+                            <span className="booking-status appointment">OTP</span>
+                          ) : null}
+                          {ctx.processingPayout ? (
+                            <span className="booking-status ongoing">Processing</span>
+                          ) : null}
+                          {ctx.paymentStatus === 'REFUND_REQUESTED' ? (
+                            <span className="booking-status appointment">Refund pending</span>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="admin-jobs-table-amount" data-label="Amount">
+                        <strong>{money(ctx.amount)}</strong>
+                        {booking.payment ? (
+                          <span
+                            className="admin-jobs-table-meta"
+                            title={`Fee ${money(booking.payment.platformFee)} · Artisan ${money(booking.payment.providerEarning)}${
+                              (booking.payment.releasedAmount ?? 0) > 0
+                                ? ` · Released ${money(booking.payment.releasedAmount ?? 0)}`
+                                : ''
+                            }`}
+                          >
+                            Fee {money(booking.payment.platformFee)}
+                          </span>
+                        ) : null}
+                      </td>
+                      <td data-label="Moderator">
+                        <select
+                          className="admin-inline-select admin-jobs-table-select"
+                          value={booking.moderatorId || ''}
                           disabled={busy}
-                          onClick={() => startDisputeResolution(openDispute.id, 'RELEASE')}
+                          aria-label={`Moderator for ${ctx.title}`}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            void runAction(
+                              () => assignModerator(booking.id, value || null),
+                              value ? 'Moderator assigned' : 'Moderator cleared'
+                            );
+                          }}
                         >
-                          Resolve & release
-                        </button>
-                      )}
-                      {canRefundOnDispute && (
-                        <>
+                          <option value="">Unassigned</option>
+                          {adminModerators.map((admin) => (
+                            <option key={admin.firebaseUid} value={admin.firebaseUid}>
+                              {moderatorLabel(admin)}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td data-label="Access">
+                        <div className="admin-jobs-table-access">
                           <button
                             type="button"
-                            className="secondary-button"
-                            disabled={busy}
-                            onClick={() => startDisputeResolution(openDispute.id, 'REFUND_FULL')}
+                            className="secondary-button admin-jobs-table-action"
+                            onClick={() =>
+                              setExpandedActionsId(actionsOpen ? null : booking.id)
+                            }
                           >
-                            Full refund
+                            {actionsOpen ? 'Hide' : 'Actions'}
                           </button>
-                          <button
-                            type="button"
-                            className="secondary-button"
-                            disabled={busy}
-                            onClick={() => startDisputeResolution(openDispute.id, 'REFUND_PARTIAL')}
-                          >
-                            Partial refund
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
-                  {!openDispute &&
-                    ['REQUESTED', 'ACCEPTED', 'ONGOING'].includes(booking.status) && (
-                      <button
-                        type="button"
-                        className="admin-danger-button"
-                        disabled={busy}
-                        onClick={() =>
-                          runAction(
-                            () => updateStatus(booking.id, 'CANCELLED'),
-                            'Job cancelled'
-                          )
-                        }
-                      >
-                        Cancel job
-                      </button>
-                    )}
-                  {paymentStatus === 'REFUND_REQUESTED' && booking.payment?.id && (
-                    <button
-                      type="button"
-                      className="primary-action"
-                      disabled={busy}
-                      onClick={() =>
-                        runAction(
-                          () => approveCancellationRefund(booking.payment!.id),
-                          'Cancellation refund approved'
-                        )
-                      }
-                    >
-                      Approve cancellation refund
-                    </button>
-                  )}
-                  {canRelease && (
-                    <button
-                      type="button"
-                      className="primary-action"
-                      disabled={busy}
-                      onClick={() => setPayoutDialogBooking(booking)}
-                    >
-                      {paymentStatus === 'PARTIALLY_RELEASED' ? 'Release more' : 'Release payout'}
-                    </button>
-                  )}
-                  {awaitingOtpPayout && (
-                    <button
-                      type="button"
-                      className="primary-action"
-                      disabled={busy}
-                      onClick={() =>
-                        setPayoutOtpPrompt({
-                          payoutId: awaitingOtpPayout.id,
-                          bookingId: booking.id,
-                          title,
-                        })
-                      }
-                    >
-                      Enter payout OTP
-                    </button>
-                  )}
-                </div>
-              )}
+                          {ctx.conversationId ? (
+                            <button
+                              type="button"
+                              className="text-button admin-jobs-table-action"
+                              onClick={() =>
+                                setExpandedChatId(chatOpen ? null : booking.id)
+                              }
+                            >
+                              {chatOpen ? 'Hide chat' : 'Chat'}
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
 
-              {chatOpen && conversationId && (
-                <AdminJobChat
-                  token={token}
-                  conversationId={conversationId}
-                  busy={busy}
-                  runAction={runAction}
-                />
-              )}
-            </article>
-          );
-        })}
-      </div>
+                    {actionsOpen ? (
+                      <tr className="admin-jobs-table-expand-row">
+                        <td colSpan={11}>
+                          <div className="admin-jobs-table-actions">
+                            {booking.status === 'REQUESTED' && (
+                              <button
+                                type="button"
+                                className="primary-action"
+                                disabled={busy}
+                                onClick={() =>
+                                  void runAction(
+                                    () => confirmAppointment(booking.id),
+                                    'Appointment confirmed'
+                                  )
+                                }
+                              >
+                                Confirm
+                              </button>
+                            )}
+                            {!ctx.paymentSecured &&
+                              ['ACCEPTED', 'ONGOING'].includes(booking.status) && (
+                                <p className="booking-payment-notice" role="status">
+                                  Payment not secured — cannot progress this job.
+                                </p>
+                              )}
+                            {booking.status === 'ACCEPTED' && (
+                              <button
+                                type="button"
+                                className="primary-action"
+                                disabled={busy || !ctx.paymentSecured}
+                                onClick={() =>
+                                  void runAction(
+                                    () => updateStatus(booking.id, 'ONGOING'),
+                                    'Job marked in progress'
+                                  )
+                                }
+                              >
+                                Start
+                              </button>
+                            )}
+                            {(booking.status === 'ACCEPTED' || booking.status === 'ONGOING') && (
+                              <button
+                                type="button"
+                                className="secondary-button"
+                                disabled={busy || !ctx.paymentSecured}
+                                onClick={() =>
+                                  void runAction(
+                                    () => updateStatus(booking.id, 'COMPLETED'),
+                                    'Job marked completed'
+                                  )
+                                }
+                              >
+                                Complete
+                              </button>
+                            )}
+                            {ctx.conversationId ? (
+                              <button
+                                type="button"
+                                className="text-button"
+                                onClick={() => {
+                                  onOpenConversation(ctx.conversationId!);
+                                  setSection('messages');
+                                }}
+                              >
+                                Full support view
+                              </button>
+                            ) : null}
+                            {ctx.openDispute ? (
+                              <div className="admin-dispute-actions">
+                                <button
+                                  type="button"
+                                  className="secondary-button"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    startDisputeResolution(ctx.openDispute!.id, 'CLOSE')
+                                  }
+                                >
+                                  Close dispute
+                                </button>
+                                {ctx.canReleaseOnDispute ? (
+                                  <button
+                                    type="button"
+                                    className="primary-action"
+                                    disabled={busy}
+                                    onClick={() =>
+                                      startDisputeResolution(ctx.openDispute!.id, 'RELEASE')
+                                    }
+                                  >
+                                    Resolve & release
+                                  </button>
+                                ) : null}
+                                {ctx.canRefundOnDispute ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      className="secondary-button"
+                                      disabled={busy}
+                                      onClick={() =>
+                                        startDisputeResolution(ctx.openDispute!.id, 'REFUND_FULL')
+                                      }
+                                    >
+                                      Full refund
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="secondary-button"
+                                      disabled={busy}
+                                      onClick={() =>
+                                        startDisputeResolution(
+                                          ctx.openDispute!.id,
+                                          'REFUND_PARTIAL'
+                                        )
+                                      }
+                                    >
+                                      Partial refund
+                                    </button>
+                                  </>
+                                ) : null}
+                              </div>
+                            ) : null}
+                            {!ctx.openDispute &&
+                              ['REQUESTED', 'ACCEPTED', 'ONGOING'].includes(booking.status) && (
+                                <button
+                                  type="button"
+                                  className="admin-danger-button"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void runAction(
+                                      () => updateStatus(booking.id, 'CANCELLED'),
+                                      'Job cancelled'
+                                    )
+                                  }
+                                >
+                                  Cancel job
+                                </button>
+                              )}
+                            {ctx.paymentStatus === 'REFUND_REQUESTED' && booking.payment?.id ? (
+                              <button
+                                type="button"
+                                className="primary-action"
+                                disabled={busy}
+                                onClick={() =>
+                                  void runAction(
+                                    () => approveCancellationRefund(booking.payment!.id),
+                                    'Cancellation refund approved'
+                                  )
+                                }
+                              >
+                                Approve cancellation refund
+                              </button>
+                            ) : null}
+                            {ctx.canRelease ? (
+                              <button
+                                type="button"
+                                className="primary-action"
+                                disabled={busy}
+                                onClick={() => setPayoutDialogBooking(booking)}
+                              >
+                                {ctx.paymentStatus === 'PARTIALLY_RELEASED'
+                                  ? 'Release more'
+                                  : 'Release payout'}
+                              </button>
+                            ) : null}
+                            {ctx.awaitingOtpPayout ? (
+                              <button
+                                type="button"
+                                className="primary-action"
+                                disabled={busy}
+                                onClick={() =>
+                                  setPayoutOtpPrompt({
+                                    payoutId: ctx.awaitingOtpPayout!.id,
+                                    bookingId: booking.id,
+                                    title: ctx.title,
+                                  })
+                                }
+                              >
+                                Enter payout OTP
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ) : null}
+
+                    {chatOpen && ctx.conversationId ? (
+                      <tr className="admin-jobs-table-expand-row">
+                        <td colSpan={11}>
+                          <AdminJobChat
+                            token={token}
+                            conversationId={ctx.conversationId}
+                            busy={busy}
+                            runAction={runAction}
+                          />
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <PromptDialog
         open={disputePrompt !== null}
@@ -743,6 +815,7 @@ export function AdminBookingsPanel({
         onCancel={() => setPayoutOtpPrompt(null)}
         onConfirm={(value) => runAction(() => finalizePayoutOtp(value), 'Payout authorized')}
       />
+      </article>
     </section>
   );
 }

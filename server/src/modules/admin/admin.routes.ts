@@ -204,9 +204,18 @@ router.get('/artisans/:id', asyncHandler(async (req, res) => {
 
 router.get('/kyc-submissions', asyncHandler(async (req, res) => {
   const pagination = getPagination(req);
+  const statusParam = typeof req.query.status === 'string' ? req.query.status : undefined;
+  const allowedStatuses = [
+    KycStatus.PENDING,
+    KycStatus.APPROVED,
+    KycStatus.REJECTED,
+    KycStatus.CHANGES_REQUESTED,
+  ] as const;
+  const status = allowedStatuses.find((value) => value === statusParam);
+  const filters = status ? { status } : undefined;
   const [submissions, total] = await Promise.all([
-    getAdminKycSubmissions(pagination),
-    countAdminKycSubmissions(),
+    getAdminKycSubmissions(pagination, filters),
+    countAdminKycSubmissions(filters),
   ]);
 
   res.json({

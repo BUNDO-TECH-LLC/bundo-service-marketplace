@@ -1,6 +1,13 @@
 import type { AdminSection } from '../appTypes';
 import { EmptyState } from '../components/EmptyState';
 import { adminMetricLabel } from './adminMetricLabel';
+import {
+  OVERVIEW_PIPELINE_TARGETS,
+  OVERVIEW_PRIORITY_TARGETS,
+  OVERVIEW_STAT_TARGETS,
+  type AdminOverviewTarget,
+  type AdminSectionIntent,
+} from './adminNavigation';
 
 const KEY_METRICS = [
   'users',
@@ -11,46 +18,52 @@ const KEY_METRICS = [
   'conversations',
 ] as const;
 
+const PRIORITY_LABELS = [
+  {
+    title: 'Pending KYC reviews',
+    action: 'Open verification',
+    statKey: 'pendingKycSubmissions',
+  },
+  {
+    title: 'New appointments',
+    action: 'Open jobs',
+    statKey: 'bookingAppointments',
+  },
+  {
+    title: 'Open disputes',
+    action: 'Open jobs',
+    statKey: 'openDisputes',
+  },
+  {
+    title: 'Artisans awaiting review',
+    action: 'Open profiles',
+    statKey: 'pendingArtisans',
+  },
+] as const;
+
 export function AdminOverviewPanel({
   stats,
-  setSection,
+  navigateToSection,
 }: {
   stats: Record<string, number> | null;
-  setSection: (section: AdminSection) => void;
+  navigateToSection: (section: AdminSection, intent?: AdminSectionIntent) => void;
 }) {
-  const priorityItems = stats
-    ? [
-        {
-          title: 'Pending KYC reviews',
-          value: stats.pendingKycSubmissions ?? 0,
-          action: 'Open verification',
-          section: 'verification' as AdminSection,
-        },
-        {
-          title: 'New appointments',
-          value: stats.bookingAppointments ?? 0,
-          action: 'Open jobs',
-          section: 'jobs' as AdminSection,
-        },
-        {
-          title: 'Open disputes',
-          value: stats.openDisputes ?? 0,
-          action: 'Open jobs',
-          section: 'jobs' as AdminSection,
-        },
-        {
-          title: 'Artisans awaiting review',
-          value: stats.pendingArtisans ?? 0,
-          action: 'Open profiles',
-          section: 'profiles' as AdminSection,
-        },
-      ]
-    : [];
+  function openTarget(target: AdminOverviewTarget) {
+    navigateToSection(target.section, target.intent);
+  }
+
+  const priorityItems =
+    stats &&
+    PRIORITY_LABELS.map((item, index) => ({
+      ...item,
+      value: stats[item.statKey] ?? 0,
+      target: OVERVIEW_PRIORITY_TARGETS[index],
+    }));
 
   return (
     <section className="admin-panel">
       <p className="admin-panel-lead muted">
-        Live counts from the database — use the priority queue for work that needs attention.
+        Live counts from the database — tap a metric or queue item to jump to the matching filtered view.
       </p>
 
       <div className="admin-stat-grid admin-stat-grid--key">
@@ -58,12 +71,23 @@ export function AdminOverviewPanel({
           <EmptyState title="Admin stats unavailable" body="Sign in as an admin, then reopen this page." />
         )}
         {stats &&
-          KEY_METRICS.map((key) => (
-            <article className={`admin-stat-card${key === 'openDisputes' && stats[key] > 0 ? ' admin-stat-card--alert' : ''}`} key={key}>
-              <span>{adminMetricLabel(key)}</span>
-              <strong>{stats[key] ?? 0}</strong>
-            </article>
-          ))}
+          KEY_METRICS.map((key) => {
+            const target = OVERVIEW_STAT_TARGETS[key];
+            return (
+              <button
+                key={key}
+                type="button"
+                className={`admin-stat-card admin-stat-card--clickable${
+                  key === 'openDisputes' && stats[key] > 0 ? ' admin-stat-card--alert' : ''
+                }`}
+                onClick={() => openTarget(target)}
+              >
+                <span>{adminMetricLabel(key)}</span>
+                <strong>{stats[key] ?? 0}</strong>
+                <small className="admin-stat-card-hint">View filtered section</small>
+              </button>
+            );
+          })}
       </div>
 
       <div className="admin-overview-grid">
@@ -74,7 +98,7 @@ export function AdminOverviewPanel({
               <h3>Needs attention</h3>
             </div>
           </div>
-          {!stats ? (
+          {!stats || !priorityItems ? (
             <EmptyState title="No stats loaded" body="Refresh the page if this persists." />
           ) : (
             <div className="admin-priority-list">
@@ -83,7 +107,7 @@ export function AdminOverviewPanel({
                   key={item.title}
                   className={`admin-priority-item${item.value > 0 ? ' admin-priority-item--active' : ''}`}
                   type="button"
-                  onClick={() => setSection(item.section)}
+                  onClick={() => openTarget(item.target)}
                 >
                   <div>
                     <strong>{item.title}</strong>
@@ -106,32 +130,21 @@ export function AdminOverviewPanel({
           {!stats ? (
             <EmptyState title="No stats loaded" body="Refresh the page if this persists." />
           ) : (
-            <dl className="admin-summary-list">
-              <div>
-                <dt>Requests</dt>
-                <dd>{stats.bookingRequests ?? 0}</dd>
-              </div>
-              <div>
-                <dt>Appointments</dt>
-                <dd>{stats.bookingAppointments ?? 0}</dd>
-              </div>
-              <div>
-                <dt>In progress</dt>
-                <dd>{stats.bookingOngoing ?? 0}</dd>
-              </div>
-              <div>
-                <dt>Completed</dt>
-                <dd>{stats.bookingCompleted ?? 0}</dd>
-              </div>
-              <div>
-                <dt>Approved artisans</dt>
-                <dd>{stats.approvedArtisans ?? 0}</dd>
-              </div>
-              <div>
-                <dt>Active listings</dt>
-                <dd>{stats.offerings ?? 0}</dd>
-              </div>
-            </dl>
+            <div className="admin-pipeline-list">
+              {OVERVIEW_PIPELINE_TARGETS.map((item) => (
+                <button
+                  key={item.statKey}
+                  type="button"
+                  className={`admin-pipeline-item${
+                    (stats[item.statKey] ?? 0) > 0 ? ' admin-pipeline-item--active' : ''
+                  }`}
+                  onClick={() => openTarget(item)}
+                >
+                  <span>{item.label}</span>
+                  <strong>{stats[item.statKey] ?? 0}</strong>
+                </button>
+              ))}
+            </div>
           )}
         </article>
       </div>
