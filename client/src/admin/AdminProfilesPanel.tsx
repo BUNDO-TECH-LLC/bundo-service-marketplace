@@ -6,6 +6,7 @@ import { AdminPortfolioGallery } from '../components/AdminPortfolioGallery';
 import { Pagination } from '../components/Pagination';
 import { useAdminList } from '../hooks/useAdminList';
 import type { AdminProfilesFilter, AdminVerifyFilter } from './adminNavigation';
+import { AdminTableScrollHint } from './AdminTableScrollHint';
 import type { Artisan, Role } from '../types';
 
 type ProfileFilter = AdminProfilesFilter;
@@ -214,8 +215,9 @@ export function AdminProfilesPanel({
         )}
 
         {!activeList.loading && !isArtisanView && usersList.items.length > 0 && (
-          <div className="admin-profiles-table-wrap">
-            <table className="admin-profiles-table">
+          <div className="admin-table-scroll-wrap admin-profiles-table-wrap">
+            <AdminTableScrollHint />
+            <table className="admin-profiles-table admin-data-table">
               <thead>
                 <tr>
                   <th scope="col">Account</th>
@@ -298,8 +300,9 @@ export function AdminProfilesPanel({
         )}
 
         {!activeList.loading && isArtisanView && artisansList.items.length > 0 && (
-          <div className="admin-profiles-table-wrap">
-            <table className="admin-profiles-table">
+          <div className="admin-table-scroll-wrap admin-profiles-table-wrap">
+            <AdminTableScrollHint />
+            <table className="admin-profiles-table admin-data-table">
               <thead>
                 <tr>
                   <th scope="col">Artisan</th>

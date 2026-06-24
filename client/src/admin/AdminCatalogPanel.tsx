@@ -5,6 +5,7 @@ import type { ActionRunner, AdminCategoryRecord } from '../appTypes';
 import { EmptyState } from '../components/EmptyState';
 import { Pagination } from '../components/Pagination';
 import { useAdminList } from '../hooks/useAdminList';
+import { AdminTableScrollHint } from './AdminTableScrollHint';
 
 export function AdminCatalogPanel({
   token,
@@ -91,7 +92,9 @@ export function AdminCatalogPanel({
           setDialogOpen(false);
           setEditingCategory(null);
         }}
-        onConfirm={(values) => runAction(() => saveCategory(values), editingCategory ? 'Category updated' : 'Category created')}
+        onConfirm={(values) =>
+          runAction(() => saveCategory(values), editingCategory ? 'Category updated' : 'Category created')
+        }
       />
 
       {loading && <p className="muted">Loading categories…</p>}
@@ -99,57 +102,66 @@ export function AdminCatalogPanel({
         <EmptyState title="No categories yet" body="Create your first service category to power marketplace search." />
       )}
 
-      <div className="admin-record-list">
-        {categories.map((category) => (
-          <article className="admin-record-card" key={category.id}>
-            <div className="admin-record-head">
-              <div>
-                <h4>{category.name}</h4>
-                <p>{category.slug}</p>
-              </div>
-              <span className="booking-status">{category._count?.offerings || 0} offerings</span>
-            </div>
-            <dl className="admin-inline-list">
-              <div>
-                <dt>Icon key</dt>
-                <dd>{category.iconKey}</dd>
-              </div>
-              <div>
-                <dt>Linked services</dt>
-                <dd>{category._count?.offerings || 0}</dd>
-              </div>
-            </dl>
-            <div className="admin-action-row">
-              <button
-                className="secondary-button"
-                disabled={busy}
-                onClick={() => {
-                  setEditingCategory(category);
-                  setDialogOpen(true);
-                }}
-              >
-                Edit
-              </button>
-              <button
-                className="secondary-button"
-                disabled={busy}
-                onClick={() =>
-                  runAction(async () => {
-                    if (!window.confirm(`Delete ${category.name}?`)) return;
-                    await api(`/admin/categories/${category.id}`, {
-                      method: 'DELETE',
-                      token,
-                    });
-                    await refreshAfterMutation();
-                  }, 'Category deleted')
-                }
-              >
-                Delete
-              </button>
-            </div>
-          </article>
-        ))}
-      </div>
+      {categories.length > 0 && (
+        <div className="admin-table-scroll-wrap">
+          <AdminTableScrollHint />
+          <table className="admin-catalog-table admin-data-table">
+            <thead>
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Slug</th>
+                <th scope="col">Icon</th>
+                <th scope="col">Offerings</th>
+                <th scope="col">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {categories.map((category) => (
+                <tr key={category.id}>
+                  <td>
+                    <strong>{category.name}</strong>
+                  </td>
+                  <td>{category.slug}</td>
+                  <td>{category.iconKey}</td>
+                  <td>{category._count?.offerings || 0}</td>
+                  <td>
+                    <div className="admin-data-table-actions">
+                      <button
+                        type="button"
+                        className="secondary-button admin-data-table-action"
+                        disabled={busy}
+                        onClick={() => {
+                          setEditingCategory(category);
+                          setDialogOpen(true);
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary-button admin-data-table-action"
+                        disabled={busy}
+                        onClick={() =>
+                          runAction(async () => {
+                            if (!window.confirm(`Delete ${category.name}?`)) return;
+                            await api(`/admin/categories/${category.id}`, {
+                              method: 'DELETE',
+                              token,
+                            });
+                            await refreshAfterMutation();
+                          }, 'Category deleted')
+                        }
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <Pagination page={page} limit={limit} total={total} busy={busy || loading} onPageChange={setPage} />
     </section>

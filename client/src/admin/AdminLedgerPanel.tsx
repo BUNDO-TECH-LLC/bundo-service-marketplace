@@ -3,6 +3,7 @@ import { money } from '../lib/formatting';
 import { EmptyState } from '../components/EmptyState';
 import { Pagination } from '../components/Pagination';
 import { useAdminList } from '../hooks/useAdminList';
+import { AdminTableScrollHint } from './AdminTableScrollHint';
 
 type LedgerEntryRow = {
   id: string;
@@ -39,34 +40,43 @@ export function AdminLedgerPanel({ token }: { token: string }) {
         <EmptyState title="No ledger entries" body="Payment activity will appear here once bookings are paid." />
       )}
 
-      <ul className="admin-inline-table" role="list">
-        {entries.map((entry) => (
-          <li className="admin-row admin-row--compact" key={entry.id} role="listitem">
-            <div className="admin-row-grid">
-              <div className="admin-row-primary">
-                <strong className="admin-row-title">
-                  {entry.type.replace(/_/g, ' ')} · {money(entry.amount)}
-                </strong>
-                <p className="admin-row-sub">
-                  {entry.booking?.offering?.title || 'Booking'} · #{entry.booking?.id.slice(0, 8)}
-                </p>
-                {entry.note && <p className="admin-row-note">{entry.note}</p>}
-                <span className="muted">{bookingDate(entry.createdAt)}</span>
-              </div>
-              <dl className="admin-row-fields admin-row-fields--compact">
-                <div>
-                  <dt>Payment</dt>
-                  <dd>{entry.payment?.status || '—'}</dd>
-                </div>
-                <div>
-                  <dt>Reference</dt>
-                  <dd>{entry.payment?.paystackReference || '—'}</dd>
-                </div>
-            </dl>
-          </div>
-        </li>
-        ))}
-      </ul>
+      {entries.length > 0 && (
+        <div className="admin-table-scroll-wrap">
+          <AdminTableScrollHint />
+          <table className="admin-ledger-table admin-data-table">
+            <thead>
+              <tr>
+                <th scope="col">Type</th>
+                <th scope="col">Amount</th>
+                <th scope="col">Booking</th>
+                <th scope="col">Note</th>
+                <th scope="col">Date</th>
+                <th scope="col">Payment</th>
+                <th scope="col">Reference</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((entry) => (
+                <tr key={entry.id}>
+                  <td>{entry.type.replace(/_/g, ' ')}</td>
+                  <td className="admin-data-table-nowrap">
+                    <strong>{money(entry.amount)}</strong>
+                  </td>
+                  <td className="admin-data-table-clip">
+                    {entry.booking?.offering?.title || 'Booking'} · #{entry.booking?.id.slice(0, 8)}
+                  </td>
+                  <td className="admin-data-table-clip" title={entry.note || undefined}>
+                    {entry.note || '—'}
+                  </td>
+                  <td className="admin-data-table-nowrap">{bookingDate(entry.createdAt)}</td>
+                  <td>{entry.payment?.status || '—'}</td>
+                  <td className="admin-data-table-clip">{entry.payment?.paystackReference || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <Pagination page={page} limit={limit} total={total} busy={loading} onPageChange={setPage} />
     </section>

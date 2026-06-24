@@ -5,6 +5,7 @@ import type { Review } from '../types';
 import { EmptyState } from '../components/EmptyState';
 import { Pagination } from '../components/Pagination';
 import { useAdminList } from '../hooks/useAdminList';
+import { AdminTableScrollHint } from './AdminTableScrollHint';
 
 type AdminReview = Review & {
   customer?: { email?: string | null; phone?: string | null };
@@ -53,35 +54,48 @@ export function AdminReviewsPanel({
         <EmptyState title="No reviews yet" body="Customer reviews will appear here for moderation." />
       )}
 
-      <div className="admin-inline-table" role="list">
-        {reviews.map((review) => (
-          <article className="admin-row" key={review.id} role="listitem">
-            <div className="admin-row-grid">
-              <div className="admin-row-primary">
-                <strong className="admin-row-title">
-                  {review.rating}/5 · {review.artisan?.displayName || 'Artisan'}
-                </strong>
-                <p className="admin-row-sub">
-                  {review.customer?.email || review.customer?.phone || 'Customer'} ·{' '}
-                  {review.booking?.offering?.title || 'Booking'}
-                </p>
-                {review.comment && <p className="admin-row-note">{review.comment}</p>}
-                <span className="muted">{bookingDate(review.createdAt)}</span>
-              </div>
-            </div>
-            <div className="admin-row-actions admin-row-actions--inline">
-              <button
-                type="button"
-                className="secondary-button"
-                disabled={busy}
-                onClick={() => runAction(() => removeReview(review.id), 'Review removed')}
-              >
-                Remove
-              </button>
-            </div>
-          </article>
-        ))}
-      </div>
+      {reviews.length > 0 && (
+        <div className="admin-table-scroll-wrap">
+          <AdminTableScrollHint />
+          <table className="admin-reviews-table admin-data-table">
+            <thead>
+              <tr>
+                <th scope="col">Rating</th>
+                <th scope="col">Artisan</th>
+                <th scope="col">Customer</th>
+                <th scope="col">Service</th>
+                <th scope="col">Comment</th>
+                <th scope="col">Posted</th>
+                <th scope="col">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reviews.map((review) => (
+                <tr key={review.id}>
+                  <td>{review.rating}/5</td>
+                  <td>{review.artisan?.displayName || 'Artisan'}</td>
+                  <td>{review.customer?.email || review.customer?.phone || 'Customer'}</td>
+                  <td>{review.booking?.offering?.title || 'Booking'}</td>
+                  <td className="admin-data-table-clip" title={review.comment || undefined}>
+                    {review.comment || '—'}
+                  </td>
+                  <td className="admin-data-table-nowrap">{bookingDate(review.createdAt)}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="secondary-button admin-data-table-action"
+                      disabled={busy}
+                      onClick={() => runAction(() => removeReview(review.id), 'Review removed')}
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <Pagination page={page} limit={limit} total={total} busy={busy || loading} onPageChange={setPage} />
     </section>

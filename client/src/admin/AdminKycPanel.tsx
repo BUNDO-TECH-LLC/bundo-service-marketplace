@@ -8,6 +8,7 @@ import { PromptDialog } from '../components/PromptDialog';
 import { Pagination } from '../components/Pagination';
 import { useAdminList } from '../hooks/useAdminList';
 import { AdminKycSubmissionDetailDialog } from './AdminKycSubmissionDetailDialog';
+import { AdminTableScrollHint } from './AdminTableScrollHint';
 
 type KycStatusFilter = 'all' | Exclude<KycStatus, 'NOT_SUBMITTED'>;
 
@@ -206,62 +207,65 @@ export function AdminKycPanel({
         )}
 
         {!loading && submissions.length > 0 && (
-          <div className="admin-kyc-queue-wrap">
-            <ol className="admin-kyc-queue" start={(page - 1) * limit + 1}>
-              <li className="admin-kyc-queue-head" aria-hidden="true">
-                <span>#</span>
-                <span>Applicant</span>
-                <span>Status</span>
-                <span>Document</span>
-                <span>City</span>
-                <span>Submitted</span>
-                <span>Files</span>
-                <span>Action</span>
-              </li>
-              {submissions.map((submission, index) => {
-                const queueNumber = (page - 1) * limit + index + 1;
+          <div className="admin-table-scroll-wrap">
+            <AdminTableScrollHint />
+            <table className="admin-kyc-table admin-data-table">
+              <thead>
+                <tr>
+                  <th scope="col">#</th>
+                  <th scope="col">Applicant</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Document</th>
+                  <th scope="col">City</th>
+                  <th scope="col">Submitted</th>
+                  <th scope="col">Files</th>
+                  <th scope="col">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {submissions.map((submission, index) => {
+                  const queueNumber = (page - 1) * limit + index + 1;
 
-                return (
-                  <li className="admin-kyc-queue-row" key={submission.id}>
-                    <span className="admin-kyc-queue-index" data-label="#">
-                      {queueNumber}
-                    </span>
-                    <div className="admin-kyc-queue-applicant" data-label="Applicant">
-                      <strong>{submission.legalName}</strong>
-                      <small>
-                        {submission.artisan?.displayName ||
-                          submission.artisan?.user?.email ||
-                          'Artisan submission'}
-                      </small>
-                    </div>
-                    <div data-label="Status">
-                      <span className={`booking-status ${statusClass(submission.status)}`}>
-                        {statusLabel(submission.status)}
-                      </span>
-                    </div>
-                    <div className="admin-kyc-queue-doc" data-label="Document">
-                      <strong>{submission.documentType}</strong>
-                      <small>{maskDocumentNumber(submission.documentNumber)}</small>
-                    </div>
-                    <span data-label="City">{submission.city}</span>
-                    <span data-label="Submitted">{bookingDate(submission.submittedAt)}</span>
-                    <span className="admin-kyc-queue-files" data-label="Files">
-                      {fileSummary(submission)}
-                    </span>
-                    <div data-label="Action">
-                      <button
-                        type="button"
-                        className="secondary-button admin-kyc-open-button"
-                        disabled={busy}
-                        onClick={() => setActiveSubmissionId(submission.id)}
-                      >
-                        Open
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
+                  return (
+                    <tr key={submission.id}>
+                      <td className="admin-kyc-table-index">{queueNumber}</td>
+                      <td className="admin-kyc-table-applicant">
+                        <strong>{submission.legalName}</strong>
+                        <span className="admin-profiles-meta">
+                          {submission.artisan?.displayName ||
+                            submission.artisan?.user?.email ||
+                            'Artisan submission'}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`booking-status ${statusClass(submission.status)}`}>
+                          {statusLabel(submission.status)}
+                        </span>
+                      </td>
+                      <td className="admin-kyc-table-doc">
+                        <strong>{submission.documentType}</strong>
+                        <span className="admin-profiles-meta">
+                          {maskDocumentNumber(submission.documentNumber)}
+                        </span>
+                      </td>
+                      <td>{submission.city}</td>
+                      <td className="admin-data-table-nowrap">{bookingDate(submission.submittedAt)}</td>
+                      <td className="admin-data-table-clip">{fileSummary(submission)}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="secondary-button admin-data-table-action"
+                          disabled={busy}
+                          onClick={() => setActiveSubmissionId(submission.id)}
+                        >
+                          Open
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
 

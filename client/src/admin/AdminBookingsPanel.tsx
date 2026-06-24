@@ -18,6 +18,7 @@ import { EmptyState } from '../components/EmptyState';
 import { AdminToast } from '../components/AdminToast';
 import { AdminJobChat } from './AdminJobChat';
 import { AdminPayoutDialog } from './AdminPayoutDialog';
+import { AdminTableScrollHint } from './AdminTableScrollHint';
 
 const filters: Array<{ id: AdminJobFilter; label: string }> = [
   { id: 'all', label: 'All' },
@@ -453,8 +454,9 @@ export function AdminBookingsPanel({
       )}
 
       {visibleJobs.length > 0 && (
-        <div className="admin-jobs-table-wrap">
-          <table className="admin-jobs-table">
+        <div className="admin-table-scroll-wrap admin-jobs-table-wrap">
+          <AdminTableScrollHint />
+          <table className="admin-jobs-table admin-data-table">
             <thead>
               <tr>
                 <th scope="col">#</th>
