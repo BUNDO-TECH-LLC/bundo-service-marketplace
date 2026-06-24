@@ -6,6 +6,8 @@ export type AdminJobFilter =
   | 'appointments'
   | 'ongoing'
   | 'completed'
+  | 'declined'
+  | 'cancelled'
   | 'payouts';
 
 export type AdminBooking = Booking & {
@@ -59,6 +61,10 @@ export function filterAdminJobs(bookings: AdminBooking[], filter: AdminJobFilter
       return bookings.filter((booking) => booking.status === 'ONGOING');
     case 'completed':
       return bookings.filter((booking) => booking.status === 'COMPLETED');
+    case 'declined':
+      return bookings.filter((booking) => booking.status === 'DECLINED');
+    case 'cancelled':
+      return bookings.filter((booking) => booking.status === 'CANCELLED');
     case 'payouts':
       return bookings.filter((booking) => {
         const paymentStatus = booking.payment?.status;
@@ -82,6 +88,8 @@ export function adminJobFilterCounts(bookings: AdminBooking[]) {
     appointments: filterAdminJobs(bookings, 'appointments').length,
     ongoing: filterAdminJobs(bookings, 'ongoing').length,
     completed: filterAdminJobs(bookings, 'completed').length,
+    declined: filterAdminJobs(bookings, 'declined').length,
+    cancelled: filterAdminJobs(bookings, 'cancelled').length,
     payouts: filterAdminJobs(bookings, 'payouts').length,
   };
 }

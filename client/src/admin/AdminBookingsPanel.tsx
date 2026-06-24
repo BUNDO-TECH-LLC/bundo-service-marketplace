@@ -15,6 +15,7 @@ import {
 import type { ActionRunner, AdminSection, AdminUserRecord } from '../appTypes';
 import type { Booking, Payout } from '../types';
 import { EmptyState } from '../components/EmptyState';
+import { AdminToast } from '../components/AdminToast';
 import { AdminJobChat } from './AdminJobChat';
 import { AdminPayoutDialog } from './AdminPayoutDialog';
 
@@ -24,6 +25,8 @@ const filters: Array<{ id: AdminJobFilter; label: string }> = [
   { id: 'appointments', label: 'Appointments' },
   { id: 'ongoing', label: 'In progress' },
   { id: 'completed', label: 'Completed' },
+  { id: 'declined', label: 'Declined' },
+  { id: 'cancelled', label: 'Cancelled' },
   { id: 'payouts', label: 'Payouts' },
 ];
 
@@ -125,6 +128,7 @@ export function AdminBookingsPanel({
     resolution?: string;
   }>(null);
   const [payoutDialogBooking, setPayoutDialogBooking] = useState<Booking | null>(null);
+  const [moderatorToast, setModeratorToast] = useState<string | null>(null);
 
   useEffect(() => {
     setJobs(bookings);
@@ -333,6 +337,24 @@ export function AdminBookingsPanel({
     await refresh();
   }
 
+  function handleModeratorAssign(
+    booking: AdminBooking,
+    moderatorId: string | null,
+    moderatorName: string | null
+  ) {
+    const jobTitle =
+      booking.offering?.title || booking.offering?.category?.name || 'this job';
+
+    void runAction(async () => {
+      await assignModerator(booking.id, moderatorId);
+      setModeratorToast(
+        moderatorId && moderatorName
+          ? `${moderatorName} assigned to ${jobTitle}`
+          : `Moderator cleared for ${jobTitle}`
+      );
+    }, '');
+  }
+
   return (
     <section className="admin-jobs admin-panel">
       <article className="admin-surface">
@@ -348,7 +370,25 @@ export function AdminBookingsPanel({
           <span className="admin-surface-count">{visibleJobs.length}</span>
         </div>
 
-      <div className="admin-job-filters" role="tablist" aria-label="Job filters">
+      <div className="admin-jobs-toolbar">
+        <label className="admin-jobs-status-filter">
+          <span>Status</span>
+          <select
+            value={filter}
+            disabled={busy}
+            aria-label="Filter jobs by status"
+            onChange={(event) => setFilter(event.target.value as AdminJobFilter)}
+          >
+            {filters.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.label} ({counts[item.id]})
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="admin-job-filters" role="tablist" aria-label="Filter jobs by status">
         {filters.map((item) => (
           <button
             key={item.id}
@@ -517,9 +557,13 @@ export function AdminBookingsPanel({
                           aria-label={`Moderator for ${ctx.title}`}
                           onChange={(event) => {
                             const value = event.target.value;
-                            void runAction(
-                              () => assignModerator(booking.id, value || null),
-                              value ? 'Moderator assigned' : 'Moderator cleared'
+                            const selected = value
+                              ? adminModerators.find((admin) => admin.firebaseUid === value)
+                              : null;
+                            handleModeratorAssign(
+                              booking,
+                              value || null,
+                              selected ? moderatorLabel(selected) : null
                             );
                           }}
                         >
@@ -815,6 +859,10 @@ export function AdminBookingsPanel({
         onCancel={() => setPayoutOtpPrompt(null)}
         onConfirm={(value) => runAction(() => finalizePayoutOtp(value), 'Payout authorized')}
       />
+
+      {moderatorToast ? (
+        <AdminToast message={moderatorToast} onDismiss={() => setModeratorToast(null)} />
+      ) : null}
       </article>
     </section>
   );

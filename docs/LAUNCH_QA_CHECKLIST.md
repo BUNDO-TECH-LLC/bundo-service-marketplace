@@ -18,7 +18,7 @@ Run on **production** after each release.
 - [ ] Render `/ready` shows `paystackMode: "live"` and `callbackConfigured: true`
 - [ ] Render `PAYSTACK_CALLBACK_URL` = `https://bundo-service-marketplace.vercel.app/workspace/bookings`
 - [ ] Render `CORS_ORIGIN` includes Vercel production URL
-- [ ] Vercel `VITE_API_BASE_URL` = `https://bundo-service-marketplace.onrender.com`
+- [ ] Vercel `VITE_API_BASE_URL` = `/api` (Vercel rewrites `/api/*` to Render)
 - [ ] Firebase Console → Authorized domains → `bundo-service-marketplace.vercel.app`
 - [ ] Paystack Dashboard → Webhooks → URL set (see Paystack setup below)
 - [ ] `ALLOW_PAYMENT_SIMULATION` **not** set on Render

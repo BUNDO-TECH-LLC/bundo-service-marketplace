@@ -18,7 +18,7 @@ if (!apiBaseUrl) {
 
 let origin;
 try {
-  origin = new URL(apiBaseUrl).origin;
+  origin = apiBaseUrl.startsWith('/') ? "'self'" : new URL(apiBaseUrl).origin;
 } catch {
   console.warn('[sync-vercel-csp] VITE_API_BASE_URL is invalid; leaving vercel.json unchanged.');
   process.exit(0);
@@ -50,7 +50,7 @@ const preserved = parts.filter(
     part.includes('recaptcha') ||
     part.includes('cloudinary')
 );
-const nextConnectSrc = ["'self'", origin, ...preserved.filter((part) => part !== "'self'")];
+const nextConnectSrc = ["'self'", ...[origin].filter((part) => part !== "'self'"), ...preserved.filter((part) => part !== "'self'")];
 cspHeader.value = cspHeader.value.replace(connectSrcMatch[0], `connect-src ${nextConnectSrc.join(' ')}`);
 
 fs.writeFileSync(vercelPath, `${JSON.stringify(config, null, 2)}\n`);
