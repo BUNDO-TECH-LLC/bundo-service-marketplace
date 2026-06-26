@@ -9,7 +9,7 @@ import { buildAppPath, buildCustomerBookingsPath } from '../lib/appPaths';
 import { needsPublicMarketplaceData } from '../lib/appRouting';
 import { locationErrorMessage } from '../lib/geolocation';
 import { nextHelpOpenState } from '../lib/helpNavigation';
-import { nigeriaStates } from '../lib/geo';
+import { LocationTrigger } from '../components/LocationTrigger';
 import { userDisplayName } from '../lib/userDisplayName';
 import bundoLogo from '../assets/BundoLogo.png';
 import { auth } from '../lib/firebase';
@@ -194,33 +194,13 @@ export function MainLayout() {
                   />
                 </label>
                 <label className="topbar-location-field">
-                  <button
-                    type="button"
-                    className="topbar-location-trigger"
-                    disabled={ctx.isDetectingLocation}
-                    aria-label="Use my current location"
-                    title="Use my current location"
-                    onClick={handleUseMyLocation}
-                  >
-                    <span aria-hidden="true">⌖</span>
-                  </button>
-                  <select
-                    value={ctx.selectedState}
-                    disabled={ctx.isDetectingLocation}
-                    aria-label="Location"
-                    onChange={(event) => {
-                      ctx.setSelectedState(event.target.value);
-                    }}
-                  >
-                    <option value="">
-                      {ctx.isDetectingLocation ? 'Detecting…' : 'Nigeria'}
-                    </option>
-                    {nigeriaStates.map((state) => (
-                      <option key={state} value={state}>
-                        {state}, Nigeria
-                      </option>
-                    ))}
-                  </select>
+                  <LocationTrigger
+                    className="topbar-location-trigger-wrap"
+                    locationLabel={ctx.locationLabel}
+                    isDetectingLocation={ctx.isDetectingLocation}
+                    onOpen={ctx.openLocationPicker}
+                    onUseMyLocation={handleUseMyLocation}
+                  />
                 </label>
               </form>
             )}

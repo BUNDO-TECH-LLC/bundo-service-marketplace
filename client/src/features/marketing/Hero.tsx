@@ -1,32 +1,31 @@
 import { FormEvent } from 'react';
+import { LocationTrigger } from '../../components/LocationTrigger';
 import { heroImage } from '../../lib/marketingAssets';
 
 export function Hero({
-  selectedState,
-  states,
-  onStateChange,
+  locationLabel,
   searchTerm,
   onSearchTermChange,
   onSearch,
   onBrowse,
+  onOpenLocationPicker,
   onUseMyLocation,
   onBecomeArtisan,
   isDetectingLocation = false,
 }: {
-  selectedState: string;
-  states: string[];
-  onStateChange: (state: string) => Promise<void>;
+  locationLabel: string;
   searchTerm: string;
   onSearchTermChange: (value: string) => void;
-  onSearch: (state: string, queryText: string) => Promise<void>;
+  onSearch: (queryText: string) => Promise<void>;
   onBrowse: () => void;
+  onOpenLocationPicker: () => void;
   onUseMyLocation: () => void;
   onBecomeArtisan?: () => void;
   isDetectingLocation?: boolean;
 }) {
   async function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await onSearch(selectedState, searchTerm);
+    await onSearch(searchTerm);
   }
 
   return (
@@ -47,36 +46,20 @@ export function Hero({
         <p>Experienced professionals for the work that keeps daily life moving.</p>
         <form className="hero-search" onSubmit={submitSearch}>
           <div className="search-heading">
-            <label htmlFor="service-state">Where do you need a service?</label>
+            <label htmlFor="service-location">Where do you need a service?</label>
             <span>Find trusted help near you</span>
           </div>
           <div className="location-control">
             <div className="field-shell field-shell--location">
               <span>Location</span>
-              <div className="hero-location-row">
-                <button
-                  type="button"
-                  className="hero-location-trigger"
-                  disabled={isDetectingLocation}
-                  aria-label="Use my current location"
-                  title="Use my current location"
-                  onClick={onUseMyLocation}
-                >
-                  <span aria-hidden="true">⌖</span>
-                </button>
-                <select
-                  id="service-state"
-                  value={selectedState}
-                  disabled={isDetectingLocation}
-                  aria-label="State"
-                  onChange={(event) => onStateChange(event.target.value)}
-                >
-                  <option value="">{isDetectingLocation ? 'Detecting…' : 'Select your state'}</option>
-                  {states.map((state) => (
-                    <option key={state} value={state}>{state}</option>
-                  ))}
-                </select>
-              </div>
+              <LocationTrigger
+                id="service-location"
+                className="hero-location-trigger-wrap"
+                locationLabel={locationLabel}
+                isDetectingLocation={isDetectingLocation}
+                onOpen={onOpenLocationPicker}
+                onUseMyLocation={onUseMyLocation}
+              />
             </div>
             <div className="field-shell">
               <span>Service</span>

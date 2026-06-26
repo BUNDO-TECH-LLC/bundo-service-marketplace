@@ -254,22 +254,30 @@ export default function WorkspacePage() {
               categories={ctx.categories}
               offerings={ctx.publicOfferings}
               artisans={ctx.artisans}
-              selectedState={ctx.selectedState}
+              locationLabel={ctx.locationLabel}
               searchTerm={ctx.searchTerm}
               token={ctx.token}
               busy={ctx.busy}
+              isDetectingLocation={ctx.isDetectingLocation}
               onSearchTermChange={ctx.setSearchTerm}
-              onSelectedStateChange={ctx.setSelectedState}
+              onOpenLocationPicker={ctx.openLocationPicker}
               onBrowse={async (categoryId) => {
                 ctx.setSelectedCategoryId(categoryId || '');
                 await ctx.withNotice(async () => {
-                  await ctx.loadPublicData(ctx.selectedState, ctx.searchTerm, { categoryId: categoryId || '' });
+                  await ctx.loadPublicData(ctx.selectedState, ctx.searchTerm, {
+                    categoryId: categoryId || '',
+                    locationId: ctx.locationId || undefined,
+                    area: ctx.selectedArea || undefined,
+                  });
                   ctx.navigate('/marketplace');
                 }, categoryId ? 'Category selected' : 'Opening marketplace');
               }}
               onSearch={async () => {
                 await ctx.withNotice(async () => {
-                  await ctx.loadPublicData(ctx.selectedState, ctx.searchTerm);
+                  await ctx.loadPublicData(ctx.selectedState, ctx.searchTerm, {
+                    locationId: ctx.locationId || undefined,
+                    area: ctx.selectedArea || undefined,
+                  });
                   ctx.navigate('/marketplace');
                 }, ctx.searchTerm.trim() ? `Searching for ${ctx.searchTerm.trim()}` : 'Showing available services');
               }}

@@ -13,7 +13,10 @@ import { mergeAuthDrawerIntoSearch } from '../lib/authDrawerPrompt';
 import { isArtisanApplicant, hasArtisanApplicantSubmittedVerification } from '../lib/artisanApplication';
 import { useMarketplaceFilters } from '../hooks/useMarketplaceFilters';
 import { useUserLocation } from '../hooks/useUserLocation';
+import { shouldSeedBrowseFromProfile } from '../lib/syncBrowseLocationFromProfile';
+import { LocationPicker } from '../components/LocationPicker';
 import type { ApiUser } from '../types';
+import type { LocationListItem } from '../types/location';
 import { AppRootContext, type AppRootValue } from './appRootContext';
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -22,9 +25,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const { busy, notice, setNotice, withNotice } = useActionRunner();
   const marketplaceFilters = useMarketplaceFilters();
   const userLocation = useUserLocation();
+  const [locationPickerOpen, setLocationPickerOpen] = useState(false);
+  const profileLocationSeededRef = useRef(false);
   const filterState = useMemo(
     () => ({
       selectedState: userLocation.selectedState,
+      selectedArea: userLocation.selectedArea,
+      locationId: userLocation.locationId,
       searchTerm: marketplaceFilters.searchTerm,
       selectedCategoryId: marketplaceFilters.selectedCategoryId,
       priceMin: marketplaceFilters.priceMin,
@@ -35,6 +42,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }),
     [
       userLocation.selectedState,
+      userLocation.selectedArea,
+      userLocation.locationId,
       userLocation.searchLat,
       userLocation.searchLng,
       marketplaceFilters.searchTerm,
@@ -126,12 +135,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
   }, [
     userLocation.selectedState,
+    userLocation.selectedArea,
+    userLocation.locationId,
     userLocation.searchLat,
     userLocation.searchLng,
     location.pathname,
     appData.loadPublicData,
     setNotice,
   ]);
+
+  useEffect(() => {
+    if (!auth.me || profileLocationSeededRef.current) {
+      return;
+    }
+
+    if (!shouldSeedBrowseFromProfile(auth.me)) {
+      profileLocationSeededRef.current = true;
+      return;
+    }
+
+    profileLocationSeededRef.current = true;
+    userLocation.applyProfileLocation(auth.me.state ?? '', auth.me.area);
+  }, [auth.me, userLocation.applyProfileLocation]);
+
+  const handleLocationPickerSelect = useCallback(
+    (item: LocationListItem) => {
+      userLocation.applyLocationSelection(item);
+    },
+    [userLocation.applyLocationSelection]
+  );
+
+  const openLocationPicker = useCallback(() => {
+    setLocationPickerOpen(true);
+  }, []);
 
   const isAuthed = Boolean(auth.firebaseUser && auth.token);
   const onAuthScreen = isAuthPathname(location.pathname);
@@ -254,7 +290,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     adminArtisans: appData.adminArtisans,
     adminCategories: appData.adminCategories,
     selectedState: userLocation.selectedState,
+    selectedArea: userLocation.selectedArea,
+    locationId: userLocation.locationId,
+    locationLabel: userLocation.locationLabel,
     setSelectedState: userLocation.setSelectedState,
+    applyLocationSelection: userLocation.applyLocationSelection,
+    applyProfileLocation: userLocation.applyProfileLocation,
+    openLocationPicker,
     locationSource: userLocation.locationSource,
     isDetectingLocation: userLocation.isDetectingLocation,
     searchTerm: marketplaceFilters.searchTerm,
@@ -344,7 +386,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     appData.adminCategories,
     appData.loadPublicData,
     userLocation.selectedState,
+    userLocation.selectedArea,
+    userLocation.locationId,
+    userLocation.locationLabel,
     userLocation.setSelectedState,
+    userLocation.applyLocationSelection,
+    userLocation.applyProfileLocation,
+    openLocationPicker,
     userLocation.locationSource,
     userLocation.isDetectingLocation,
     userLocation.searchLat,
@@ -386,5 +434,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     enablePushAlerts,
   ]);
 
-  return <AppRootContext.Provider value={rootValue}>{children}</AppRootContext.Provider>;
+  return (
+    <AppRootContext.Provider value={rootValue}>
+      {children}
+      <LocationPicker
+        open={locationPickerOpen}
+        onClose={() => setLocationPickerOpen(false)}
+        onSelect={handleLocationPickerSelect}
+      />
+    </AppRootContext.Provider>
+  );
 }

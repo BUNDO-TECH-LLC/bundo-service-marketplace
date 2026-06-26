@@ -16,6 +16,7 @@ import paymentRoutes from './modules/payments/payments.routes';
 import reviewRoutes from './modules/reviews/reviews.routes';
 import userRoutes from './modules/users/users.routes';
 import { serializeUser } from './modules/users/users.service';
+import locationRoutes from './modules/locations/locations.routes';
 import logger from './utils/logger';
 import db from './db/client';
 import { appErrorHandler } from './middlewares/errorHandler';
@@ -208,6 +209,7 @@ export function createApp() {
   app.use('/artisans', artisanRoutes);
   app.use('/bookings', bookingRoutes);
   app.use('/categories', categoryRoutes);
+  app.use('/locations', locationRoutes);
   app.use('/', chatRoutes);
   app.use('/notifications', notificationRoutes);
   app.use('/offerings', offeringRoutes);

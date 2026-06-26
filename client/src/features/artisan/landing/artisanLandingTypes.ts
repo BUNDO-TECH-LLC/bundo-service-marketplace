@@ -10,6 +10,7 @@ import type {
   Offering,
   PortfolioImage,
 } from '../../../types';
+import type { LocationListItem } from '../../../types/location';
 
 export type ArtisanSetupSubPhase = 'wizard' | 'verification';
 
@@ -19,6 +20,8 @@ export type ArtisanSetupState = {
   categoryId: string;
   location: string;
   area: string;
+  locationId: string;
+  locationLabel: string;
   lat: string;
   lng: string;
   title: string;
@@ -73,6 +76,7 @@ export type ArtisanLandingModel = {
   categories: Category[];
   setup: ArtisanSetupState;
   updateSetup: (field: keyof ArtisanSetupState, value: string) => void;
+  applyCatalogLocation: (item: LocationListItem) => void;
   agreed: boolean;
   setAgreed: (value: boolean) => void;
   servicePackages: ServicePackageDraft[];

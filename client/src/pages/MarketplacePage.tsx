@@ -2,7 +2,6 @@ import { EmptyState } from '../components/EmptyState';
 import { MarketplaceFilters, OfferingGrid } from '../features/marketplace';
 import { coordinatesForState } from '../lib/nigeriaStateCoordinates';
 import { locationErrorMessage } from '../lib/geolocation';
-import { nigeriaStates } from '../lib/geo';
 import { useAppRoot } from '../app/appRootContext';
 
 export default function MarketplacePage() {
@@ -24,7 +23,7 @@ export default function MarketplacePage() {
     const coords = resolveSearchCoordinates();
     if (ctx.marketplaceSort === 'distance') {
       if (!coords) {
-        ctx.setNotice('Choose a state or use your location before sorting by nearest.');
+        ctx.setNotice('Choose a location or use your location before sorting by nearest.');
         return;
       }
       ctx.setSearchCoordinates(coords.lat, coords.lng);
@@ -37,6 +36,8 @@ export default function MarketplacePage() {
           minPrice: ctx.priceMin,
           maxPrice: ctx.priceMax,
           sort: ctx.marketplaceSort,
+          locationId: ctx.locationId || undefined,
+          area: ctx.selectedArea || undefined,
         });
       },
       'Marketplace filters updated'
@@ -53,6 +54,7 @@ export default function MarketplacePage() {
           sort: 'distance',
           lat: result.lat,
           lng: result.lng,
+          locationId: ctx.locationId || undefined,
         });
         return;
       }
@@ -62,22 +64,25 @@ export default function MarketplacePage() {
     });
   }
 
+  const locationSummary =
+    ctx.locationLabel && ctx.locationLabel !== 'Nigeria' ? ctx.locationLabel : ctx.selectedState;
+
   return (
     <main className="page">
       <section className="section-head">
         <p className="eyebrow">Book trusted help</p>
         <h1>Find skilled professionals near you</h1>
         <p>
-          {ctx.selectedState || ctx.searchTerm
-            ? `Browse approved artisans and offerings${ctx.selectedState ? ` in ${ctx.selectedState}` : ''}${ctx.searchTerm ? ` matching "${ctx.searchTerm}"` : ''}.`
+          {locationSummary || ctx.searchTerm
+            ? `Browse approved artisans and offerings${locationSummary ? ` in ${locationSummary}` : ''}${ctx.searchTerm ? ` matching "${ctx.searchTerm}"` : ''}.`
             : 'Browse approved artisans, compare services, and place a booking request.'}
         </p>
       </section>
 
       <MarketplaceFilters
         categories={ctx.categories}
-        selectedState={ctx.selectedState}
-        states={nigeriaStates}
+        locationLabel={ctx.locationLabel}
+        isDetectingLocation={ctx.isDetectingLocation}
         searchTerm={ctx.searchTerm}
         selectedCategoryId={ctx.selectedCategoryId}
         sort={ctx.marketplaceSort}
@@ -85,7 +90,7 @@ export default function MarketplacePage() {
         priceMax={ctx.priceMax}
         onPriceMinChange={ctx.setPriceMin}
         onPriceMaxChange={ctx.setPriceMax}
-        onSelectedStateChange={ctx.setSelectedState}
+        onOpenLocationPicker={ctx.openLocationPicker}
         onSearchTermChange={ctx.setSearchTerm}
         onCategoryChange={ctx.setSelectedCategoryId}
         onSortChange={ctx.setMarketplaceSort}
@@ -127,7 +132,7 @@ export default function MarketplacePage() {
       {ctx.publicOfferings.length === 0 && (
         <EmptyState
           title="No matching services"
-          body="Try clearing filters, choosing another state, or browsing without distance sorting."
+          body="Try clearing filters, choosing another location, or browsing without distance sorting."
         />
       )}
     </main>

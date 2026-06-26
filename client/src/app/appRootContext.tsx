@@ -28,6 +28,7 @@ import type {
   Offering,
   Review,
 } from '../types';
+import type { LocationListItem } from '../types/location';
 
 export type AppRootValue = {
   navigate: NavigateFunction;
@@ -57,7 +58,13 @@ export type AppRootValue = {
   adminArtisans: AdminArtisanRecord[];
   adminCategories: AdminCategoryRecord[];
   selectedState: string;
+  selectedArea: string;
+  locationId: string;
+  locationLabel: string;
   setSelectedState: (value: string) => void;
+  applyLocationSelection: (item: LocationListItem) => void;
+  applyProfileLocation: (state: string, area?: string | null) => void;
+  openLocationPicker: () => void;
   locationSource: LocationSource;
   isDetectingLocation: boolean;
   searchTerm: string;
@@ -103,6 +110,8 @@ export type AppRootValue = {
       sort?: MarketplaceSort;
       lat?: number;
       lng?: number;
+      area?: string;
+      locationId?: string;
     }
   ) => Promise<void>;
   loadPrivateData: (authToken?: string, user?: ApiUser | null) => Promise<void>;

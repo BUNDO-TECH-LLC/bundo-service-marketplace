@@ -1,9 +1,18 @@
-import { nigeriaStates } from '../../../lib/geo';
+import { ArtisanLocationField } from '../../../components/ArtisanLocationField';
 import type { ArtisanLandingModel } from './artisanLandingTypes';
 
 export function ArtisanLandingStepBasic({ landing }: { landing: ArtisanLandingModel }) {
-  const { setup, updateSetup, agreed, setAgreed, categories, useCurrentLocation, busy, accountEmail } =
-    landing;
+  const {
+    setup,
+    applyCatalogLocation,
+    agreed,
+    setAgreed,
+    categories,
+    useCurrentLocation,
+    busy,
+    accountEmail,
+    updateSetup,
+  } = landing;
 
   return (
     <section className="artisan-setup-card">
@@ -45,41 +54,17 @@ export function ArtisanLandingStepBasic({ landing }: { landing: ArtisanLandingMo
       </label>
 
       <label>
-        State<span>*</span>
-        <select
-          value={setup.location}
-          onChange={(event) => updateSetup('location', event.target.value)}
-          required
-        >
-          <option value="">Select your state</option>
-          {nigeriaStates.map((state) => (
-            <option key={state} value={state}>
-              {state}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label>
-        Area / city<span>*</span>
-        <input
-          value={setup.area}
-          onChange={(event) => updateSetup('area', event.target.value)}
-          placeholder="e.g. Lekki, Ikeja, GRA"
-          required
+        Where you work<span>*</span>
+        <ArtisanLocationField
+          locationLabel={setup.locationLabel}
+          disabled={busy}
+          onSelect={applyCatalogLocation}
+          onUseMyLocation={() => {
+            void useCurrentLocation();
+          }}
         />
       </label>
-
-      <button
-        className="location-link"
-        type="button"
-        disabled={busy}
-        onClick={() => {
-          void useCurrentLocation();
-        }}
-      >
-        ⌖ Use your current location
-      </button>
+      <small className="muted">Pick your state and area so customers can find you in search.</small>
 
       <label className="terms-row">
         <input type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} />{' '}

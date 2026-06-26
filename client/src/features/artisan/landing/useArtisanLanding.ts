@@ -12,6 +12,12 @@ import { uploadKycImage } from '../../../lib/kycUpload';
 import { validateKycForm, validateLegalName } from '../../../lib/kycValidation';
 import { uploadPortfolioImage } from '../../../lib/portfolioUpload';
 import { validateImageFileForPick } from '../../../lib/imageFile';
+import {
+  artisanLocationFromCatalogItem,
+  artisanLocationFromGps,
+  artisanLocationFromProfile,
+} from '../../../lib/artisanLocationSelection';
+import type { LocationListItem } from '../../../types/location';
 import type {
   Artisan,
   ArtisanKycSubmission,
@@ -41,14 +47,17 @@ export function useArtisanLanding({
   const [resumeMessage, setResumeMessage] = useState<string | null>(null);
   const [uploadingPortfolio, setUploadingPortfolio] = useState(false);
   const [kycDocumentFile, setKycDocumentFile] = useState<File | null>(null);
+  const initialProfileLocation = artisanLocationFromProfile(me?.state || 'Lagos', me?.area);
   const [setup, setSetup] = useState({
     fullName: firebaseUser?.displayName || '',
     businessName: '',
     categoryId: '',
-    location: me?.state || 'Lagos',
-    area: me?.area || '',
-    lat: '6.5244',
-    lng: '3.3792',
+    location: initialProfileLocation.state,
+    area: initialProfileLocation.area,
+    locationId: initialProfileLocation.locationId,
+    locationLabel: initialProfileLocation.locationLabel,
+    lat: String(initialProfileLocation.lat),
+    lng: String(initialProfileLocation.lng),
     title: 'Basic inspection',
     priceFrom: '',
     description: '',
@@ -143,15 +152,22 @@ export function useArtisanLanding({
           (category) => category.name.toLowerCase() === (nextProfile?.bio || '').toLowerCase()
         );
 
+        const profileLocation = artisanLocationFromProfile(
+          nextProfile?.city || me?.state,
+          nextProfile?.area || me?.area
+        );
+
         setSetup((current) => ({
           ...current,
           fullName: current.fullName || nextProfile?.displayName || firebaseUser?.displayName || '',
           businessName: nextProfile?.displayName || current.businessName,
           categoryId: matchedCategory?.id || current.categoryId,
-          location: nextProfile?.city || me?.state || current.location,
-          area: nextProfile?.area || me?.area || current.area,
-          lat: String(nextProfile?.lat ?? current.lat),
-          lng: String(nextProfile?.lng ?? current.lng),
+          location: profileLocation.state || current.location,
+          area: profileLocation.area || current.area,
+          locationId: profileLocation.locationId || current.locationId,
+          locationLabel: profileLocation.locationLabel || current.locationLabel,
+          lat: String(nextProfile?.lat ?? profileLocation.lat ?? current.lat),
+          lng: String(nextProfile?.lng ?? profileLocation.lng ?? current.lng),
           address: nextKyc?.address || me?.address || current.address,
           documentNumber: nextKyc?.documentNumber || current.documentNumber,
         }));
@@ -208,6 +224,7 @@ export function useArtisanLanding({
         bio: categories.find((category) => category.id === setup.categoryId)?.name || 'Bundo artisan',
         city: setup.location.trim() || 'Lagos',
         area: setup.area.trim() || undefined,
+        locationId: setup.locationId || undefined,
         lat: Number(setup.lat) || 6.5244,
         lng: Number(setup.lng) || 3.3792,
       }),
@@ -243,14 +260,27 @@ export function useArtisanLanding({
     );
   }
 
+  function applyCatalogLocation(item: LocationListItem) {
+    const selection = artisanLocationFromCatalogItem(item);
+    setSetup((current) => ({
+      ...current,
+      location: selection.state,
+      area: selection.area,
+      locationId: selection.locationId,
+      locationLabel: selection.locationLabel,
+      lat: String(selection.lat),
+      lng: String(selection.lng),
+    }));
+  }
+
   async function saveBasicInfo() {
     const nameCheck = validateLegalName(setup.fullName);
     if (!nameCheck.ok) {
       throw new Error(nameCheck.message);
     }
 
-    if (!setup.area.trim()) {
-      throw new Error('Enter your area or neighbourhood.');
+    if (!setup.location.trim()) {
+      throw new Error('Select where you work.');
     }
 
     if (me?.role === 'CUSTOMER' && me.onboardingIntent !== 'ARTISAN') {
@@ -264,7 +294,8 @@ export function useArtisanLanding({
         displayName: setup.fullName.trim(),
         bio: categories.find((category) => category.id === setup.categoryId)?.name || 'Bundo artisan',
         city: setup.location.trim(),
-        area: setup.area.trim(),
+        area: setup.area.trim() || undefined,
+        locationId: setup.locationId || undefined,
         lat: Number(setup.lat),
         lng: Number(setup.lng),
       }),
@@ -439,11 +470,15 @@ export function useArtisanLanding({
       }
 
       const state = inferNigeriaState(result.lat, result.lng);
+      const selection = artisanLocationFromGps(state, result.lat, result.lng);
       setSetup((current) => ({
         ...current,
-        location: state,
-        lat: String(result.lat),
-        lng: String(result.lng),
+        location: selection.state,
+        area: selection.area,
+        locationId: selection.locationId,
+        locationLabel: selection.locationLabel,
+        lat: String(selection.lat),
+        lng: String(selection.lng),
       }));
     }, 'Location updated');
   }
@@ -471,6 +506,7 @@ export function useArtisanLanding({
     categories,
     setup,
     updateSetup,
+    applyCatalogLocation,
     agreed,
     setAgreed,
     servicePackages,

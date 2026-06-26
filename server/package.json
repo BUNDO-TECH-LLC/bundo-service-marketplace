@@ -16,6 +16,7 @@
     "db:migrate:deploy:pooler": "node scripts/migrate-deploy-pooler.mjs",
     "db:seed": "ts-node prisma/seed.ts",
     "db:purge": "ts-node --transpile-only scripts/purge-user-data.ts",
+    "db:backfill-artisan-locations": "ts-node --transpile-only scripts/backfill-artisan-locations.ts",
     "db:studio": "prisma studio"
   },
   "repository": {

@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { api } from '../lib/api';
 import { nigeriaStates } from '../lib/geo';
+import { shouldSeedBrowseFromProfile } from '../lib/syncBrowseLocationFromProfile';
 import { useAppRoot } from '../app/appRootContext';
 import type { ApiUser } from '../types';
 
@@ -43,6 +44,7 @@ export default function CustomerProfilePage() {
     }
 
     setBusy(true);
+    const seedBrowseLocation = shouldSeedBrowseFromProfile(ctx.me);
 
     try {
       const response = await api<{ user: ApiUser }>('/users/profile', {
@@ -57,6 +59,9 @@ export default function CustomerProfilePage() {
       });
 
       ctx.acknowledgeSession(ctx.token, response.user);
+      if (seedBrowseLocation) {
+        ctx.applyProfileLocation(state.trim(), area.trim());
+      }
       ctx.setNotice('Profile saved. Welcome to Bundo!');
       ctx.navigate('/marketplace', { replace: true });
     } catch (submitError) {

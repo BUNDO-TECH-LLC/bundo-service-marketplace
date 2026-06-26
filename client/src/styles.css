@@ -11791,3 +11791,224 @@ footer h4 {
     transform: translateX(320%);
   }
 }
+
+.location-trigger {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.location-trigger-gps,
+.location-trigger-select {
+  border: 0;
+  background: transparent;
+  font: inherit;
+}
+
+.location-trigger-gps {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.location-trigger-gps:active:not(:disabled) {
+  color: var(--accent-dark);
+  background: var(--accent-soft);
+}
+
+.location-trigger-gps:disabled,
+.location-trigger-select:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.location-trigger-select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.location-trigger-label {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.location-trigger-chevron {
+  flex: 0 0 auto;
+  color: var(--ink-muted, #667085);
+  font-size: 0.85rem;
+}
+
+.hero-location-trigger-wrap,
+.topbar-location-trigger-wrap {
+  width: 100%;
+}
+
+.marketplace-filter-location .location-trigger {
+  margin-top: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.artisan-setup-card .location-trigger,
+.artisan-settings-card .location-trigger {
+  margin-top: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.location-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(15 23 42 / 0.48);
+}
+
+.location-picker {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  width: min(100%, 480px);
+  max-height: min(88dvh, 720px);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-white, #fff);
+  box-shadow: 0 24px 80px var(--shadow-modal, rgb(15 23 42 / 0.18));
+}
+
+.location-picker-head {
+  display: grid;
+  gap: 12px;
+  padding: 18px 18px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.location-picker-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.location-picker-back,
+.location-picker-close {
+  border: 0;
+  background: transparent;
+  color: var(--accent-dark);
+  font: inherit;
+  cursor: pointer;
+}
+
+.location-picker-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.location-picker-back-spacer {
+  width: 32px;
+}
+
+.location-picker-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.location-picker-search input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  font: inherit;
+}
+
+.location-picker-body {
+  overflow: auto;
+}
+
+.location-picker-status {
+  margin: 0;
+  padding: 18px;
+  color: var(--ink-muted, #667085);
+}
+
+.location-picker-status--error {
+  color: #b42318;
+}
+
+.location-picker-list {
+  margin: 0;
+  padding: 8px 0;
+  list-style: none;
+}
+
+.location-picker-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 18px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.location-picker-item:hover,
+.location-picker-item:focus-visible {
+  background: var(--accent-soft, #fff4eb);
+}
+
+.location-picker-item-label {
+  font-weight: 600;
+}
+
+.location-picker-item-meta {
+  flex: 0 0 auto;
+  color: var(--ink-muted, #667085);
+  font-size: 0.92rem;
+}
+
+@media (max-width: 640px) {
+  .location-picker-backdrop {
+    align-items: end;
+    padding: 0;
+  }
+
+  .location-picker {
+    width: 100%;
+    max-height: 92dvh;
+    border-radius: 18px 18px 0 0;
+  }
+}

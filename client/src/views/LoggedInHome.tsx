@@ -9,13 +9,13 @@ import { ServiceCategoryIcon } from '../lib/serviceCategoryIcons';
 import { heroImage } from '../lib/marketingAssets';
 import { money } from '../lib/formatting';
 import { formatStarDisplay } from '../lib/ratingDisplay';
-import { nigeriaStates } from '../lib/geo';
 import { userDisplayName } from '../lib/userDisplayName';
 import { completeBookingRequest } from '../lib/bookingSuccess';
 import type { ActionRunner, BookingSuccessState } from '../appTypes';
 import type { ApiUser, Artisan, Booking, Category, Offering } from '../types';
 import { EmptyState } from '../components/EmptyState';
 import { BookOfferingDialog } from '../components/BookOfferingDialog';
+import { LocationTrigger } from '../components/LocationTrigger';
 
 export function LoggedInHome({
   me,
@@ -23,12 +23,13 @@ export function LoggedInHome({
   categories,
   offerings,
   artisans,
-  selectedState,
+  locationLabel,
   searchTerm,
   token,
   busy,
+  isDetectingLocation = false,
   onSearchTermChange,
-  onSelectedStateChange,
+  onOpenLocationPicker,
   onBrowse,
   onSearch,
   onViewProfile,
@@ -41,12 +42,13 @@ export function LoggedInHome({
   categories: Category[];
   offerings: Offering[];
   artisans: Artisan[];
-  selectedState: string;
+  locationLabel: string;
   searchTerm: string;
   token: string;
   busy: boolean;
+  isDetectingLocation?: boolean;
   onSearchTermChange: (value: string) => void;
-  onSelectedStateChange: (value: string) => void;
+  onOpenLocationPicker: () => void;
   onBrowse: (categoryId?: string) => Promise<void>;
   onSearch: () => Promise<void>;
   onViewProfile: (artisanId: string) => Promise<void>;
@@ -119,14 +121,11 @@ export function LoggedInHome({
             </label>
             <label>
               Location
-              <select value={selectedState} onChange={(event) => onSelectedStateChange(event.target.value)}>
-                <option value="">All Nigeria</option>
-                {nigeriaStates.map((state) => (
-                  <option key={state} value={state}>
-                    {state}, Nigeria
-                  </option>
-                ))}
-              </select>
+              <LocationTrigger
+                locationLabel={locationLabel}
+                isDetectingLocation={isDetectingLocation}
+                onOpen={onOpenLocationPicker}
+              />
             </label>
             <button type="submit">Search</button>
           </form>

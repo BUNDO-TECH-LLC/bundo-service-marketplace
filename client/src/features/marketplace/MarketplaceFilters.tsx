@@ -1,11 +1,11 @@
 import type { MarketplaceSort } from '../../appTypes';
+import { LocationTrigger } from '../../components/LocationTrigger';
 import { sortCategoriesByCatalog } from '../../lib/serviceCategoryCatalog';
 import type { Category } from '../../types';
 
 export function MarketplaceFilters({
   categories,
-  selectedState,
-  states,
+  locationLabel,
   searchTerm,
   selectedCategoryId,
   sort,
@@ -13,17 +13,17 @@ export function MarketplaceFilters({
   priceMax,
   onPriceMinChange,
   onPriceMaxChange,
-  onSelectedStateChange,
+  onOpenLocationPicker,
   onSearchTermChange,
   onCategoryChange,
   onSortChange,
   onUseMyLocation,
   onApply,
   onClear,
+  isDetectingLocation = false,
 }: {
   categories: Category[];
-  selectedState: string;
-  states: string[];
+  locationLabel: string;
   searchTerm: string;
   selectedCategoryId: string;
   sort: MarketplaceSort;
@@ -31,13 +31,14 @@ export function MarketplaceFilters({
   priceMax: string;
   onPriceMinChange: (value: string) => void;
   onPriceMaxChange: (value: string) => void;
-  onSelectedStateChange: (value: string) => void;
+  onOpenLocationPicker: () => void;
   onSearchTermChange: (value: string) => void;
   onCategoryChange: (value: string) => void;
   onSortChange: (value: MarketplaceSort) => void;
   onUseMyLocation?: () => void;
   onApply: () => Promise<void>;
   onClear: () => Promise<void>;
+  isDetectingLocation?: boolean;
 }) {
   const sortedCategories = sortCategoriesByCatalog(categories);
 
@@ -46,20 +47,18 @@ export function MarketplaceFilters({
       <header className="marketplace-filter-head">
         <p className="eyebrow">Search</p>
         <h2>Find the right service</h2>
-        <p>Filter by state, category, search, and sort order.</p>
+        <p>Filter by location, category, search, and sort order.</p>
       </header>
 
       <div className="marketplace-filter-grid">
-        <label>
-          State
-          <select value={selectedState} onChange={(event) => onSelectedStateChange(event.target.value)}>
-            <option value="">All states</option>
-            {states.map((state) => (
-              <option key={state} value={state}>
-                {state}
-              </option>
-            ))}
-          </select>
+        <label className="marketplace-filter-location">
+          Location
+          <LocationTrigger
+            locationLabel={locationLabel}
+            isDetectingLocation={isDetectingLocation}
+            onOpen={onOpenLocationPicker}
+            onUseMyLocation={onUseMyLocation}
+          />
         </label>
         <label>
           Category
@@ -120,7 +119,7 @@ export function MarketplaceFilters({
           <button type="button" className="marketplace-filter-link-button" onClick={onUseMyLocation}>
             Use my current location
           </button>{' '}
-          for distance ranking, or pick a state above as your reference point.
+          for distance ranking, or pick a location above as your reference point.
         </p>
       ) : null}
 

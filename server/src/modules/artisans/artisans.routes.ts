@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { validateAvailabilitySlotTimes } from '../../lib/bookingSchedule';
+import { resolveArtisanLocationInput } from '../../lib/resolveArtisanLocationInput';
 import { asyncHandler } from '../../middlewares/errorHandler';
 import { BadGatewayError, httpError } from '../../utils/errors';
 import { Prisma, Role, OnboardingIntent } from '@prisma/client';
@@ -47,6 +48,33 @@ import {
 
 const PORTFOLIO_FOLDER = 'bundo/artisan-portfolio';
 const KYC_FOLDER = 'bundo/artisan-kyc';
+
+function parseArtisanProfileLocation(body: Record<string, unknown>) {
+  const lat =
+    typeof body.lat === 'number'
+      ? body.lat
+      : typeof body.lat === 'string' && body.lat.trim()
+        ? Number(body.lat)
+        : undefined;
+  const lng =
+    typeof body.lng === 'number'
+      ? body.lng
+      : typeof body.lng === 'string' && body.lng.trim()
+        ? Number(body.lng)
+        : undefined;
+
+  return resolveArtisanLocationInput({
+    ...(typeof body.locationId === 'string' ? { locationId: body.locationId } : {}),
+    ...(typeof body.city === 'string' ? { city: body.city } : {}),
+    ...(typeof body.area === 'string'
+      ? { area: body.area }
+      : body.area === null
+        ? { area: null }
+        : {}),
+    ...(lat !== undefined && !Number.isNaN(lat) ? { lat } : {}),
+    ...(lng !== undefined && !Number.isNaN(lng) ? { lng } : {}),
+  });
+}
 
 function validateCloudinaryImageInput(
   imageUrl: string,
@@ -190,18 +218,15 @@ router.post(
   verifyFirebaseToken,
   requireArtisanOrApplicant,
   async (req, res) => {
-    const { displayName, bio, city, area, lat, lng } = req.body;
+    const { displayName, bio } = req.body;
+    const location = parseArtisanProfileLocation(req.body);
 
     if (!displayName || typeof displayName !== 'string') {
       throw httpError(400, 'displayName is required');
     }
 
-    if (!city || typeof city !== 'string') {
-      throw httpError(400, 'city is required');
-    }
-
-    if (typeof lat !== 'number' || typeof lng !== 'number') {
-      throw httpError(400, 'lat and lng must be numbers');
+    if (!location) {
+      throw httpError(400, 'Provide locationId or city with lat and lng');
     }
 
     try {
@@ -209,10 +234,10 @@ router.post(
         userId: (req as any).user.firebaseUid,
         displayName,
         bio,
-        city,
-        area,
-        lat,
-        lng,
+        city: location.city,
+        ...(location.area ? { area: location.area } : {}),
+        lat: location.lat,
+        lng: location.lng,
       });
 
       const authUser = (req as any).user;
@@ -242,7 +267,7 @@ router.patch(
   verifyFirebaseToken,
   requireArtisanOrApplicant,
   async (req, res) => {
-    const { displayName, bio, city, area, lat, lng } = req.body;
+    const { displayName, bio } = req.body;
     const data: {
       displayName?: string;
       bio?: string | null;
@@ -266,32 +291,23 @@ router.patch(
       data.bio = bio;
     }
 
-    if (city !== undefined) {
-      if (typeof city !== 'string' || !city.trim()) {
-        throw httpError(400, 'city must be a string');
-      }
-      data.city = city;
-    }
+    const hasLocationFields =
+      req.body.locationId !== undefined ||
+      req.body.city !== undefined ||
+      req.body.area !== undefined ||
+      req.body.lat !== undefined ||
+      req.body.lng !== undefined;
 
-    if (area !== undefined) {
-      if (area !== null && typeof area !== 'string') {
-        throw httpError(400, 'area must be a string');
+    if (hasLocationFields) {
+      const location = parseArtisanProfileLocation(req.body);
+      if (!location) {
+        throw httpError(400, 'Provide locationId or city with lat and lng');
       }
-      data.area = area;
-    }
 
-    if (lat !== undefined) {
-      if (typeof lat !== 'number') {
-        throw httpError(400, 'lat must be a number');
-      }
-      data.lat = lat;
-    }
-
-    if (lng !== undefined) {
-      if (typeof lng !== 'number') {
-        throw httpError(400, 'lng must be a number');
-      }
-      data.lng = lng;
+      data.city = location.city;
+      data.area = location.area ?? null;
+      data.lat = location.lat;
+      data.lng = location.lng;
     }
 
     if (!Object.keys(data).length) {

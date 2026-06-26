@@ -25,6 +25,8 @@ import type {
 
 type MarketplaceFilterState = {
   selectedState: string;
+  selectedArea: string;
+  locationId: string;
   searchTerm: string;
   selectedCategoryId: string;
   priceMin: string;
@@ -80,6 +82,8 @@ export function useAppData(filters: MarketplaceFilterState, options?: UseAppData
         sort?: MarketplaceSort;
         lat?: number;
         lng?: number;
+        area?: string;
+        locationId?: string;
       }
     ) => {
       const params = new URLSearchParams({ page: '1', limit: '12' });
@@ -89,8 +93,15 @@ export function useAppData(filters: MarketplaceFilterState, options?: UseAppData
       const nextSort = options?.sort ?? filters.marketplaceSort;
       const nextLat = options?.lat ?? filters.searchLat;
       const nextLng = options?.lng ?? filters.searchLng;
+      const nextLocationId = options?.locationId ?? filters.locationId;
+      const nextArea = options?.area ?? filters.selectedArea;
 
-      if (state) params.set('state', state);
+      if (nextLocationId) {
+        params.set('locationId', nextLocationId);
+      } else {
+        if (state) params.set('state', state);
+        if (nextArea.trim()) params.set('area', nextArea.trim());
+      }
       if (queryText.trim()) params.set('q', queryText.trim());
       if (nextCategoryId) params.set('categoryId', nextCategoryId);
       if (nextMinPrice.trim()) params.set('minPrice', nextMinPrice.trim());

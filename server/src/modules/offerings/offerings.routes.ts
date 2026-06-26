@@ -133,13 +133,19 @@ router.get(
 router.get(
   '/',
   asyncHandler(async (req, res) => {
-    const { artisanId, categoryId, city, state, q, minPrice, maxPrice, sort, lat, lng } = req.query;
+    const { artisanId, categoryId, city, state, area, locationId, q, minPrice, maxPrice, sort, lat, lng } =
+      req.query;
     const pagination = getPagination(req);
     const filters = {
       ...(typeof artisanId === 'string' ? { artisanId } : {}),
       ...(typeof categoryId === 'string' ? { categoryId } : {}),
+      ...(typeof locationId === 'string' && locationId.trim() ? { locationId: locationId.trim() } : {}),
       ...(typeof state === 'string' && state.trim() ? { state: state.trim() } : {}),
-      ...(typeof city === 'string' && city.trim() && !(typeof state === 'string' && state.trim())
+      ...(typeof area === 'string' && area.trim() ? { area: area.trim() } : {}),
+      ...(typeof city === 'string' &&
+      city.trim() &&
+      !(typeof state === 'string' && state.trim()) &&
+      !(typeof locationId === 'string' && locationId.trim())
         ? { city: city.trim() }
         : {}),
       ...(typeof q === 'string' ? { q } : {}),

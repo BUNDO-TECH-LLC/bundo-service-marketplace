@@ -2,10 +2,16 @@ import { useEffect, useState } from 'react';
 import { buildAppPath } from '../../lib/appPaths';
 import type { ActionRunner } from '../../appTypes';
 import { ArtisanAvailabilityEditor } from '../../components/ArtisanAvailabilityEditor';
+import { ArtisanLocationField } from '../../components/ArtisanLocationField';
 import { ArtisanPortfolioManager } from '../../components/ArtisanPortfolioManager';
 import { api } from '../../lib/api';
-import { nigeriaStates } from '../../lib/geo';
+import {
+  artisanLocationFromCatalogItem,
+  artisanLocationFromProfile,
+  type ArtisanLocationSelection,
+} from '../../lib/artisanLocationSelection';
 import { useArtisanPortfolio } from '../../lib/useArtisanPortfolio';
+import type { LocationListItem } from '../../types/location';
 import type { Artisan, ArtisanKycSubmission } from '../../types';
 
 type ProfileSection = 'about' | 'photos' | 'availability';
@@ -33,6 +39,11 @@ export function ArtisanProfileSettings({
   const [profileFormKey, setProfileFormKey] = useState(0);
   const [profile, setProfile] = useState<Artisan | null>(null);
   const [kycSubmission, setKycSubmission] = useState<ArtisanKycSubmission | null>(null);
+  const [locationSelection, setLocationSelection] = useState<ArtisanLocationSelection>(() =>
+    artisanLocationFromProfile('Lagos')
+  );
+  const [displayName, setDisplayName] = useState('');
+  const [bio, setBio] = useState('');
   const kycStatus = kycSubmission?.status ?? 'NOT_SUBMITTED';
   const approved = profile?.verifyStatus === 'APPROVED' && kycStatus === 'APPROVED';
   const {
@@ -54,8 +65,12 @@ export function ArtisanProfileSettings({
     ])
       .then(([profileResponse, kycResponse]) => {
         if (!mounted) return;
-        setProfile(profileResponse.profile || null);
+        const nextProfile = profileResponse.profile || null;
+        setProfile(nextProfile);
         setKycSubmission(kycResponse.submission);
+        setDisplayName(nextProfile?.displayName || '');
+        setBio(nextProfile?.bio || '');
+        setLocationSelection(artisanLocationFromProfile(nextProfile?.city, nextProfile?.area));
       })
       .catch(() => {
         if (!mounted) return;
@@ -74,20 +89,28 @@ export function ArtisanProfileSettings({
     ]);
     setProfile(profileResponse.profile || null);
     setKycSubmission(kycResponse.submission);
+    const nextProfile = profileResponse.profile || null;
+    setDisplayName(nextProfile?.displayName || '');
+    setBio(nextProfile?.bio || '');
+    setLocationSelection(artisanLocationFromProfile(nextProfile?.city, nextProfile?.area));
   }
 
-  async function saveAbout(formElement: HTMLFormElement) {
-    const form = new FormData(formElement);
+  function applyCatalogLocation(item: LocationListItem) {
+    setLocationSelection(artisanLocationFromCatalogItem(item));
+  }
+
+  async function saveAbout() {
     await api('/artisans/profile', {
       method: profile ? 'PATCH' : 'POST',
       token,
       body: JSON.stringify({
-        displayName: form.get('displayName'),
-        bio: String(form.get('bio') || '').trim() || 'Bundo artisan',
-        city: form.get('city'),
-        area: form.get('area'),
-        lat: profile?.lat ?? 6.5244,
-        lng: profile?.lng ?? 3.3792,
+        displayName: displayName.trim(),
+        bio: bio.trim() || 'Bundo artisan',
+        city: locationSelection.state,
+        area: locationSelection.area.trim() || undefined,
+        locationId: locationSelection.locationId || undefined,
+        lat: profile?.lat ?? locationSelection.lat,
+        lng: profile?.lng ?? locationSelection.lng,
       }),
     });
     const response = await api<{ profile: Artisan }>('/artisans/me', { token });
@@ -158,33 +181,37 @@ export function ArtisanProfileSettings({
           className={`artisan-settings-card ${panelClass('about')}`}
           onSubmit={(event) => {
             event.preventDefault();
-            const form = event.currentTarget;
-            void runAction(() => saveAbout(form), 'Profile saved');
+            void runAction(() => saveAbout(), 'Profile saved');
           }}
         >
           <h2>About your business</h2>
           <p>Update the listing details customers see on your public profile.</p>
           <label>
             Business name
-            <input name="displayName" defaultValue={profile?.displayName || ''} required />
+            <input
+              name="displayName"
+              value={displayName}
+              onChange={(event) => setDisplayName(event.target.value)}
+              required
+            />
           </label>
           <label>
             Short bio
-            <textarea name="bio" rows={4} defaultValue={profile?.bio || ''} placeholder="Tell customers about your work and experience." />
+            <textarea
+              name="bio"
+              rows={4}
+              value={bio}
+              onChange={(event) => setBio(event.target.value)}
+              placeholder="Tell customers about your work and experience."
+            />
           </label>
           <label>
-            State
-            <select name="city" defaultValue={profile?.city || 'Lagos'} required>
-              {nigeriaStates.map((state) => (
-                <option key={state} value={state}>
-                  {state}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Area / neighbourhood
-            <input name="area" defaultValue={profile?.area || ''} placeholder="e.g. Lekki, Ikeja" />
+            Where you work
+            <ArtisanLocationField
+              locationLabel={locationSelection.locationLabel}
+              disabled={busy}
+              onSelect={applyCatalogLocation}
+            />
           </label>
           <p className="muted account-settings-hint">
             Contact phone and login email are managed in{' '}
@@ -204,6 +231,9 @@ export function ArtisanProfileSettings({
               onClick={() => {
                 setProfileFormKey((value) => value + 1);
                 void hydrateProfile();
+                setDisplayName(profile?.displayName || '');
+                setBio(profile?.bio || '');
+                setLocationSelection(artisanLocationFromProfile(profile?.city, profile?.area));
               }}
             >
               Cancel

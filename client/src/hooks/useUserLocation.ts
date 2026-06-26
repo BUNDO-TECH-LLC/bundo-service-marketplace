@@ -1,6 +1,8 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { api, PUBLIC_API_TIMEOUT_MS } from '../lib/api';
 import { readBrowserLocation, type UseMyLocationResult } from '../lib/geolocation';
 import { inferNigeriaState } from '../lib/inferNigeriaState';
+import { formatBrowseLocationLabel, stateLocationId } from '../lib/locationDisplay';
 import {
   clearLocationPreference,
   readLocationPreference,
@@ -8,52 +10,74 @@ import {
   type LocationSource,
 } from '../lib/locationPreference';
 import { coordinatesForState } from '../lib/nigeriaStateCoordinates';
+import type { LocationListItem } from '../types/location';
 
 export type UserLocationState = {
   selectedState: string;
+  selectedArea: string;
+  locationId: string;
+  locationLabel: string;
   searchLat: number | null;
   searchLng: number | null;
   locationSource: LocationSource;
   isDetectingLocation: boolean;
   setSelectedState: (state: string) => void;
+  applyLocationSelection: (item: LocationListItem) => void;
+  applyProfileLocation: (state: string, area?: string | null) => void;
   setSearchCoordinates: (lat: number | null, lng: number | null) => void;
   useMyLocation: () => Promise<UseMyLocationResult>;
   clearLocation: () => void;
 };
 
 type UseUserLocationOptions = {
-  onLocationApplied?: (state: string, source: LocationSource, lat: number | null, lng: number | null) => void;
+  onLocationApplied?: (
+    state: string,
+    area: string,
+    source: LocationSource,
+    lat: number | null,
+    lng: number | null,
+    locationId?: string
+  ) => void;
 };
 
-function applyManualState(
-  state: string,
-  setSelectedState: (value: string) => void,
-  setSearchCoordinates: (lat: number | null, lng: number | null) => void,
-  setLocationSource: (value: LocationSource) => void
-) {
-  setSelectedState(state);
+function coordsForSelection(state: string, area?: string) {
   if (state) {
-    const coords = coordinatesForState(state);
-    setSearchCoordinates(coords.lat, coords.lng);
-    setLocationSource('manual');
-    saveLocationPreference({
-      source: 'manual',
-      state,
-      lat: coords.lat,
-      lng: coords.lng,
-      promptStatus: readLocationPreference()?.promptStatus ?? null,
-    });
-    return;
+    return coordinatesForState(state);
   }
 
-  setSearchCoordinates(null, null);
-  setLocationSource('none');
-  clearLocationPreference();
+  return { lat: null, lng: null };
+}
+
+function persistManualSelection(input: {
+  state: string;
+  area?: string;
+  locationId?: string;
+  locationLabel?: string;
+  lat: number | null;
+  lng: number | null;
+  source?: LocationSource;
+}) {
+  saveLocationPreference({
+    source: input.source ?? 'manual',
+    state: input.state,
+    area: input.area ?? '',
+    locationId: input.locationId ?? (input.state ? stateLocationId(input.state) : ''),
+    locationLabel:
+      input.locationLabel ?? formatBrowseLocationLabel(input.state, input.area),
+    lat: input.lat,
+    lng: input.lng,
+    promptStatus: readLocationPreference()?.promptStatus ?? null,
+  });
 }
 
 export function useUserLocation(options?: UseUserLocationOptions): UserLocationState {
   const stored = readLocationPreference();
   const [selectedState, setSelectedStateInternal] = useState(stored?.state ?? '');
+  const [selectedArea, setSelectedArea] = useState(stored?.area ?? '');
+  const [locationId, setLocationId] = useState(stored?.locationId ?? '');
+  const [locationLabel, setLocationLabel] = useState(
+    stored?.locationLabel ?? formatBrowseLocationLabel(stored?.state ?? '', stored?.area)
+  );
   const [searchLat, setSearchLat] = useState<number | null>(stored?.lat ?? null);
   const [searchLng, setSearchLng] = useState<number | null>(stored?.lng ?? null);
   const [locationSource, setLocationSource] = useState<LocationSource>(stored?.source ?? 'none');
@@ -65,24 +89,133 @@ export function useUserLocation(options?: UseUserLocationOptions): UserLocationS
     setSearchLng(lng);
   }, []);
 
+  const notifyApplied = useCallback(
+    (
+      state: string,
+      area: string,
+      source: LocationSource,
+      lat: number | null,
+      lng: number | null,
+      nextLocationId?: string
+    ) => {
+      onLocationApplied?.(state, area, source, lat, lng, nextLocationId);
+    },
+    [onLocationApplied]
+  );
+
+  const applyManualState = useCallback(
+    (state: string) => {
+      setSelectedStateInternal(state);
+      setSelectedArea('');
+      const nextLocationId = state ? stateLocationId(state) : '';
+      setLocationId(nextLocationId);
+      setLocationLabel(formatBrowseLocationLabel(state));
+
+      if (state) {
+        const coords = coordinatesForState(state);
+        setSearchCoordinates(coords.lat, coords.lng);
+        setLocationSource('manual');
+        persistManualSelection({
+          state,
+          locationId: nextLocationId,
+          lat: coords.lat,
+          lng: coords.lng,
+        });
+        notifyApplied(state, '', 'manual', coords.lat, coords.lng, nextLocationId);
+        return;
+      }
+
+      setSearchCoordinates(null, null);
+      setLocationSource('none');
+      clearLocationPreference();
+      notifyApplied('', '', 'none', null, null);
+    },
+    [notifyApplied, setSearchCoordinates]
+  );
+
+  const applyLocationSelection = useCallback(
+    (item: LocationListItem) => {
+      const state = item.state?.trim() ?? '';
+      const area = item.kind === 'area' ? item.area?.trim() ?? item.label.split(',')[0]?.trim() ?? '' : '';
+      const coords = coordsForSelection(state, area);
+
+      setSelectedStateInternal(state);
+      setSelectedArea(area);
+      setLocationId(item.id);
+      setLocationLabel(item.label);
+      setSearchCoordinates(coords.lat, coords.lng);
+      setLocationSource('manual');
+      persistManualSelection({
+        state,
+        area,
+        locationId: item.id,
+        locationLabel: item.label,
+        lat: coords.lat,
+        lng: coords.lng,
+      });
+      notifyApplied(state, area, 'manual', coords.lat, coords.lng, item.id);
+    },
+    [notifyApplied, setSearchCoordinates]
+  );
+
+  const applyProfileLocation = useCallback(
+    (state: string, area?: string | null) => {
+      const trimmedState = state.trim();
+      if (!trimmedState) {
+        return;
+      }
+
+      const trimmedArea = area?.trim() ?? '';
+      const nextLocationId = stateLocationId(trimmedState);
+      const label = formatBrowseLocationLabel(trimmedState, trimmedArea);
+      const coords = coordinatesForState(trimmedState);
+
+      setSelectedStateInternal(trimmedState);
+      setSelectedArea(trimmedArea);
+      setLocationId(nextLocationId);
+      setLocationLabel(label);
+      setSearchCoordinates(coords.lat, coords.lng);
+      setLocationSource('profile');
+      saveLocationPreference({
+        source: 'profile',
+        state: trimmedState,
+        area: trimmedArea,
+        locationId: nextLocationId,
+        locationLabel: label,
+        lat: coords.lat,
+        lng: coords.lng,
+        promptStatus: readLocationPreference()?.promptStatus ?? null,
+      });
+      notifyApplied(trimmedState, trimmedArea, 'profile', coords.lat, coords.lng, nextLocationId);
+    },
+    [notifyApplied, setSearchCoordinates]
+  );
+
   const applyAutoLocation = useCallback(
     (lat: number, lng: number) => {
       const state = inferNigeriaState(lat, lng);
       setSelectedStateInternal(state);
+      setSelectedArea('');
+      const nextLocationId = stateLocationId(state);
+      setLocationId(nextLocationId);
+      setLocationLabel(formatBrowseLocationLabel(state));
       setSearchLat(lat);
       setSearchLng(lng);
       setLocationSource('auto');
       saveLocationPreference({
         source: 'auto',
         state,
+        area: '',
+        locationId: nextLocationId,
+        locationLabel: formatBrowseLocationLabel(state),
         lat,
         lng,
         promptStatus: 'granted',
       });
-      onLocationApplied?.(state, 'auto', lat, lng);
+      notifyApplied(state, '', 'auto', lat, lng, nextLocationId);
       return state;
     },
-    [onLocationApplied]
+    [notifyApplied]
   );
 
   const useMyLocation = useCallback(async (): Promise<UseMyLocationResult> => {
@@ -94,6 +227,9 @@ export function useUserLocation(options?: UseUserLocationOptions): UserLocationS
           saveLocationPreference({
             source: locationSource,
             state: selectedState,
+            area: selectedArea,
+            locationId,
+            locationLabel,
             lat: searchLat,
             lng: searchLng,
             promptStatus: 'denied',
@@ -111,38 +247,67 @@ export function useUserLocation(options?: UseUserLocationOptions): UserLocationS
     } finally {
       setIsDetectingLocation(false);
     }
-  }, [applyAutoLocation, locationSource, searchLat, searchLng, selectedState]);
+  }, [
+    applyAutoLocation,
+    locationId,
+    locationLabel,
+    locationSource,
+    searchLat,
+    searchLng,
+    selectedArea,
+    selectedState,
+  ]);
 
   const setSelectedState = useCallback(
     (state: string) => {
-      applyManualState(state, setSelectedStateInternal, setSearchCoordinates, setLocationSource);
-      if (state) {
-        const coords = coordinatesForState(state);
-        onLocationApplied?.(state, 'manual', coords.lat, coords.lng);
-      } else {
-        onLocationApplied?.('', 'none', null, null);
-      }
+      applyManualState(state);
     },
-    [onLocationApplied, setSearchCoordinates]
+    [applyManualState]
   );
 
   const clearLocation = useCallback(() => {
     setSelectedStateInternal('');
+    setSelectedArea('');
+    setLocationId('');
+    setLocationLabel('Nigeria');
     setSearchCoordinates(null, null);
     setLocationSource('none');
     clearLocationPreference();
-    onLocationApplied?.('', 'none', null, null);
-  }, [onLocationApplied, setSearchCoordinates]);
+    notifyApplied('', '', 'none', null, null);
+  }, [notifyApplied, setSearchCoordinates]);
 
-  return {
-    selectedState,
-    searchLat,
-    searchLng,
-    locationSource,
-    isDetectingLocation,
-    setSelectedState,
-    setSearchCoordinates,
-    useMyLocation,
-    clearLocation,
-  };
+  return useMemo(
+    () => ({
+      selectedState,
+      selectedArea,
+      locationId,
+      locationLabel,
+      searchLat,
+      searchLng,
+      locationSource,
+      isDetectingLocation,
+      setSelectedState,
+      applyLocationSelection,
+      applyProfileLocation,
+      setSearchCoordinates,
+      useMyLocation,
+      clearLocation,
+    }),
+    [
+      applyLocationSelection,
+      applyProfileLocation,
+      clearLocation,
+      isDetectingLocation,
+      locationId,
+      locationLabel,
+      locationSource,
+      searchLat,
+      searchLng,
+      selectedArea,
+      selectedState,
+      setSearchCoordinates,
+      setSelectedState,
+      useMyLocation,
+    ]
+  );
 }
