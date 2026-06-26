@@ -1893,9 +1893,9 @@ canvas {
 
 .location-control {
   display: grid;
-  grid-template-columns: minmax(170px, 0.8fr) minmax(230px, 1fr) 112px;
+  grid-template-columns: minmax(180px, 1.08fr) minmax(148px, 0.72fr) 84px;
   align-items: stretch;
-  gap: 12px;
+  gap: 10px;
 }
 
 .field-shell {
@@ -1906,6 +1906,71 @@ canvas {
   border-radius: 6px;
   padding: 9px 12px 10px;
   background: var(--color-white);
+}
+
+.field-shell--location {
+  border-color: transparent;
+  padding: 10px 12px;
+  background: var(--accent);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 12%);
+}
+
+.hero-search .field-shell--location span {
+  color: rgb(255 255 255 / 78%);
+  font-size: 11px;
+}
+
+.hero-search .field-shell--location .location-trigger-gps,
+.hero-search .field-shell--location .location-trigger-select {
+  color: #fff;
+  background: transparent;
+}
+
+.hero-search .field-shell--location .location-trigger-label {
+  color: #fff;
+  font-weight: 700;
+}
+
+.hero-search .field-shell--location .location-trigger-chevron {
+  color: rgb(255 255 255 / 82%);
+}
+
+.hero-search .field-shell--location .location-trigger-gps:active:not(:disabled),
+.hero-search .field-shell--location .location-trigger-select:hover {
+  border-radius: 6px;
+  background: rgb(255 255 255 / 14%);
+}
+
+.hero-search .field-shell:not(.field-shell--location) {
+  padding: 8px 12px 9px;
+}
+
+.hero-search .field-shell:not(.field-shell--location) input {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.hero-search-submit {
+  align-self: stretch;
+  min-width: 0;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--color-white);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  background: var(--ink);
+  box-shadow: 0 8px 18px rgb(0 0 0 / 14%);
+}
+
+.hero-search-submit:hover {
+  background: #000;
+}
+
+.hero-search-submit:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: 0 4px 10px rgb(0 0 0 / 12%);
 }
 
 .field-shell span {
@@ -1971,7 +2036,7 @@ canvas {
   font-weight: 600;
 }
 
-.hero-search button:not(.browse-link):not(.hero-location-trigger),
+.hero-search button:not(.browse-link):not(.hero-location-trigger):not(.location-trigger-select):not(.location-trigger-gps):not(.hero-search-submit),
 .actions button,
 .form-card button,
 .phone-input button,
@@ -1981,7 +2046,7 @@ canvas {
   background: var(--accent);
 }
 
-.hero-search button:not(.browse-link):not(.hero-location-trigger):hover,
+.hero-search button:not(.browse-link):not(.hero-location-trigger):not(.location-trigger-select):not(.location-trigger-gps):not(.hero-search-submit):hover,
 .actions button:hover,
 .form-card button:hover,
 .phone-input button:hover,
@@ -10270,6 +10335,10 @@ footer h4 {
 
   .location-control {
     grid-template-columns: 1fr;
+  }
+
+  .hero-search-submit {
+    min-height: 46px;
   }
 
   .admin-overview-grid,

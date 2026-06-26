@@ -70,7 +70,7 @@ export function Hero({
                 type="search"
               />
             </div>
-            <button type="submit">
+            <button type="submit" className="hero-search-submit">
               Search
             </button>
           </div>
