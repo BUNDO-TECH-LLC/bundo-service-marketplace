@@ -23,7 +23,16 @@ export type UserLocationState = {
   isDetectingLocation: boolean;
   setSelectedState: (state: string) => void;
   applyLocationSelection: (item: LocationListItem) => void;
-  applyProfileLocation: (state: string, area?: string | null) => void;
+  applyProfileLocation: (
+    state: string,
+    area?: string | null,
+    options?: {
+      locationId?: string | null;
+      locationLabel?: string | null;
+      lat?: number | null;
+      lng?: number | null;
+    }
+  ) => void;
   setSearchCoordinates: (lat: number | null, lng: number | null) => void;
   useMyLocation: () => Promise<UseMyLocationResult>;
   clearLocation: () => void;
@@ -40,12 +49,13 @@ type UseUserLocationOptions = {
   ) => void;
 };
 
-function coordsForSelection(state: string, area?: string) {
-  if (state) {
-    return coordinatesForState(state);
+function coordsForItem(item: LocationListItem) {
+  if (Number.isFinite(item.lat) && Number.isFinite(item.lng)) {
+    return { lat: item.lat, lng: item.lng };
   }
 
-  return { lat: null, lng: null };
+  const state = item.state?.trim() ?? '';
+  return state ? coordinatesForState(state) : { lat: null, lng: null };
 }
 
 function persistManualSelection(input: {
@@ -137,7 +147,7 @@ export function useUserLocation(options?: UseUserLocationOptions): UserLocationS
     (item: LocationListItem) => {
       const state = item.state?.trim() ?? '';
       const area = item.kind === 'area' ? item.area?.trim() ?? item.label.split(',')[0]?.trim() ?? '' : '';
-      const coords = coordsForSelection(state, area);
+      const coords = coordsForItem(item);
 
       setSelectedStateInternal(state);
       setSelectedArea(area);
@@ -159,22 +169,33 @@ export function useUserLocation(options?: UseUserLocationOptions): UserLocationS
   );
 
   const applyProfileLocation = useCallback(
-    (state: string, area?: string | null) => {
+    (
+      state: string,
+      area?: string | null,
+      options?: {
+        locationId?: string | null;
+        locationLabel?: string | null;
+        lat?: number | null;
+        lng?: number | null;
+      }
+    ) => {
       const trimmedState = state.trim();
       if (!trimmedState) {
         return;
       }
 
       const trimmedArea = area?.trim() ?? '';
-      const nextLocationId = stateLocationId(trimmedState);
-      const label = formatBrowseLocationLabel(trimmedState, trimmedArea);
-      const coords = coordinatesForState(trimmedState);
+      const nextLocationId = options?.locationId?.trim() || stateLocationId(trimmedState);
+      const label = options?.locationLabel?.trim() || formatBrowseLocationLabel(trimmedState, trimmedArea);
+      const fallback = coordinatesForState(trimmedState);
+      const lat = options?.lat ?? fallback.lat;
+      const lng = options?.lng ?? fallback.lng;
 
       setSelectedStateInternal(trimmedState);
       setSelectedArea(trimmedArea);
       setLocationId(nextLocationId);
       setLocationLabel(label);
-      setSearchCoordinates(coords.lat, coords.lng);
+      setSearchCoordinates(lat, lng);
       setLocationSource('profile');
       saveLocationPreference({
         source: 'profile',
@@ -182,11 +203,11 @@ export function useUserLocation(options?: UseUserLocationOptions): UserLocationS
         area: trimmedArea,
         locationId: nextLocationId,
         locationLabel: label,
-        lat: coords.lat,
-        lng: coords.lng,
+        lat,
+        lng,
         promptStatus: readLocationPreference()?.promptStatus ?? null,
       });
-      notifyApplied(trimmedState, trimmedArea, 'profile', coords.lat, coords.lng, nextLocationId);
+      notifyApplied(trimmedState, trimmedArea, 'profile', lat, lng, nextLocationId);
     },
     [notifyApplied, setSearchCoordinates]
   );

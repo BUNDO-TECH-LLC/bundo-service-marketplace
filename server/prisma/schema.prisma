@@ -107,6 +107,7 @@ model User {
   status             UserStatus     @default(ACTIVE)
   state              String?
   area               String?
+  locationId         String?        @map("location_id")
   address            String?
   profileCompletedAt DateTime?      @map("profile_completed_at")
   onboardingIntent   OnboardingIntent? @map("onboarding_intent")
@@ -134,6 +135,7 @@ model ArtisanProfile {
   bio               String?
   city              String
   area              String?
+  locationId        String?           @map("location_id")
   lat               Float
   lng               Float
   verifyStatus      VerifyStatus      @default(PENDING) @map("verify_status")

@@ -7,14 +7,20 @@ export function hasActiveBrowseLocation(preference: StoredLocationPreference | n
     return false;
   }
 
-  if (preference.source === 'auto' || preference.source === 'manual') {
+  if (
+    preference.source === 'auto' ||
+    preference.source === 'manual' ||
+    preference.source === 'profile'
+  ) {
     return Boolean(preference.state.trim() || preference.locationId?.trim());
   }
 
   return false;
 }
 
-export function buildProfileBrowseLocation(me: Pick<ApiUser, 'state' | 'area'>) {
+export function buildProfileBrowseLocation(
+  me: Pick<ApiUser, 'state' | 'area' | 'locationId' | 'locationLat' | 'locationLng'>
+) {
   const state = me.state?.trim() ?? '';
   const area = me.area?.trim() ?? '';
 
@@ -22,15 +28,21 @@ export function buildProfileBrowseLocation(me: Pick<ApiUser, 'state' | 'area'>) 
     return null;
   }
 
+  const locationId = me.locationId?.trim() || stateLocationId(state);
+
   return {
     state,
     area,
-    locationId: stateLocationId(state),
+    locationId,
     locationLabel: formatBrowseLocationLabel(state, area),
+    lat: me.locationLat ?? null,
+    lng: me.locationLng ?? null,
   };
 }
 
-export function shouldSeedBrowseFromProfile(me: Pick<ApiUser, 'state' | 'area'> | null | undefined) {
+export function shouldSeedBrowseFromProfile(
+  me: Pick<ApiUser, 'state' | 'area' | 'locationId'> | null | undefined
+) {
   if (!me?.state?.trim()) {
     return false;
   }

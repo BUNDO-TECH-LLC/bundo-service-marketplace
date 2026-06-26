@@ -155,7 +155,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     profileLocationSeededRef.current = true;
-    userLocation.applyProfileLocation(auth.me.state ?? '', auth.me.area);
+    userLocation.applyProfileLocation(auth.me.state ?? '', auth.me.area, {
+      locationId: auth.me.locationId,
+      lat: auth.me.locationLat,
+      lng: auth.me.locationLng,
+    });
   }, [auth.me, userLocation.applyProfileLocation]);
 
   const handleLocationPickerSelect = useCallback(

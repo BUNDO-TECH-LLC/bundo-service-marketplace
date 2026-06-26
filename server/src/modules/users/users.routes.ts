@@ -208,19 +208,20 @@ router.patch(
   '/profile',
   verifyFirebaseToken,
   asyncHandler(async (req, res) => {
-    const { phone, state, area, address } = req.body;
+    const { phone, state, area, address, locationId } = req.body;
 
     if (typeof phone !== 'string') {
       throw new ValidationError('phone is required');
     }
 
-    if (typeof state !== 'string') {
-      throw new ValidationError('state is required');
+    if (typeof locationId !== 'string' && typeof state !== 'string') {
+      throw new ValidationError('locationId or state is required');
     }
 
     const result = await completeCustomerProfile((req as any).user.firebaseUid, {
       phone,
-      state,
+      ...(typeof locationId === 'string' ? { locationId } : {}),
+      ...(typeof state === 'string' ? { state } : {}),
       ...(typeof area === 'string' ? { area } : {}),
       ...(typeof address === 'string' ? { address } : {}),
     });

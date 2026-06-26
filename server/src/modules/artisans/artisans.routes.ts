@@ -226,7 +226,7 @@ router.post(
     }
 
     if (!location) {
-      throw httpError(400, 'Provide locationId or city with lat and lng');
+      throw httpError(400, 'Provide locationId or city and area');
     }
 
     try {
@@ -236,6 +236,7 @@ router.post(
         bio,
         city: location.city,
         ...(location.area ? { area: location.area } : {}),
+        locationId: location.locationId,
         lat: location.lat,
         lng: location.lng,
       });
@@ -273,6 +274,7 @@ router.patch(
       bio?: string | null;
       city?: string;
       area?: string | null;
+      locationId?: string | null;
       lat?: number;
       lng?: number;
     } = {};
@@ -301,11 +303,12 @@ router.patch(
     if (hasLocationFields) {
       const location = parseArtisanProfileLocation(req.body);
       if (!location) {
-        throw httpError(400, 'Provide locationId or city with lat and lng');
+        throw httpError(400, 'Provide locationId or city and area');
       }
 
       data.city = location.city;
       data.area = location.area ?? null;
+      data.locationId = location.locationId;
       data.lat = location.lat;
       data.lng = location.lng;
     }

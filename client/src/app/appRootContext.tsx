@@ -63,7 +63,16 @@ export type AppRootValue = {
   locationLabel: string;
   setSelectedState: (value: string) => void;
   applyLocationSelection: (item: LocationListItem) => void;
-  applyProfileLocation: (state: string, area?: string | null) => void;
+  applyProfileLocation: (
+    state: string,
+    area?: string | null,
+    options?: {
+      locationId?: string | null;
+      locationLabel?: string | null;
+      lat?: number | null;
+      lng?: number | null;
+    }
+  ) => void;
   openLocationPicker: () => void;
   locationSource: LocationSource;
   isDetectingLocation: boolean;

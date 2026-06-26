@@ -7,7 +7,7 @@ import { ArtisanPortfolioManager } from '../../components/ArtisanPortfolioManage
 import { api } from '../../lib/api';
 import {
   artisanLocationFromCatalogItem,
-  artisanLocationFromProfile,
+  profileLocationFromUser,
   type ArtisanLocationSelection,
 } from '../../lib/artisanLocationSelection';
 import { useArtisanPortfolio } from '../../lib/useArtisanPortfolio';
@@ -40,7 +40,7 @@ export function ArtisanProfileSettings({
   const [profile, setProfile] = useState<Artisan | null>(null);
   const [kycSubmission, setKycSubmission] = useState<ArtisanKycSubmission | null>(null);
   const [locationSelection, setLocationSelection] = useState<ArtisanLocationSelection>(() =>
-    artisanLocationFromProfile('Lagos')
+    profileLocationFromUser({ state: 'Lagos', area: '' })
   );
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
@@ -70,7 +70,15 @@ export function ArtisanProfileSettings({
         setKycSubmission(kycResponse.submission);
         setDisplayName(nextProfile?.displayName || '');
         setBio(nextProfile?.bio || '');
-        setLocationSelection(artisanLocationFromProfile(nextProfile?.city, nextProfile?.area));
+        setLocationSelection(
+          profileLocationFromUser({
+            state: nextProfile?.city,
+            area: nextProfile?.area,
+            locationId: nextProfile?.locationId,
+            locationLat: nextProfile?.lat,
+            locationLng: nextProfile?.lng,
+          })
+        );
       })
       .catch(() => {
         if (!mounted) return;
@@ -92,7 +100,15 @@ export function ArtisanProfileSettings({
     const nextProfile = profileResponse.profile || null;
     setDisplayName(nextProfile?.displayName || '');
     setBio(nextProfile?.bio || '');
-    setLocationSelection(artisanLocationFromProfile(nextProfile?.city, nextProfile?.area));
+    setLocationSelection(
+      profileLocationFromUser({
+        state: nextProfile?.city,
+        area: nextProfile?.area,
+        locationId: nextProfile?.locationId,
+        locationLat: nextProfile?.lat,
+        locationLng: nextProfile?.lng,
+      })
+    );
   }
 
   function applyCatalogLocation(item: LocationListItem) {
@@ -233,7 +249,15 @@ export function ArtisanProfileSettings({
                 void hydrateProfile();
                 setDisplayName(profile?.displayName || '');
                 setBio(profile?.bio || '');
-                setLocationSelection(artisanLocationFromProfile(profile?.city, profile?.area));
+                setLocationSelection(
+                  profileLocationFromUser({
+                    state: profile?.city,
+                    area: profile?.area,
+                    locationId: profile?.locationId,
+                    locationLat: profile?.lat,
+                    locationLng: profile?.lng,
+                  })
+                );
               }}
             >
               Cancel

@@ -1,14 +1,19 @@
 import { useEffect, useState } from 'react';
+import { ArtisanLocationField } from '../../components/ArtisanLocationField';
 import { KycImageUploadField } from '../../components/KycImageUploadField';
 import { api } from '../../lib/api';
 import { kycStatusLabel } from '../../lib/artisanVerification';
+import {
+  artisanLocationFromCatalogItem,
+  profileLocationFromUser,
+  type ArtisanLocationSelection,
+} from '../../lib/artisanLocationSelection';
 import {
   documentNumberLabel,
   documentNumberPlaceholder,
   validateKycForm,
   type KycDocumentType,
 } from '../../lib/kycValidation';
-import { nigeriaStates } from '../../lib/geo';
 import { uploadKycImage } from '../../lib/kycUpload';
 import type { ActionRunner } from '../../appTypes';
 import type { ArtisanKycSubmission } from '../../types';
@@ -45,15 +50,32 @@ export function ArtisanKycSection({
   runAction,
   refresh,
   profileCity,
+  profileArea,
+  profileLocationId,
+  profileLat,
+  profileLng,
 }: {
   token: string;
   busy: boolean;
   runAction: ActionRunner;
   refresh: () => Promise<void>;
   profileCity?: string | null;
+  profileArea?: string | null;
+  profileLocationId?: string | null;
+  profileLat?: number | null;
+  profileLng?: number | null;
 }) {
   const [kycSubmission, setKycSubmission] = useState<ArtisanKycSubmission | null>(null);
   const [documentType, setDocumentType] = useState<KycDocumentType>('NIN');
+  const [locationSelection, setLocationSelection] = useState<ArtisanLocationSelection>(() =>
+    profileLocationFromUser({
+      state: profileCity,
+      area: profileArea,
+      locationId: profileLocationId,
+      locationLat: profileLat,
+      locationLng: profileLng,
+    })
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -75,6 +97,27 @@ export function ArtisanKycSection({
       mounted = false;
     };
   }, [token]);
+
+  useEffect(() => {
+    if (kycSubmission?.city) {
+      setLocationSelection((current) =>
+        current.state === kycSubmission.city
+          ? current
+          : profileLocationFromUser({ state: kycSubmission.city, area: profileArea })
+      );
+      return;
+    }
+
+    setLocationSelection(
+      profileLocationFromUser({
+        state: profileCity,
+        area: profileArea,
+        locationId: profileLocationId,
+        locationLat: profileLat,
+        locationLng: profileLng,
+      })
+    );
+  }, [kycSubmission?.city, profileArea, profileCity, profileLat, profileLng, profileLocationId]);
 
   async function submitKyc(formElement: HTMLFormElement) {
     const form = new FormData(formElement);
@@ -105,7 +148,7 @@ export function ArtisanKycSection({
         documentImageUrl,
         selfieImageUrl: selfieImageUrl || undefined,
         address: validation.address,
-        city: form.get('city'),
+        city: locationSelection.state,
       }),
     });
     setKycSubmission(response.submission);
@@ -250,14 +293,13 @@ export function ArtisanKycSection({
         <input name="address" defaultValue={kycSubmission?.address || ''} required />
       </label>
       <label>
-        State
-        <select name="city" defaultValue={kycSubmission?.city || profileCity || 'Lagos'} required>
-          {nigeriaStates.map((state) => (
-            <option key={state} value={state}>
-              {state}
-            </option>
-          ))}
-        </select>
+        Location
+        <ArtisanLocationField
+          locationLabel={locationSelection.locationLabel || 'Select state and area'}
+          disabled={busy}
+          onSelect={(item) => setLocationSelection(artisanLocationFromCatalogItem(item))}
+        />
+        <small className="muted">Matches your artisan profile location when available.</small>
       </label>
       <button type="submit" disabled={busy}>
         {kycSubmission ? 'Resubmit verification details' : 'Submit verification details'}

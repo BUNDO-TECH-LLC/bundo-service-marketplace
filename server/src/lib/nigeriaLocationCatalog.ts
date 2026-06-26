@@ -5,6 +5,7 @@ import {
   nigeriaStateCoordinates,
   normalizeArtisanCity,
 } from './nigeriaStateFilter';
+import { ALIAS_ONLY_AREA_LABELS, FCT_AREAS, LAGOS_AREAS } from './lagosAbujaAreas';
 
 export type LocationKind = 'country' | 'state' | 'area';
 
@@ -26,44 +27,34 @@ export const NIGERIA_ROOT_ID = 'nigeria';
 export const POPULAR_STATE_NAMES = ['FCT', 'Lagos', 'Ogun', 'Oyo', 'Rivers'] as const;
 
 const EXTRA_AREAS_BY_STATE: Partial<Record<string, string[]>> = {
-  Lagos: [
-    'Ikorodu',
-    'Alimosho',
-    'Agege',
-    'Mushin',
-    'Ojo',
-    'Festac',
-    'Apapa',
-    'Maryland',
-    'Gbagada',
-    'Isolo',
-    'Oshodi',
-    'Magodo',
-    'Berger',
-    'Ikotun',
-    'Egbeda',
-    'Bariga',
-    'Anthony',
-    'Ejigbo',
-    'Satellite Town',
-  ],
-  FCT: ['Garki', 'Wuse', 'Maitama', 'Asokoro', 'Kubwa', 'Gwarinpa', 'Lugbe', 'Nyanya', 'Karu', 'Jabi'],
+  Lagos: [...LAGOS_AREAS],
+  FCT: [...FCT_AREAS],
   Rivers: ['Trans Amadi', 'GRA', 'Elelenwo', 'Rumuola', 'Diobu'],
   Oyo: ['Bodija', 'Molete', 'Challenge', 'Apata'],
   Ogun: ['Sagamu', 'Ota', 'Ijebu Ode', 'Agbara'],
 };
 
 const AREA_COORDINATES: Record<string, { lat: number; lng: number }> = {
-  'lagos-ikeja': { lat: 6.6018, lng: 3.3515 },
-  'lagos-lekki': { lat: 6.4474, lng: 3.5562 },
-  'lagos-surulere': { lat: 6.4969, lng: 3.3584 },
-  'lagos-yaba': { lat: 6.5158, lng: 3.3811 },
-  'lagos-ajah': { lat: 6.4675, lng: 3.6015 },
+  'lagos-lekki-phase-1': { lat: 6.4474, lng: 3.4722 },
+  'lagos-lekki-phase-2': { lat: 6.4392, lng: 3.5089 },
   'lagos-victoria-island': { lat: 6.4281, lng: 3.4219 },
   'lagos-ikoyi': { lat: 6.4541, lng: 3.4346 },
+  'lagos-ajah': { lat: 6.4675, lng: 3.6015 },
+  'lagos-surulere': { lat: 6.4969, lng: 3.3584 },
+  'lagos-yaba': { lat: 6.5158, lng: 3.3811 },
+  'lagos-ikeja': { lat: 6.6018, lng: 3.3515 },
+  'lagos-lekki': { lat: 6.4474, lng: 3.5562 },
   'fct-abuja': { lat: 9.0579, lng: 7.4951 },
   'fct-garki': { lat: 9.04, lng: 7.4898 },
   'fct-wuse': { lat: 9.0765, lng: 7.4896 },
+  'fct-maitama': { lat: 9.0833, lng: 7.4958 },
+  'fct-asokoro': { lat: 9.0458, lng: 7.5319 },
+  'fct-kubwa': { lat: 9.0092, lng: 7.3958 },
+  'fct-gwarinpa': { lat: 9.1081, lng: 7.3989 },
+  'fct-lugbe': { lat: 8.9964, lng: 7.3678 },
+  'fct-nyanya': { lat: 8.9967, lng: 7.5644 },
+  'fct-karu': { lat: 8.9989, lng: 7.6133 },
+  'fct-jabi': { lat: 9.0764, lng: 7.4278 },
   'rivers-port-harcourt': { lat: 4.8156, lng: 7.0498 },
   'oyo-ibadan': { lat: 7.3775, lng: 3.947 },
   'ogun-abeokuta': { lat: 7.1608, lng: 3.3481 },
@@ -154,7 +145,8 @@ function buildCatalog(): Map<string, LocationNode> {
     const areaLabels = uniqueLabels([
       ...(majorCitiesByState[stateName] ?? []),
       ...(EXTRA_AREAS_BY_STATE[stateName] ?? []),
-    ]).filter((label) => normalizeToken(label) !== normalizeToken(stateName));
+    ]).filter((label) => normalizeToken(label) !== normalizeToken(stateName))
+      .filter((label) => !ALIAS_ONLY_AREA_LABELS.has(normalizeToken(label)));
 
     for (const areaLabel of areaLabels) {
       const areaId = `${stateSlug}-${slugify(areaLabel)}`;
@@ -278,12 +270,27 @@ export function findAreaNode(stateName: string, areaLabel: string): LocationNode
   }
 
   const token = normalizeToken(areaLabel);
-  return (
-    getLocationChildren(stateId).find((node) => {
-      const labels = [node.label, ...(node.aliases ?? [])].map(normalizeToken);
-      return labels.some((label) => label === token || label.includes(token) || token.includes(label));
-    }) ?? null
-  );
+  const children = getLocationChildren(stateId);
+  let bestMatch: { node: LocationNode; score: number } | null = null;
+
+  for (const node of children) {
+    const labels = [node.label, ...(node.aliases ?? [])].map(normalizeToken);
+
+    for (const label of labels) {
+      if (label === token) {
+        return node;
+      }
+
+      if (label.includes(token) || token.includes(label)) {
+        const score = label.length;
+        if (!bestMatch || score > bestMatch.score) {
+          bestMatch = { node, score };
+        }
+      }
+    }
+  }
+
+  return bestMatch?.node ?? null;
 }
 
 export function buildCatalogAreaWhere(state: string, areaLabel: string): Prisma.ArtisanProfileWhereInput {

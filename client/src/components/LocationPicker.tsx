@@ -180,7 +180,7 @@ export function LocationPicker({ open, onClose, onSelect }: LocationPickerProps)
                   <button type="button" className="location-picker-item" onClick={() => handleSelect(item)}>
                     <span className="location-picker-item-label">{item.label}</span>
                     <span className="location-picker-item-meta">
-                      {item.hasChildren && !debouncedSearch ? '›' : `${item.count.toLocaleString()} ads`}
+                      {item.hasChildren && !debouncedSearch ? '›' : `${item.count.toLocaleString()} services`}
                     </span>
                   </button>
                 </li>

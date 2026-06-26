@@ -14,6 +14,7 @@ type CreateArtisanProfileInput = {
   bio?: string;
   city: string;
   area?: string;
+  locationId?: string;
   lat: number;
   lng: number;
 };
@@ -32,6 +33,7 @@ type UpdateArtisanProfileInput = {
   bio?: string | null;
   city?: string;
   area?: string | null;
+  locationId?: string | null;
   lat?: number;
   lng?: number;
 };

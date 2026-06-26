@@ -42,4 +42,15 @@ describe('nigeriaLocationCatalog', () => {
     expect(stateIdForStateName('FCT')).toBe('state-fct');
     expect(stateIdForStateName('Lagos')).toBe('state-lagos');
   });
+
+  it('keeps short alias labels off the catalog as separate nodes', () => {
+    expect(getLocationById('rivers-ph')).toBeNull();
+    expect(getLocationById('lagos-vi')).toBeNull();
+
+    const portHarcourt = getLocationById('rivers-port-harcourt');
+    expect(portHarcourt?.aliases).toContain('PH');
+
+    const victoriaIsland = getLocationById('lagos-victoria-island');
+    expect(victoriaIsland?.aliases).toContain('VI');
+  });
 });

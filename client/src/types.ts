@@ -46,6 +46,9 @@ export type ApiUser = {
   status: 'ACTIVE' | 'BANNED';
   state?: string | null;
   area?: string | null;
+  locationId?: string | null;
+  locationLat?: number | null;
+  locationLng?: number | null;
   address?: string | null;
   profileCompletedAt?: string | null;
   profileComplete?: boolean;
@@ -67,6 +70,7 @@ export type Artisan = {
   bio: string | null;
   city: string;
   area: string | null;
+  locationId?: string | null;
   lat: number;
   lng: number;
   avgRating: number;

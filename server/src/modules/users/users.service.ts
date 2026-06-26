@@ -1,5 +1,7 @@
 import { BookingStatus, DisputeStatus, OnboardingIntent, PaymentStatus, Prisma, Role, UserStatus } from '@prisma/client';
 import db from '../../db/client';
+import { resolveUserLocationInput } from '../../lib/resolveArtisanLocationInput';
+import { getLocationById } from '../../lib/nigeriaLocationCatalog';
 import {
   defaultNotificationPreferences,
   parseNotificationPreferences,
@@ -342,9 +344,10 @@ export const completeCustomerProfile = async (
   firebaseUid: string,
   input: {
     phone: string;
-    state: string;
+    state?: string;
     area?: string;
     address?: string;
+    locationId?: string;
   }
 ) => {
   const user = await db.user.findUnique({ where: { firebaseUid } });
@@ -358,13 +361,19 @@ export const completeCustomerProfile = async (
   }
 
   const normalizedPhone = normalizePhoneInput(input.phone);
-  const state = input.state.trim();
-  const area = input.area?.trim() || null;
   const address = input.address?.trim() || null;
 
-  if (!state) {
-    throw new ValidationError('Select your state.');
+  const resolved = resolveUserLocationInput({
+    ...(input.locationId ? { locationId: input.locationId } : {}),
+    ...(input.state ? { state: input.state } : {}),
+    ...(input.area !== undefined ? { area: input.area } : {}),
+  });
+
+  if (!resolved?.state) {
+    throw new ValidationError('Select your state and area.');
   }
+
+  const { state, area, locationId } = resolved;
 
   if (area && area.length > 80) {
     throw new ValidationError('Area name is too long.');
@@ -381,6 +390,7 @@ export const completeCustomerProfile = async (
         phone: normalizedPhone,
         state,
         area,
+        locationId,
         address,
         profileCompletedAt: new Date(),
       },
@@ -447,11 +457,14 @@ export function serializeUser(user: {
   status: string;
   state?: string | null;
   area?: string | null;
+  locationId?: string | null;
   address?: string | null;
   profileCompletedAt?: Date | null;
   onboardingIntent?: OnboardingIntent | null;
   notificationPreferences?: unknown | null;
 }) {
+  const catalogNode = user.locationId ? getLocationById(user.locationId) : null;
+
   return {
     firebaseUid: user.firebaseUid,
     email: user.email,
@@ -460,6 +473,9 @@ export function serializeUser(user: {
     status: user.status,
     state: user.state ?? null,
     area: user.area ?? null,
+    locationId: user.locationId ?? null,
+    locationLat: catalogNode?.lat ?? null,
+    locationLng: catalogNode?.lng ?? null,
     address: user.address ?? null,
     profileCompletedAt: user.profileCompletedAt?.toISOString() ?? null,
     profileComplete: isCustomerProfileComplete(user),

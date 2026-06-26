@@ -406,6 +406,10 @@ export function AccountSettingsHub({
                 runAction={runAction}
                 refresh={refresh}
                 profileCity={artisanProfile?.city}
+                profileArea={artisanProfile?.area}
+                profileLocationId={artisanProfile?.locationId}
+                profileLat={artisanProfile?.lat}
+                profileLng={artisanProfile?.lng}
               />
             </article>
           )}

@@ -18,6 +18,8 @@ export type LocationListItem = {
   parentId: string | null;
   state?: string | undefined;
   area?: string | undefined;
+  lat: number;
+  lng: number;
   count: number;
   hasChildren: boolean;
 };
@@ -71,18 +73,32 @@ function countRowsForState(rows: ArtisanLocationRow[], stateName: string) {
   return rows.filter((row) => resolveArtisanState(row.city, row.area) === stateName).length;
 }
 
+function toListItem(
+  node: Pick<LocationNode, 'id' | 'label' | 'kind' | 'parentId' | 'state' | 'area' | 'lat' | 'lng'>,
+  count: number,
+  hasChildren: boolean,
+  label?: string
+): LocationListItem {
+  return {
+    id: node.id,
+    label: label ?? node.label,
+    kind: node.kind,
+    parentId: node.parentId,
+    state: node.state,
+    area: node.area,
+    lat: node.lat,
+    lng: node.lng,
+    count,
+    hasChildren,
+  };
+}
+
 function buildStateListing(rows: ArtisanLocationRow[]): LocationListItem[] {
   const popularIds = new Set(['state-fct', 'state-lagos', 'state-ogun', 'state-oyo', 'state-rivers']);
   const states = getAllStateNodes();
 
   const items = states.map((node) => ({
-    id: node.id,
-    label: node.label,
-    kind: node.kind,
-    parentId: node.parentId,
-    state: node.state,
-    count: countRowsForState(rows, node.state ?? node.label),
-    hasChildren: getLocationChildren(node.id).length > 0,
+    ...toListItem(node, countRowsForState(rows, node.state ?? node.label), getLocationChildren(node.id).length > 0),
     popular: popularIds.has(node.id),
   }));
 
@@ -124,26 +140,16 @@ function buildAreaListing(parentId: string, rows: ArtisanLocationRow[]): Locatio
     }
   }
 
-  const allStateItem: LocationListItem = {
-    id: parent.id,
-    label: `All ${parent.label} State`,
-    kind: 'state',
-    parentId: parent.parentId,
-    state: parent.state,
-    count: stateRows.length,
-    hasChildren: false,
-  };
+  const allStateItem = toListItem(
+    parent,
+    stateRows.length,
+    false,
+    `All ${parent.label} State`
+  );
 
-  const areaItems = areaNodes.map((node) => ({
-    id: node.id,
-    label: node.label,
-    kind: node.kind,
-    parentId: node.parentId,
-    state: node.state,
-    area: node.area,
-    count: areaCounts.get(node.id) ?? 0,
-    hasChildren: false,
-  }));
+  const areaItems = areaNodes.map((node) =>
+    toListItem(node, areaCounts.get(node.id) ?? 0, false)
+  );
 
   areaItems.sort((left, right) => {
     if (right.count !== left.count) {
@@ -161,15 +167,7 @@ function buildSearchListing(query: string, rows: ArtisanLocationRow[]): Location
 
   return matches.map((node) => {
     if (node.kind === 'state' && node.state) {
-      return {
-        id: node.id,
-        label: node.label,
-        kind: node.kind,
-        parentId: node.parentId,
-        state: node.state,
-        count: countRowsForState(rows, node.state),
-        hasChildren: getLocationChildren(node.id).length > 0,
-      };
+      return toListItem(node, countRowsForState(rows, node.state), getLocationChildren(node.id).length > 0);
     }
 
     const stateName = node.state ?? '';
@@ -177,16 +175,12 @@ function buildSearchListing(query: string, rows: ArtisanLocationRow[]): Location
       ? rows.filter((row) => resolveArtisanState(row.city, row.area) === stateName)
       : [];
 
-    return {
-      id: node.id,
-      label: node.kind === 'area' && node.state ? `${node.label}, ${node.state}` : node.label,
-      kind: node.kind,
-      parentId: node.parentId,
-      state: node.state,
-      area: node.area,
-      count: stateRows.filter((row) => matchArtisanToAreaNode(row.city, row.area, [node])).length,
-      hasChildren: node.kind === 'state' && getLocationChildren(node.id).length > 0,
-    };
+    return toListItem(
+      node,
+      stateRows.filter((row) => matchArtisanToAreaNode(row.city, row.area, [node])).length,
+      node.kind === 'state' && getLocationChildren(node.id).length > 0,
+      node.kind === 'area' && node.state ? `${node.label}, ${node.state}` : node.label
+    );
   });
 }
 

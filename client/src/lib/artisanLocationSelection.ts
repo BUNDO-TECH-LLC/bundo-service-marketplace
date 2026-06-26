@@ -1,6 +1,7 @@
 import { formatBrowseLocationLabel, stateLocationId } from './locationDisplay';
 import { coordinatesForState } from './nigeriaStateCoordinates';
 import type { LocationListItem } from '../types/location';
+import type { ApiUser } from '../types';
 
 export type ArtisanLocationSelection = {
   state: string;
@@ -17,15 +18,34 @@ export function artisanLocationFromCatalogItem(item: LocationListItem): ArtisanL
     item.kind === 'area'
       ? item.area?.trim() || item.label.split(',')[0]?.trim() || ''
       : '';
-  const coords = state ? coordinatesForState(state) : { lat: 6.5244, lng: 3.3792 };
+  const lat = Number.isFinite(item.lat) ? item.lat : state ? coordinatesForState(state).lat : 6.5244;
+  const lng = Number.isFinite(item.lng) ? item.lng : state ? coordinatesForState(state).lng : 3.3792;
 
   return {
     state,
     area,
     locationId: item.id,
     locationLabel: item.label,
-    lat: coords.lat,
-    lng: coords.lng,
+    lat,
+    lng,
+  };
+}
+
+export function profileLocationFromUser(
+  user: Pick<ApiUser, 'state' | 'area' | 'locationId' | 'locationLat' | 'locationLng'>
+): ArtisanLocationSelection {
+  const state = user.state?.trim() ?? '';
+  const area = user.area?.trim() ?? '';
+  const locationId = user.locationId?.trim() || (state ? stateLocationId(state) : '');
+  const fallback = state ? coordinatesForState(state) : { lat: 6.5244, lng: 3.3792 };
+
+  return {
+    state,
+    area,
+    locationId,
+    locationLabel: formatBrowseLocationLabel(state, area),
+    lat: user.locationLat ?? fallback.lat,
+    lng: user.locationLng ?? fallback.lng,
   };
 }
 

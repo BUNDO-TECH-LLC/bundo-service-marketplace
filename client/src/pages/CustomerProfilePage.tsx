@@ -1,6 +1,11 @@
 import { FormEvent, useState } from 'react';
+import { ArtisanLocationField } from '../components/ArtisanLocationField';
 import { api } from '../lib/api';
-import { nigeriaStates } from '../lib/geo';
+import {
+  artisanLocationFromCatalogItem,
+  profileLocationFromUser,
+  type ArtisanLocationSelection,
+} from '../lib/artisanLocationSelection';
 import { shouldSeedBrowseFromProfile } from '../lib/syncBrowseLocationFromProfile';
 import { useAppRoot } from '../app/appRootContext';
 import type { ApiUser } from '../types';
@@ -14,8 +19,9 @@ export default function CustomerProfilePage() {
   const ctx = useAppRoot();
   const email = ctx.firebaseUser?.email || ctx.me?.email || '';
   const [phone, setPhone] = useState(ctx.me?.phone?.replace(/^\+234/, '') || '');
-  const [state, setState] = useState(ctx.me?.state || '');
-  const [area, setArea] = useState(ctx.me?.area || '');
+  const [locationSelection, setLocationSelection] = useState<ArtisanLocationSelection>(() =>
+    ctx.me ? profileLocationFromUser(ctx.me) : profileLocationFromUser({ state: '', area: '' })
+  );
   const [address, setAddress] = useState(ctx.me?.address || '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -33,13 +39,8 @@ export default function CustomerProfilePage() {
       return;
     }
 
-    if (!state.trim()) {
-      setError('Select your state.');
-      return;
-    }
-
-    if (!area.trim()) {
-      setError('Enter your area or city.');
+    if (!locationSelection.state.trim()) {
+      setError('Select your state and area.');
       return;
     }
 
@@ -52,15 +53,20 @@ export default function CustomerProfilePage() {
         token: ctx.token,
         body: JSON.stringify({
           phone: normalizedPhone,
-          state: state.trim(),
-          area: area.trim(),
+          locationId: locationSelection.locationId || undefined,
+          state: locationSelection.state,
+          area: locationSelection.area || undefined,
           address: address.trim() || undefined,
         }),
       });
 
       ctx.acknowledgeSession(ctx.token, response.user);
       if (seedBrowseLocation) {
-        ctx.applyProfileLocation(state.trim(), area.trim());
+        ctx.applyProfileLocation(response.user.state ?? '', response.user.area, {
+          locationId: response.user.locationId,
+          lat: response.user.locationLat,
+          lng: response.user.locationLng,
+        });
       }
       ctx.setNotice('Profile saved. Welcome to Bundo!');
       ctx.navigate('/marketplace', { replace: true });
@@ -118,30 +124,11 @@ export default function CustomerProfilePage() {
           </label>
 
           <label className={labelClassName}>
-            State
-            <select
-              value={state}
-              onChange={(event) => setState(event.target.value)}
-              required
-              className={fieldClassName}
-            >
-              <option value="">Select state</option>
-              {nigeriaStates.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className={labelClassName}>
-            Area / city
-            <input
-              value={area}
-              onChange={(event) => setArea(event.target.value)}
-              placeholder="e.g. Lekki, Wuse, GRA"
-              required
-              className={fieldClassName}
+            Location
+            <ArtisanLocationField
+              locationLabel={locationSelection.locationLabel || 'Select state and area'}
+              disabled={busy}
+              onSelect={(item) => setLocationSelection(artisanLocationFromCatalogItem(item))}
             />
           </label>
 

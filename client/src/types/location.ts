@@ -7,6 +7,8 @@ export type LocationListItem = {
   parentId: string | null;
   state?: string;
   area?: string;
+  lat: number;
+  lng: number;
   count: number;
   hasChildren: boolean;
 };
