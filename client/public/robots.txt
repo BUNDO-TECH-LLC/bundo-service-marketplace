@@ -22,4 +22,4 @@ Disallow: /onboarding/
 Disallow: /artisan/onboarding
 Disallow: /artisan/onboarding/
 
-Sitemap: https://bundo-service-marketplace.vercel.app/sitemap.xml
+Sitemap: https://www.bundo.ng/sitemap.xml

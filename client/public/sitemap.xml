@@ -1,77 +1,77 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://bundo-service-marketplace.vercel.app/</loc>
+    <loc>https://www.bundo.ng/</loc>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://bundo-service-marketplace.vercel.app/marketplace</loc>
+    <loc>https://www.bundo.ng/marketplace</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://bundo-service-marketplace.vercel.app/help</loc>
+    <loc>https://www.bundo.ng/help</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://bundo-service-marketplace.vercel.app/help/getting-started</loc>
+    <loc>https://www.bundo.ng/help/getting-started</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://bundo-service-marketplace.vercel.app/help/customers</loc>
+    <loc>https://www.bundo.ng/help/customers</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://bundo-service-marketplace.vercel.app/help/artisans</loc>
+    <loc>https://www.bundo.ng/help/artisans</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://bundo-service-marketplace.vercel.app/help/trust</loc>
+    <loc>https://www.bundo.ng/help/trust</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://bundo-service-marketplace.vercel.app/help/payments</loc>
+    <loc>https://www.bundo.ng/help/payments</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://bundo-service-marketplace.vercel.app/help/disputes</loc>
+    <loc>https://www.bundo.ng/help/disputes</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://bundo-service-marketplace.vercel.app/help/cancellations</loc>
+    <loc>https://www.bundo.ng/help/cancellations</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://bundo-service-marketplace.vercel.app/help/artisan-standards</loc>
+    <loc>https://www.bundo.ng/help/artisan-standards</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://bundo-service-marketplace.vercel.app/help/privacy</loc>
+    <loc>https://www.bundo.ng/help/privacy</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://bundo-service-marketplace.vercel.app/help/support</loc>
+    <loc>https://www.bundo.ng/help/support</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://bundo-service-marketplace.vercel.app/terms</loc>
+    <loc>https://www.bundo.ng/terms</loc>
     <changefreq>yearly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://bundo-service-marketplace.vercel.app/privacy</loc>
+    <loc>https://www.bundo.ng/privacy</loc>
     <changefreq>yearly</changefreq>
     <priority>0.4</priority>
   </url>

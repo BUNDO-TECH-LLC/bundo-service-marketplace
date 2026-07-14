@@ -1,6 +1,6 @@
 /** Public site URL and SEO helpers. Additive only — never throws. */
 
-export const SITE_ORIGIN = 'https://bundo-service-marketplace.vercel.app';
+export const SITE_ORIGIN = 'https://www.bundo.ng';
 
 export const DEFAULT_DOCUMENT_TITLE = 'Bundo | Quality home services on demand';
 
