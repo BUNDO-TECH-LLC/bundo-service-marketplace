@@ -1,0 +1,25 @@
+User-agent: *
+Allow: /
+Allow: /marketplace
+Allow: /help
+Allow: /help/
+Allow: /terms
+Allow: /privacy
+Allow: /artisans/
+
+# Private app surfaces — do not index
+Disallow: /workspace
+Disallow: /workspace/
+Disallow: /admin
+Disallow: /admin/
+Disallow: /login
+Disallow: /signup
+Disallow: /create-account
+Disallow: /forgot-password
+Disallow: /verify-email
+Disallow: /loading
+Disallow: /onboarding/
+Disallow: /artisan/onboarding
+Disallow: /artisan/onboarding/
+
+Sitemap: https://bundo-service-marketplace.vercel.app/sitemap.xml

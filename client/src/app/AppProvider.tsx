@@ -12,6 +12,7 @@ import { useAppRouteSync } from '../hooks/useAppRouteSync';
 import { mergeAuthDrawerIntoSearch } from '../lib/authDrawerPrompt';
 import { isArtisanApplicant, hasArtisanApplicantSubmittedVerification } from '../lib/artisanApplication';
 import { useMarketplaceFilters } from '../hooks/useMarketplaceFilters';
+import { useRouteDocumentTitle } from '../hooks/useRouteDocumentTitle';
 import { useUserLocation } from '../hooks/useUserLocation';
 import { shouldSeedBrowseFromProfile } from '../lib/syncBrowseLocationFromProfile';
 import { LocationPicker } from '../components/LocationPicker';
@@ -54,6 +55,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     ]
   );
   const appData = useAppData(filterState, { notifyConversationError: (msg) => setNotice(msg) });
+  useRouteDocumentTitle(
+    appData.selectedArtisan
+      ? { displayName: appData.selectedArtisan.displayName, city: appData.selectedArtisan.city }
+      : null
+  );
   const [bookingSuccess, setBookingSuccess] = useState<BookingSuccessState | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState<PaymentSuccessState | null>(null);
   const [manualAuthInProgress, setManualAuthInProgress] = useState(false);
